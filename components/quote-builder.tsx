@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { calculateQuote } from "@/lib/calculations";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import {
@@ -9,11 +10,14 @@ import {
   pricingLevels,
   projectTypes
 } from "@/lib/seed-data";
+import {
+  clearActiveQuote,
+  getActiveQuote,
+  saveActiveQuote
+} from "@/lib/quote-storage";
 import type { BasePricingMode, QuoteFormState } from "@/lib/types";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
-import { useRouter } from "next/navigation";
-import { saveActiveQuote } from "@/lib/quote-storage";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -43,6 +47,17 @@ export function QuoteBuilder() {
   const router = useRouter();
   const [quote, setQuote] = useState<QuoteFormState>(() => createDraftQuote());
   const [completionMessage, setCompletionMessage] = useState("");
+  const [hasLoadedStoredQuote, setHasLoadedStoredQuote] = useState(false);
+
+  useEffect(() => {
+    const storedQuote = getActiveQuote();
+
+    if (storedQuote) {
+      setQuote(storedQuote.quote);
+    }
+
+    setHasLoadedStoredQuote(true);
+  }, []);
 
   const result = useMemo(() => calculateQuote(quote), [quote]);
 
@@ -97,6 +112,7 @@ export function QuoteBuilder() {
   }
 
   function resetQuote() {
+    clearActiveQuote();
     setCompletionMessage("");
     setQuote(createDraftQuote());
   }
@@ -108,7 +124,9 @@ export function QuoteBuilder() {
     }
 
     if (!quote.projectStreet.trim()) {
-      setCompletionMessage("Add the project street address before completing the quote.");
+      setCompletionMessage(
+        "Add the project street address before completing the quote."
+      );
       return;
     }
 
@@ -128,12 +146,22 @@ export function QuoteBuilder() {
     }
 
     if (quote.squareFootage <= 0) {
-      setCompletionMessage("Enter the project square footage before completing the quote.");
+      setCompletionMessage(
+        "Enter the project square footage before completing the quote."
+      );
       return;
     }
 
     saveActiveQuote(quote, result);
-      router.push("/quotes/review");
+    router.push("/quotes/review");
+  }
+
+  if (!hasLoadedStoredQuote) {
+    return (
+      <div className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
+        <p className="font-bold text-charcoal/70">Loading quote...</p>
+      </div>
+    );
   }
 
   return (
