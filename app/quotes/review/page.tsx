@@ -4,16 +4,64 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { formatCurrency } from "@/lib/currency";
-import { clearActiveQuote, getActiveQuote, type StoredQuote } from "@/lib/quote-storage";
+import {
+  clearActiveQuote,
+  getActiveQuote,
+  type StoredQuote
+} from "@/lib/quote-storage";
+import { supabase } from "@/lib/supabase";
 
 export default function QuoteReviewPage() {
   const [storedQuote, setStoredQuote] = useState<StoredQuote | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [saveStatus, setSaveStatus] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setStoredQuote(getActiveQuote());
     setHasLoaded(true);
   }, []);
+
+  async function saveQuoteToSupabase() {
+    if (!storedQuote) return;
+
+    setIsSaving(true);
+    setSaveStatus("");
+
+    const { quote, result } = storedQuote;
+
+    const { error } = await supabase.from("quotes").insert({
+      quote_id: quote.quoteId,
+      quote_date: quote.quoteDate,
+      client_name: quote.clientName,
+      client_email: quote.clientEmail || null,
+      project_street: quote.projectStreet,
+      project_city: quote.projectCity,
+      project_state: quote.projectState,
+      project_zip: quote.projectZip,
+      project_type: quote.projectType,
+      square_footage: quote.squareFootage,
+      base_pricing_mode: quote.basePricingMode,
+      manual_base_rate_cents: quote.manualBaseRateCents,
+      high_ceiling_or_complex_switching: quote.highCeilingOrComplexSwitching,
+      pricing_level_id: quote.pricingLevelId,
+      contingency_id: quote.contingencyId,
+      internal_notes: quote.internalNotes || null,
+      quote_data: quote,
+      calculation_data: result,
+      client_quote_total_cents: result.clientQuoteTotalCents,
+      status: "completed"
+    });
+
+    if (error) {
+      setSaveStatus(`Save failed: ${error.message}`);
+      setIsSaving(false);
+      return;
+    }
+
+    setSaveStatus("Quote saved successfully.");
+    setIsSaving(false);
+  }
 
   if (!hasLoaded) {
     return (
@@ -80,8 +128,8 @@ export default function QuoteReviewPage() {
           </h1>
 
           <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
-            Review the quote details before we add permanent saving and PDF
-            export.
+            Review the quote details, save the quote, and then continue toward
+            PDF export.
           </p>
         </div>
 
@@ -105,14 +153,20 @@ export default function QuoteReviewPage() {
             <ReviewField label="Quote ID" value={quote.quoteId} />
             <ReviewField label="Quote Date" value={quote.quoteDate} />
             <ReviewField label="Client" value={quote.clientName} />
-            <ReviewField label="Client Email" value={quote.clientEmail || "Not entered"} />
+            <ReviewField
+              label="Client Email"
+              value={quote.clientEmail || "Not entered"}
+            />
             <ReviewField label="Project Address" value={fullAddress} />
             <ReviewField label="Project Type" value={quote.projectType} />
             <ReviewField
               label="Square Footage"
               value={quote.squareFootage.toLocaleString()}
             />
-            <ReviewField label="Base Rate" value={formatCurrency(result.baseRateCents)} />
+            <ReviewField
+              label="Base Rate"
+              value={formatCurrency(result.baseRateCents)}
+            />
           </div>
 
           <div className="mt-8">
@@ -134,10 +188,14 @@ export default function QuoteReviewPage() {
                 <tbody className="divide-y divide-pine/10 bg-cream">
                   {result.clientFacingLines.map((line) => (
                     <tr key={line.pricingItemId}>
-                      <td className="p-3 font-bold text-charcoal">{line.name}</td>
+                      <td className="p-3 font-bold text-charcoal">
+                        {line.name}
+                      </td>
                       <td className="p-3">{line.quantity.toLocaleString()}</td>
                       <td className="p-3">{line.unitType}</td>
-                      <td className="p-3">{formatCurrency(line.clientUnitPriceCents)}</td>
+                      <td className="p-3">
+                        {formatCurrency(line.clientUnitPriceCents)}
+                      </td>
                       <td className="p-3 font-black text-deep-pine">
                         {formatCurrency(line.clientLineTotalCents)}
                       </td>
@@ -164,11 +222,11 @@ export default function QuoteReviewPage() {
 
             <button
               type="button"
-              disabled
-              className="cursor-not-allowed rounded-full bg-pine/50 px-5 py-3 font-black text-whitewarm"
-              title="Coming next"
+              onClick={saveQuoteToSupabase}
+              disabled={isSaving}
+              className="rounded-full bg-pine px-5 py-3 font-black text-whitewarm hover:bg-deep-pine disabled:cursor-wait disabled:bg-pine/50"
             >
-              Save Quote
+              {isSaving ? "Saving Quote..." : "Save Quote"}
             </button>
 
             <button
@@ -192,10 +250,15 @@ export default function QuoteReviewPage() {
             </button>
           </div>
 
+          {saveStatus ? (
+            <div className="mt-5 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">
+              {saveStatus}
+            </div>
+          ) : null}
+
           <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/70">
-            This review page is currently using temporary browser storage. Next,
-            we will make the dashboard show this quote as a recent completed
-            quote.
+            Saved quotes are now written to Supabase. Next, we will make the
+            dashboard read saved quotes from the database.
           </div>
         </aside>
       </div>
