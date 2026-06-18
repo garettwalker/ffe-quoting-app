@@ -21,7 +21,10 @@ function createDraftQuote(): QuoteFormState {
     quoteDate: today,
     clientName: "",
     clientEmail: "",
-    projectAddress: "",
+    projectStreet: "",
+    projectCity: "",
+    projectState: "NC",
+    projectZip: "",
     projectType: "Custom Home",
     squareFootage: 0,
     basePricingMode: "auto",
@@ -36,6 +39,7 @@ function createDraftQuote(): QuoteFormState {
 
 export function QuoteBuilder() {
   const [quote, setQuote] = useState<QuoteFormState>(() => createDraftQuote());
+  const [completionMessage, setCompletionMessage] = useState("");
 
   const result = useMemo(() => calculateQuote(quote), [quote]);
 
@@ -43,6 +47,7 @@ export function QuoteBuilder() {
     key: K,
     value: QuoteFormState[K]
   ) {
+    setCompletionMessage("");
     setQuote((current) => ({
       ...current,
       [key]: value
@@ -50,6 +55,7 @@ export function QuoteBuilder() {
   }
 
   function handleAddLineItem(pricingItemId: string) {
+    setCompletionMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: [
@@ -63,6 +69,7 @@ export function QuoteBuilder() {
   }
 
   function handleUpdateQuantity(pricingItemId: string, quantity: number) {
+    setCompletionMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: current.lineItems.map((lineItem) =>
@@ -77,6 +84,7 @@ export function QuoteBuilder() {
   }
 
   function handleRemoveLineItem(pricingItemId: string) {
+    setCompletionMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: current.lineItems.filter(
@@ -86,7 +94,46 @@ export function QuoteBuilder() {
   }
 
   function resetQuote() {
+    setCompletionMessage("");
     setQuote(createDraftQuote());
+  }
+
+  function completeQuote() {
+    if (!quote.clientName.trim()) {
+      setCompletionMessage("Add a client name before completing the quote.");
+      return;
+    }
+
+    if (!quote.projectStreet.trim()) {
+      setCompletionMessage("Add the project street address before completing the quote.");
+      return;
+    }
+
+    if (!quote.projectCity.trim()) {
+      setCompletionMessage("Add the project city before completing the quote.");
+      return;
+    }
+
+    if (!quote.projectState.trim()) {
+      setCompletionMessage("Add the project state before completing the quote.");
+      return;
+    }
+
+    if (!quote.projectZip.trim()) {
+      setCompletionMessage("Add the project ZIP code before completing the quote.");
+      return;
+    }
+
+    if (quote.squareFootage <= 0) {
+      setCompletionMessage("Enter the project square footage before completing the quote.");
+      return;
+    }
+
+    setCompletionMessage(
+      `Quote ${quote.quoteId} is ready. Final quote total: ${formatCurrency(
+        result.clientQuoteTotalCents
+      )}. Saving, history, and PDF export come next.`
+    );
   }
 
   return (
@@ -155,13 +202,48 @@ export function QuoteBuilder() {
               />
             </Field>
 
-            <Field label="Project Address">
+            <Field label="Address">
               <input
-                value={quote.projectAddress}
+                value={quote.projectStreet}
                 onChange={(event) =>
-                  updateQuote("projectAddress", event.target.value)
+                  updateQuote("projectStreet", event.target.value)
                 }
-                placeholder="Project location"
+                placeholder="Street address"
+                className="form-input"
+              />
+            </Field>
+
+            <Field label="City">
+              <input
+                value={quote.projectCity}
+                onChange={(event) =>
+                  updateQuote("projectCity", event.target.value)
+                }
+                placeholder="City"
+                className="form-input"
+              />
+            </Field>
+
+            <Field label="State">
+              <input
+                value={quote.projectState}
+                onChange={(event) =>
+                  updateQuote("projectState", event.target.value.toUpperCase())
+                }
+                maxLength={2}
+                placeholder="NC"
+                className="form-input"
+              />
+            </Field>
+
+            <Field label="ZIP Code">
+              <input
+                inputMode="numeric"
+                value={quote.projectZip}
+                onChange={(event) =>
+                  updateQuote("projectZip", event.target.value)
+                }
+                placeholder="27021"
                 className="form-input"
               />
             </Field>
@@ -199,10 +281,14 @@ export function QuoteBuilder() {
               <input
                 type="number"
                 min="0"
-                value={quote.squareFootage}
+                value={quote.squareFootage === 0 ? "" : quote.squareFootage}
                 onChange={(event) =>
-                  updateQuote("squareFootage", Number(event.target.value))
+                  updateQuote(
+                    "squareFootage",
+                    event.target.value === "" ? 0 : Number(event.target.value)
+                  )
                 }
+                placeholder="Enter sq ft"
                 className="form-input"
               />
             </Field>
@@ -230,13 +316,20 @@ export function QuoteBuilder() {
                   type="number"
                   min="0"
                   step="0.01"
-                  value={centsToDollars(quote.manualBaseRateCents)}
+                  value={
+                    quote.manualBaseRateCents === 0
+                      ? ""
+                      : centsToDollars(quote.manualBaseRateCents)
+                  }
                   onChange={(event) =>
                     updateQuote(
                       "manualBaseRateCents",
-                      dollarsToCents(Number(event.target.value))
+                      event.target.value === ""
+                        ? 0
+                        : dollarsToCents(Number(event.target.value))
                     )
                   }
+                  placeholder="Enter rate per sq ft"
                   className="form-input"
                 />
               </Field>
@@ -338,6 +431,33 @@ export function QuoteBuilder() {
           <div className="mt-5 rounded-soft bg-sand p-4 text-sm font-bold text-charcoal/75">
             {defaultQuoteNotes}
           </div>
+        </section>
+
+        <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
+          <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+            <div>
+              <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+                Complete Quote
+              </p>
+              <p className="font-bold text-charcoal/70">
+                Review the live total, then complete the quote when ready.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={completeQuote}
+              className="rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
+            >
+              Complete Quote
+            </button>
+          </div>
+
+          {completionMessage ? (
+            <div className="mt-5 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">
+              {completionMessage}
+            </div>
+          ) : null}
         </section>
       </div>
 
