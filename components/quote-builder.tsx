@@ -474,7 +474,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className="grid gap-2">
+    <label className="grid min-w-0 gap-2">
       <span className="text-sm font-black text-deep-pine">{label}</span>
       {children}
     </label>
