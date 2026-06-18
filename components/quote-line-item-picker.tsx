@@ -77,8 +77,16 @@ export function QuoteLineItemPicker({
               return (
                 <div
                   key={lineItem.pricingItemId}
-                  className="grid gap-4 bg-cream p-4 md:grid-cols-[1fr_120px_auto]"
+                  className="grid gap-4 bg-cream p-4 md:grid-cols-[96px_1fr_150px] md:items-end"
                 >
+                  <button
+                    type="button"
+                    onClick={() => onRemoveLineItem(lineItem.pricingItemId)}
+                    className="h-11 rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                  >
+                    Remove
+                  </button>
+
                   <div>
                     <p className="font-black text-deep-pine">{item.name}</p>
                     <p className="text-sm font-bold text-charcoal/60">
@@ -94,24 +102,18 @@ export function QuoteLineItemPicker({
                     <input
                       type="number"
                       min="0"
-                      value={lineItem.quantity}
+                      value={lineItem.quantity === 0 ? "" : lineItem.quantity}
                       onChange={(event) =>
                         onUpdateQuantity(
                           lineItem.pricingItemId,
-                          Number(event.target.value)
+                          event.target.value === ""
+                            ? 0
+                            : Number(event.target.value)
                         )
                       }
                       className="focus-ring h-11 rounded-soft border border-pine/20 bg-whitewarm px-3 font-bold text-charcoal"
                     />
                   </label>
-
-                  <button
-                    type="button"
-                    onClick={() => onRemoveLineItem(lineItem.pricingItemId)}
-                    className="self-end rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-                  >
-                    Remove
-                  </button>
                 </div>
               );
             })}
