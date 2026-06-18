@@ -67,6 +67,14 @@ a {
   color: #1d211d;
 }
 
+input[type="date"].form-input {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+}
+
 .form-input:focus {
   outline: 3px solid rgba(165, 101, 67, 0.22);
   border-color: rgba(165, 101, 67, 0.7);
