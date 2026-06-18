@@ -35,7 +35,10 @@ export type QuoteFormState = {
   quoteDate: string;
   clientName: string;
   clientEmail: string;
-  projectAddress: string;
+  projectStreet: string;
+  projectCity: string;
+  projectState: string;
+  projectZip: string;
   projectType: string;
   squareFootage: number;
   basePricingMode: BasePricingMode;
