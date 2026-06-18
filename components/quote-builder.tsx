@@ -12,6 +12,8 @@ import {
 import type { BasePricingMode, QuoteFormState } from "@/lib/types";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
+import { useRouter } from "next/navigation";
+import { saveActiveQuote } from "@/lib/quote-storage";
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -38,6 +40,7 @@ function createDraftQuote(): QuoteFormState {
 }
 
 export function QuoteBuilder() {
+  const router = useRouter();
   const [quote, setQuote] = useState<QuoteFormState>(() => createDraftQuote());
   const [completionMessage, setCompletionMessage] = useState("");
 
@@ -129,11 +132,8 @@ export function QuoteBuilder() {
       return;
     }
 
-    setCompletionMessage(
-      `Quote ${quote.quoteId} is ready. Final quote total: ${formatCurrency(
-        result.clientQuoteTotalCents
-      )}. Saving, history, and PDF export come next.`
-    );
+    saveActiveQuote(quote, result);
+      router.push("/quotes/review");
   }
 
   return (
