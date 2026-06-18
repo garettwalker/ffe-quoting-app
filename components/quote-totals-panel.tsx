@@ -7,7 +7,7 @@ type QuoteTotalsPanelProps = {
 
 export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
   return (
-    <aside className="sticky top-28 rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft">
+    <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
       <p className="mb-2 text-sm font-black uppercase tracking-[0.16em] text-clay">
         Live Total
       </p>
