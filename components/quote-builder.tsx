@@ -137,8 +137,8 @@ export function QuoteBuilder() {
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-6">
+    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-6">
         <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
           <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
@@ -397,8 +397,8 @@ export function QuoteBuilder() {
             Customer-Facing Detail
           </p>
 
-          <div className="overflow-hidden rounded-xl1 border border-pine/10">
-            <table className="w-full border-collapse text-left text-sm">
+          <div className="responsive-table-wrap rounded-xl1 border border-pine/10">
+            <table className="responsive-table w-full border-collapse text-left text-sm">
               <thead className="bg-sand text-deep-pine">
                 <tr>
                   <th className="p-3 font-black">Item</th>
