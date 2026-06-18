@@ -39,7 +39,7 @@ export function QuoteLineItemPicker({
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
         <select
-          className="focus-ring min-h-12 rounded-soft border border-pine/20 bg-whitewarm px-4 font-bold text-charcoal"
+          className="focus-ring min-h-12 min-w-0 rounded-soft border border-pine/20 bg-whitewarm px-4 font-bold text-charcoal"
           defaultValue=""
           onChange={(event) => {
             if (!event.target.value) return;
@@ -77,43 +77,47 @@ export function QuoteLineItemPicker({
               return (
                 <div
                   key={lineItem.pricingItemId}
-                  className="grid gap-4 bg-cream p-4 md:grid-cols-[96px_1fr_150px] md:items-end"
+                  className="min-w-0 bg-cream p-4"
                 >
-                  <button
-                    type="button"
-                    onClick={() => onRemoveLineItem(lineItem.pricingItemId)}
-                    className="h-11 rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-                  >
-                    Remove
-                  </button>
-
-                  <div>
-                    <p className="font-black text-deep-pine">{item.name}</p>
-                    <p className="text-sm font-bold text-charcoal/60">
+                  <div className="min-w-0">
+                    <p className="break-words font-black text-deep-pine">
+                      {item.name}
+                    </p>
+                    <p className="break-words text-sm font-bold text-charcoal/60">
                       {item.category} • {item.unitType} •{" "}
                       {formatCurrency(item.basePriceCents)}
                     </p>
                   </div>
 
-                  <label className="grid gap-1">
-                    <span className="text-xs font-black uppercase tracking-[0.12em] text-clay">
-                      Qty
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      value={lineItem.quantity === 0 ? "" : lineItem.quantity}
-                      onChange={(event) =>
-                        onUpdateQuantity(
-                          lineItem.pricingItemId,
-                          event.target.value === ""
-                            ? 0
-                            : Number(event.target.value)
-                        )
-                      }
-                      className="focus-ring h-11 rounded-soft border border-pine/20 bg-whitewarm px-3 font-bold text-charcoal"
-                    />
-                  </label>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[180px_auto] sm:items-end sm:justify-between">
+                    <label className="grid min-w-0 gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-clay">
+                        Qty
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        value={lineItem.quantity === 0 ? "" : lineItem.quantity}
+                        onChange={(event) =>
+                          onUpdateQuantity(
+                            lineItem.pricingItemId,
+                            event.target.value === ""
+                              ? 0
+                              : Number(event.target.value)
+                          )
+                        }
+                        className="focus-ring h-12 w-full min-w-0 rounded-soft border border-pine/20 bg-whitewarm px-3 font-bold text-charcoal"
+                      />
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => onRemoveLineItem(lineItem.pricingItemId)}
+                      className="h-12 rounded-full border border-pine/20 px-5 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm sm:w-auto"
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               );
             })}
