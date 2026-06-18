@@ -52,6 +52,16 @@ a {
   margin-inline: auto;
 }
 
+@media (max-width: 680px) {
+  .app-container {
+    width: min(100% - 24px, 1180px);
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+}
+
 .form-input {
   min-height: 48px;
   width: 100%;
@@ -66,6 +76,26 @@ a {
 .form-input:focus {
   outline: 3px solid rgba(165, 101, 67, 0.22);
   border-color: rgba(165, 101, 67, 0.7);
+}
+
+.responsive-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.responsive-table {
+  min-width: 760px;
+}
+
+@media (max-width: 680px) {
+  .mobile-stack {
+    grid-template-columns: 1fr !important;
+  }
+
+  .mobile-full {
+    width: 100%;
+  }
 }
 .focus-ring:focus-visible {
   outline: 3px solid rgba(165, 101, 67, 0.28);
