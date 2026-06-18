@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { DashboardEmptyState } from "@/components/dashboard-empty-state";
+import { DashboardActiveQuote } from "@/components/dashboard-active-quote";
 
 export default function DashboardPage() {
   return (
@@ -19,6 +20,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      <DashboardActiveQuote />
       <DashboardEmptyState />
     </AppShell>
   );
