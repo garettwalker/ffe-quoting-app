@@ -1,3 +1,4 @@
+import React from "react";
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 // A react-pdf recreation of the on-screen Detailed Quote printable.
@@ -65,7 +66,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     paddingBottom: 18,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(52,66,54,0.15)",
+    borderBottomColor: "#e0e1db",
     marginBottom: 24
   },
   headerLeft: {
@@ -84,7 +85,7 @@ const styles = StyleSheet.create({
   },
   businessEmail: {
     fontSize: 9.5,
-    color: "rgba(29,33,29,0.7)"
+    color: "#61635f"
   },
   headerRight: {
     alignItems: "flex-end"
@@ -102,7 +103,7 @@ const styles = StyleSheet.create({
   },
   quoteDate: {
     fontSize: 9.5,
-    color: "rgba(29,33,29,0.7)"
+    color: "#61635f"
   },
   infoGrid: {
     flexDirection: "row",
@@ -128,7 +129,7 @@ const styles = StyleSheet.create({
   },
   infoSecondary: {
     fontSize: 9.5,
-    color: "rgba(29,33,29,0.7)"
+    color: "#61635f"
   },
   sectionLabel: {
     fontSize: 8,
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
   },
   table: {
     borderWidth: 1,
-    borderColor: "rgba(52,66,54,0.15)",
+    borderColor: "#e0e1db",
     borderRadius: 6
   },
   tableHeader: {
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.sand,
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(52,66,54,0.15)"
+    borderBottomColor: "#e0e1db"
   },
   th: {
     fontSize: 9,
@@ -162,7 +163,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     backgroundColor: COLORS.cream,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(52,66,54,0.08)"
+    borderBottomColor: "#eeeee8"
   },
   td: {
     fontSize: 9.5,
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "rgba(52,66,54,0.2)",
+    borderColor: "#d6d7d1",
     backgroundColor: COLORS.cream,
     borderRadius: 8,
     paddingVertical: 12,
@@ -213,18 +214,18 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 9.5,
     lineHeight: 1.5,
-    color: "rgba(29,33,29,0.8)",
+    color: "#4a4d49",
     fontFamily: "Helvetica-Bold"
   },
   footer: {
     marginTop: 36,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "rgba(52,66,54,0.15)",
+    borderTopColor: "#e0e1db",
     textAlign: "center",
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: "rgba(29,33,29,0.6)"
+    color: "#777975"
   }
 });
 
@@ -301,7 +302,7 @@ export function DetailedQuotePdfDocument(props: DetailedQuotePdfProps) {
           </View>
           {lines.length === 0 ? (
             <View style={{ ...styles.tableRow, borderBottomWidth: 0 }}>
-              <Text style={{ ...styles.td, ...styles.tdBold, color: "rgba(29,33,29,0.5)" }}>
+              <Text style={{ ...styles.td, ...styles.tdBold, color: "#8e8f8b" }}>
                 No priced items on this quote.
               </Text>
             </View>
