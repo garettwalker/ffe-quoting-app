@@ -11,8 +11,9 @@ type StatusItem = {
 const BUILD_ITEMS: StatusItem[] = [
   { label: "Quote builder & calculator", status: "Done" },
   { label: "Save to Supabase", status: "Done" },
-  { label: "Dashboard quote history", status: "In progress" },
-  { label: "Saved quote view (/quotes/[id])", status: "Next" },
+  { label: "Dashboard quote history", status: "Done" },
+  { label: "Saved quote view (/quotes/[id])", status: "Done" },
+  { label: "Prevent duplicate saves", status: "Next" },
   { label: "PDF exports", status: "Later" },
   { label: "Owner login", status: "Launch prep" }
 ];

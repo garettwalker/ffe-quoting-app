@@ -124,14 +124,12 @@ function QuotesTable({ quotes }: { quotes: SavedQuoteRow[] }) {
                 {formatDate(quote.created_at)}
               </td>
               <td className="p-3">
-                <button
-                  type="button"
-                  disabled
-                  title="Saved quote view coming next"
-                  className="cursor-not-allowed rounded-full border border-pine/15 px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-deep-pine/45"
+                <Link
+                  href={`/quotes/${quote.id}`}
+                  className="inline-flex items-center justify-center rounded-full bg-pine px-4 py-2 text-xs font-black uppercase tracking-[0.1em] text-whitewarm shadow-card transition hover:bg-deep-pine"
                 >
                   Open
-                </button>
+                </Link>
               </td>
             </tr>
           ))}
