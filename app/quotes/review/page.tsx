@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { formatCurrency } from "@/lib/currency";
 import {
@@ -13,6 +14,7 @@ import {
 import { supabase } from "@/lib/supabase";
 
 export default function QuoteReviewPage() {
+  const router = useRouter();
   const [storedQuote, setStoredQuote] = useState<StoredQuote | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
@@ -278,29 +280,32 @@ export default function QuoteReviewPage() {
             >
               Generate PDF
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                clearActiveQuote();
-                setStoredQuote(null);
-              }}
-              className="rounded-full border border-clay/25 px-5 py-3 font-black text-clay hover:bg-clay hover:text-whitewarm"
-            >
-              Clear Review Quote
-            </button>
           </div>
 
           {saveStatus ? (
             <div className="mt-5 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">
               {saveStatus}
-              {hasSaved && savedQuoteId ? (
-                <Link
-                  href={`/quotes/${savedQuoteId}`}
-                  className="mt-3 inline-flex font-black text-clay underline decoration-clay/40 decoration-2 underline-offset-4"
-                >
-                  View saved quote
-                </Link>
+              {hasSaved ? (
+                <div className="mt-3 flex flex-col gap-2">
+                  {savedQuoteId ? (
+                    <Link
+                      href={`/quotes/${savedQuoteId}`}
+                      className="font-black text-clay underline decoration-clay/40 decoration-2 underline-offset-4"
+                    >
+                      View saved quote
+                    </Link>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearActiveQuote();
+                      router.push("/quotes/new");
+                    }}
+                    className="self-start font-black text-deep-pine underline decoration-pine/30 decoration-2 underline-offset-4"
+                  >
+                    Start a new quote
+                  </button>
+                </div>
               ) : null}
             </div>
           ) : null}
