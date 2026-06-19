@@ -10,6 +10,7 @@ import {
   getActiveQuote,
   type StoredQuote
 } from "@/lib/quote-storage";
+import { resolveQuoteIdForSave } from "@/lib/quote-id";
 import { supabase } from "@/lib/supabase";
 
 export default function QuoteReviewPage() {
@@ -33,8 +34,22 @@ export default function QuoteReviewPage() {
 
     const { quote, result, savedQuoteId } = storedQuote;
 
+    // Resolve the quote id: keep a custom id the owner typed, otherwise ask the
+    // server for the next atomic daily number. Done before the payload is
+    // built so the assigned id is what gets persisted.
+    let resolvedQuoteId: string;
+    try {
+      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId);
+    } catch (err) {
+      setSaveStatus(
+        `Save failed: ${err instanceof Error ? err.message : "Unknown error"}`
+      );
+      setIsSaving(false);
+      return;
+    }
+
     const payload = {
-      quote_id: quote.quoteId,
+      quote_id: resolvedQuoteId,
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
@@ -50,7 +65,7 @@ export default function QuoteReviewPage() {
       pricing_level_id: quote.pricingLevelId,
       contingency_id: quote.contingencyId,
       internal_notes: quote.internalNotes || null,
-      quote_data: quote,
+      quote_data: { ...quote, quoteId: resolvedQuoteId },
       calculation_data: result,
       client_quote_total_cents: result.clientQuoteTotalCents,
       status: "prepared",
@@ -71,6 +86,10 @@ export default function QuoteReviewPage() {
       }
 
       clearActiveQuote();
+      setStoredQuote({
+        ...storedQuote,
+        quote: { ...quote, quoteId: resolvedQuoteId }
+      });
       setSaveStatus("Prepared. It appears under Prepared on the dashboard.");
       setHasSaved(true);
       setIsSaving(false);
@@ -92,7 +111,11 @@ export default function QuoteReviewPage() {
       return;
     }
 
-    setStoredQuote({ ...storedQuote, savedQuoteId: data.id });
+    setStoredQuote({
+      ...storedQuote,
+      quote: { ...quote, quoteId: resolvedQuoteId },
+      savedQuoteId: data.id
+    });
     clearActiveQuote();
     setSaveStatus("Prepared. It appears under Prepared on the dashboard.");
     setHasSaved(true);
@@ -192,7 +215,7 @@ export default function QuoteReviewPage() {
           </p>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <ReviewField label="Quote ID" value={quote.quoteId} />
+            <ReviewField label="Quote ID" value={quote.quoteId || "Assigned on save"} />
             <ReviewField label="Quote Date" value={quote.quoteDate} />
             <ReviewField label="Client" value={quote.clientName} />
             <ReviewField

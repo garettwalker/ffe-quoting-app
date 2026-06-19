@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { DashboardBuildStatus } from "@/components/dashboard-build-status";
 import { DashboardQuoteSection } from "@/components/dashboard-quote-section";
 import { lifecycleStage } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
@@ -90,10 +89,6 @@ export default async function QuotesPage() {
         quotes={paid}
         emptyCopy="No fully paid quotes yet. When every invoice on a job is marked paid, it lands here."
       />
-
-      {/* TEMPORARY - remove this block and the DashboardBuildStatus
-          component once the build is complete. */}
-      <DashboardBuildStatus />
     </AppShell>
   );
 }

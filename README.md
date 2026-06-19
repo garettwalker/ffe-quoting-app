@@ -58,7 +58,6 @@ components
   app-shell.tsx
   dashboard-active-quote.tsx     // slim resume card for unsaved working copies
   dashboard-quote-section.tsx   // one pipeline stage (Draft / Prepared / Client Accepted)
-  dashboard-build-status.tsx     // TEMPORARY: internal build tracker, rendered on /quotes, safe to delete later
   status-badge.tsx              // draft/prepared/accepted + invoice paid/unpaid badges
   quote-status-button.tsx       // client button that updates quote.status then refreshes
   quote-builder.tsx
@@ -90,6 +89,7 @@ lib
   invoice-calculations.ts       // invoice amount math + outstanding balance
   pdf-logo.ts                   // server-only: reads /public/ffe-logo.png into a base64 data URI for react-pdf
   pricing.ts                    // server-side reads of the live pricing catalog + settings
+  quote-id.ts                   // resolveQuoteIdForSave: keep a custom id or ask the server for the next atomic daily number
   quote-storage.ts
   supabase.ts
   types.ts
@@ -290,12 +290,50 @@ create table if not exists public.quotes (
   quote_data jsonb not null,
   calculation_data jsonb not null,
   client_quote_total_cents integer not null,
-  status text not null default 'completed',
+  status text not null default 'draft',
   invoice_data jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 ```
+
+The quote ID is a daily sequence (`Q-YYYYMMDD-NNN`) assigned **server-side at save time** so two people saving at the same instant can never collide. The builder leaves the Quote ID blank (placeholder "Assigned on save") until the quote is actually saved; the owner may type a custom ID, which is used as-is. The server side is a small per-day counter table plus a `security definer` function that atomically increments it via `INSERT ... ON CONFLICT ... RETURNING` and returns the formatted ID. The function bypasses RLS on the counter table, so the table itself has no policies (direct anon access is denied; only the function can touch it). Run once in the Supabase SQL Editor before deploying the server-side sequencing:
+```sql
+create table if not exists public.quote_sequences (
+  day text primary key,        -- 'YYYYMMDD'
+  seq integer not null default 0
+);
+
+alter table public.quote_sequences enable row level security;
+-- No policies: direct anon access is denied. The security-definer function
+-- below is the only path that can read/write the counter.
+
+create or replace function public.next_quote_id()
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_day text;
+  v_seq integer;
+begin
+  v_day := to_char(now(), 'YYYYMMDD');
+  insert into public.quote_sequences (day, seq) values (v_day, 1)
+    on conflict (day) do update set seq = public.quote_sequences.seq + 1
+    returning seq into v_seq;
+  return 'Q-' || v_day || '-' || lpad(v_seq::text, 3, '0');
+end;
+$$;
+
+grant execute on function public.next_quote_id() to anon;
+
+-- Defensive default: a raw insert that omits status lands as draft, not the
+-- legacy 'completed'. (Every app insert sets status explicitly, so this only
+-- guards direct/SQL inserts.)
+alter table public.quotes alter column status set default 'draft';
+```
+The day prefix uses the database `now()` (UTC on Supabase), which matches the client-side `quote_date` the builder already sets from `new Date().toISOString()` (also UTC), so a quote's ID prefix and its `quote_date` always agree.
 
 RLS is enabled. Development policies (anon can insert, select, update, delete). These are intentionally permissive for the build phase and **must be tightened before production** (add auth, limit to owner/admin, move writes through server actions if possible). Current dev policies:
 ```sql
@@ -346,7 +384,7 @@ Done:
 - Saved quote view (`/quotes/[id]`) and edit (`/quotes/[id]/edit`)
 - Delete quote from Supabase
 - Owner-only internal notes (not shown to customer)
-- Daily-sequence quote IDs (client-side): new quotes get the next number for today from Supabase (e.g. Q-20260618-001, -002, -003)
+- Daily-sequence quote IDs assigned server-side at save time: a Postgres `next_quote_id()` function atomically hands out `Q-YYYYMMDD-NNN` (e.g. Q-20260618-001, -002, -003), so two people saving at once can never collide. The builder leaves the Quote ID blank (placeholder "Assigned on save") until the quote is saved; a custom ID typed by the owner is used as-is. The number is reserved only when the quote is actually saved, so abandoned builder sessions do not create gaps in client-facing IDs.
 - Printable Detailed Quote page (`/quotes/[id]/print`) using the browser print dialog (no PDF dependency yet)
 - Printable Summary Quote page (`/quotes/[id]/summary`) using the browser print dialog. Condensed customer-facing version: one subtotal per pricing category plus the quote total, no unit prices. Reuses the printable-document pattern; category grouping via `summarizeByCategory` in `lib/calculations.ts`.
 - Quote status pipeline: draft, prepared, accepted with manual stage buttons on the `/quotes` pipeline and saved-quote page
@@ -361,13 +399,11 @@ Pending (rough priority):
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
 - Access-level restriction: only admin may pull a quote back out of the invoicing lifecycle (the "Reopen as prepared" and "Move back to drafts" actions on Client Accepted / Pending Payments / Paid in Full quotes). Non-admin users can move quotes forward but not reopen an invoiced or paid quote. Gate the `QuoteStatusButton` instances that set `newStatus` to `prepared` or `draft` on an accepted quote (in `app/quotes/[id]/page.tsx` and `components/dashboard-quote-section.tsx`) behind an admin-role check once auth exists. Pairs with the RLS tightening item below.
 - **Review this Pending list on every change** and remove (or mark complete) any item that has been accomplished, so the list stays accurate and does not drift.
-- Tighten Supabase RLS for production (remove anon policies, add auth) — includes the five new pricing tables and `app_settings`; gate `/pricing-admin` to admin once auth exists
-- Move quote ID sequencing server-side for hard multi-user concurrency safety (the current client-side sequence is fine for a single owner)
-- Optional: change the `quotes.status` column default from `completed` to `draft`
-- Remove the temporary `dashboard-build-status.tsx` component once the build is complete
+- Tighten Supabase RLS for production (remove anon policies, add auth) — includes the five new pricing tables and `app_settings`; gate `/pricing-admin` to admin once auth exists. Blocked on the owner/admin login work: removing anon access before auth exists would lock the app out of its own data, so this waits until after auth.
 
 ## Recent work (history)
 
+- 2026-06-19: Production hardening pass. (1) Moved quote-ID sequencing server-side. The builder no longer guesses today's next number client-side (a race that could hand two simultaneous saves the same ID); instead a Postgres `next_quote_id()` function atomically increments a per-day counter (`public.quote_sequences`) via `INSERT ... ON CONFLICT ... RETURNING` and returns `Q-YYYYMMDD-NNN`. The number is reserved at save time, not when the builder opens, so abandoned builder sessions do not create gaps in client-facing IDs; the builder's Quote ID field is blank with a placeholder "Assigned on save" until the quote is saved, and a custom ID typed by the owner is still used as-is. New `lib/quote-id.ts` (`resolveQuoteIdForSave`) is shared by the builder's Save-as-draft and the review page's Prepare paths. Owner must run the one-time SQL (counter table + `security definer` function + grant + `quotes.status` default → `draft`) before deploy. (2) Flipped the `quotes.status` column default from legacy `completed` to `draft` (defensive — every app insert sets status explicitly). (3) Deleted the temporary `components/dashboard-build-status.tsx` build tracker and its usage on `/quotes`. RLS tightening is intentionally deferred until owner/admin login exists.
 - 2026-06-19: Renamed the quote/invoice PDF entry buttons. The links that lead to the Download PDF pages used to say "Print" (e.g. "Print Detailed Quote", "Print Summary Quote", and a bare "Print" on invoices and the dashboard cards), which implied printing rather than downloading. Now read "Detailed Quote PDF" / "Summary Quote PDF" (saved-quote and review pages), "PDF" (invoice cards and dashboard cards), and the review-page disabled tooltip reads "Save the quote first to download". The URL segments stay `/print` (internal, not user-facing); only the visible labels changed.
 - 2026-06-19: Completed the PDF export upgrade across all four customer-facing printables. Each now has one-click Download PDF rendered server-side with `@react-pdf/renderer`. New shared module `components/pdf/pdf-shared.tsx` holds the colors, page style, and header/info-grid/total/notes/footer/list building blocks (copied from the Detailed Quote styles so every PDF looks consistent; the Detailed Quote stays self-contained). New `components/pdf/summary-quote-document.tsx` (condensed category-subtotal summary) and `components/pdf/invoice-document.tsx` (initial/finish invoice with the previously-invoiced sub-box on the finish invoice). New server helpers `lib/summary-quote-pdf.ts` and `lib/invoice-pdf.ts` load the saved snapshot + live settings and build the pre-formatted props, shared by each preview page and its PDF route (`app/quotes/[id]/summary/pdf/route.tsx`, `app/quotes/[id]/invoices/[kind]/pdf/route.tsx`), so the on-screen preview and the downloaded PDF can never drift apart. The Summary and invoice print pages were refactored to render from the shared props and swap the old `window.print()` button for a Download PDF link. Removed the now-dead browser-print components (`print-quote-button`, `invoice-print-button`) and the `.no-print` / `.print-document` / `@page` / `@media print` CSS from `globals.css`. `categoryDisplayName` moved to `lib/calculations.ts` so the Summary preview and PDF agree on category labels.
 - 2026-06-19: Fixed red lines/borders in the Detailed Quote PDF. The subtle `rgba(...)` borders and muted text rendered as red/dark artifacts because react-pdf composites alpha-channel colors inconsistently through the PDF graphics state. Replaced every `rgba()` color in `components/pdf/detailed-quote-document.tsx` with a solid hex pre-blended against the page background so it looks the same to the eye but has no alpha channel. Also added the missing `import React`.

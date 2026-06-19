@@ -10,6 +10,7 @@ import {
   getActiveQuote,
   saveActiveQuote
 } from "@/lib/quote-storage";
+import { resolveQuoteIdForSave } from "@/lib/quote-id";
 import { supabase } from "@/lib/supabase";
 import type { BasePricingMode, PricingCatalog, QuoteFormState } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
@@ -20,7 +21,7 @@ const today = new Date().toISOString().slice(0, 10);
 
 function createDraftQuote(): QuoteFormState {
   return {
-    quoteId: generateTemporaryQuoteId(),
+    quoteId: "",
     quoteDate: today,
     clientName: "",
     clientEmail: "",
@@ -89,18 +90,11 @@ export function QuoteBuilder({
       return;
     }
 
-    // Truly new quote: assign a unique sequential quote id for today based on
-    // what is already saved in Supabase, so ids do not duplicate. Only update
-    // if the owner has not already typed a custom id into the field.
+    // Truly new quote: the quote id is left blank and assigned by the server at
+    // save time (see resolveQuoteIdForSave), so the owner does not see a number
+    // until the quote is actually saved and two people saving at once can never
+    // collide on the same id.
     setHasLoadedStoredQuote(true);
-    const placeholderId = quote.quoteId;
-    nextQuoteIdForToday().then((nextId) => {
-      setQuote((current) =>
-        current.quoteId === placeholderId
-          ? { ...current, quoteId: nextId }
-          : current
-      );
-    });
   }, [initialQuote]);
 
   const result = useMemo(
@@ -225,8 +219,26 @@ export function QuoteBuilder({
     setIsSavingDraft(true);
     setDraftMessage("");
 
+    // Resolve the quote id: keep a custom id the owner typed, otherwise ask the
+    // server for the next atomic daily number. Done before the payload is
+    // built so the assigned id is what gets persisted (and remembered in the
+    // form so a follow-up re-save reuses it instead of asking again).
+    let resolvedQuoteId: string;
+    try {
+      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId);
+    } catch (err) {
+      setDraftMessage(
+        `Draft save failed: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+      setIsSavingDraft(false);
+      return;
+    }
+    setQuote((current) => ({ ...current, quoteId: resolvedQuoteId }));
+
     const payload = {
-      quote_id: quote.quoteId,
+      quote_id: resolvedQuoteId,
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
@@ -242,7 +254,7 @@ export function QuoteBuilder({
       pricing_level_id: quote.pricingLevelId,
       contingency_id: quote.contingencyId,
       internal_notes: quote.internalNotes || null,
-      quote_data: quote,
+      quote_data: { ...quote, quoteId: resolvedQuoteId },
       calculation_data: result,
       client_quote_total_cents: result.clientQuoteTotalCents,
       status: "draft",
@@ -350,6 +362,7 @@ export function QuoteBuilder({
               <input
                 value={quote.quoteId}
                 onChange={(event) => updateQuote("quoteId", event.target.value)}
+                placeholder="Assigned on save"
                 className="form-input"
               />
             </Field>
@@ -717,39 +730,4 @@ function Field({
       {children}
     </label>
   );
-}
-
-function generateTemporaryQuoteId(): string {
-  const date = new Date();
-  const yyyymmdd = date.toISOString().slice(0, 10).replaceAll("-", "");
-  return `Q-${yyyymmdd}-001`;
-}
-
-async function nextQuoteIdForToday(): Promise<string> {
-  const yyyymmdd = new Date().toISOString().slice(0, 10).replaceAll("-", "");
-  const prefix = `Q-${yyyymmdd}-`;
-
-  try {
-    const { data, error } = await supabase
-      .from("quotes")
-      .select("quote_id")
-      .like("quote_id", `${prefix}%`);
-
-    if (error || !data) {
-      return `${prefix}001`;
-    }
-
-    let max = 0;
-    for (const row of data as { quote_id: string }[]) {
-      const n = parseInt(row.quote_id.slice(prefix.length), 10);
-      if (!Number.isNaN(n) && n > max) {
-        max = n;
-      }
-    }
-
-    const next = (max + 1).toString().padStart(3, "0");
-    return `${prefix}${next}`;
-  } catch {
-    return `${prefix}001`;
-  }
 }
