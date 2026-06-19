@@ -64,6 +64,37 @@ export type InvoiceData = {
   invoices: InvoiceRecord[];
 };
 
+// One invoice flattened for the Accounts Receivable view. `outstandingCents`
+// is the invoice amount when still unpaid, 0 once paid (per-invoice balance).
+export type ReceivableInvoice = {
+  kind: InvoiceKind;
+  reference: string;
+  amountCents: number;
+  status: InvoiceStatus;
+  outstandingCents: number;
+  issuedAt: string | null;
+  paidAt: string | null;
+};
+
+// One job (quote) flattened for the Accounts Receivable view: the two invoices
+// plus job-level totals. `earliestIssuedAt` is the min issuedAt across the job's
+// invoices and is the sort key for "oldest first". The AR page partitions jobs
+// into Pending Payments (totalOutstandingCents > 0) and Historical Paid (fully
+// paid with a real invoiced amount).
+export type ReceivableJob = {
+  id: string;
+  quoteId: string;
+  clientName: string;
+  projectType: string;
+  initial: ReceivableInvoice | null;
+  finish: ReceivableInvoice | null;
+  totalInvoicedCents: number;
+  totalPaidCents: number;
+  totalOutstandingCents: number;
+  earliestIssuedAt: string | null;
+  isFullyPaid: boolean;
+};
+
 export type PricingItem = {
   id: string;
   category: string;

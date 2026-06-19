@@ -1,4 +1,4 @@
-import type { InvoiceData, InvoiceKind, LifecycleStage, QuoteStatus } from "@/lib/types";
+import type { InvoiceData, InvoiceKind, InvoiceRecord, LifecycleStage, QuoteStatus } from "@/lib/types";
 
 // All money here is integer cents, matching lib/currency.ts.
 
@@ -80,6 +80,14 @@ export function outstandingCents(data: InvoiceData | null): number {
   return data.invoices
     .filter((invoice) => invoice.status === "unpaid")
     .reduce((sum, invoice) => sum + (Math.round(invoice.amountCents) || 0), 0);
+}
+
+// Per-invoice outstanding: the invoice amount when still unpaid, 0 once paid.
+// Used by the Accounts Receivable view's per-invoice (rough-in / finish) columns.
+export function invoiceOutstandingCents(invoice: InvoiceRecord): number {
+  return invoice.status === "unpaid"
+    ? Math.round(invoice.amountCents) || 0
+    : 0;
 }
 
 // True when every invoice is paid.

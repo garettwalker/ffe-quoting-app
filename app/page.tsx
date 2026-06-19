@@ -114,12 +114,20 @@ function DashboardHeader() {
         </p>
       </div>
 
-      <Link
-        href="/quotes/new"
-        className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card transition hover:-translate-y-0.5 hover:bg-deep-pine"
-      >
-        Start New Quote
-      </Link>
+      <div className="flex flex-wrap gap-3">
+        <Link
+          href="/receivables"
+          className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full border border-pine/20 bg-whitewarm px-6 py-3 font-black text-deep-pine shadow-card transition hover:bg-pine/10"
+        >
+          Receivables
+        </Link>
+        <Link
+          href="/quotes/new"
+          className="focus-ring inline-flex min-h-12 items-center justify-center rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card transition hover:-translate-y-0.5 hover:bg-deep-pine"
+        >
+          Start New Quote
+        </Link>
+      </div>
     </div>
   );
 }

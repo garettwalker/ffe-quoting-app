@@ -37,6 +37,12 @@ export function AppShell({ children }: AppShellProps) {
               Dashboard
             </Link>
             <Link
+              href="/receivables"
+              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
+            >
+              Receivables
+            </Link>
+            <Link
               href="/pricing-admin"
               className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
             >

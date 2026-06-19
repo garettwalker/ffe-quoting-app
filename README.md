@@ -25,6 +25,7 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/[id]/invoices` | Invoicing page for an accepted quote. Set contract amount, rough-in/finish split, and permit fee; mark invoices paid; print invoices. |
 | `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). Browser print dialog, save as PDF. |
 | `/pricing-admin` | Pricing admin. Edit line items, pricing levels, contingencies, project types, and business info/quote notes/invoice terms stored in Supabase. Deactivate-only (no hard delete). |
+| `/receivables` | Accounts Receivable. Two stacked tables — Pending Payments (outstanding balances) and Historical Paid (paid in full) — one row per job with rough-in and finish invoice columns. Preset period filter + sort. Read-only, derived from `quotes.invoice_data`. |
 
 ## File structure
 
@@ -43,6 +44,7 @@ app
     [id]/invoices/page.tsx      // Invoicing setup + invoice list
     [id]/invoices/[kind]/print/page.tsx  // Printable invoice (initial/finish)
   pricing-admin/page.tsx       // Pricing admin (items, levels, contingencies, project types, settings)
+  receivables/page.tsx         // Accounts Receivable (pending vs paid, two tables)
 
 components
   app-shell.tsx
@@ -58,6 +60,7 @@ components
   invoice-builder.tsx           // invoice setup form (contract, split, permit)
   invoice-paid-button.tsx       // toggles an invoice paid/unpaid
   invoice-print-button.tsx      // window.print + back link for printable invoices
+  receivables-table.tsx         // AR tables: period/sort + pending vs paid partition
   pricing-admin-ui.tsx          // shared Field/buttons/badges for the admin editors
   pricing-item-editor.tsx       // admin editor for pricing_items
   pricing-level-editor.tsx      // admin editor for pricing_levels
@@ -129,6 +132,11 @@ Invoice setup is stored as JSONB in the `quotes.invoice_data` column (null until
 alter table public.quotes add column if not exists invoice_data jsonb;
 ```
 No new RLS policies are needed; the existing anon select/update policies cover the column.
+
+### Accounts Receivable (`/receivables`)
+A read-only collections page that shows every accepted quote with invoice setup, split into **two stacked tables**: **Pending Payments** (any job with an outstanding balance, including partially-paid jobs) and **Historical Paid** (jobs paid in full — a job moves here automatically once its last unpaid invoice is marked paid). Each row is one job (customer) with separate **Rough-In** and **Finish** columns showing that invoice's amount, a Paid/Unpaid badge, and the per-invoice outstanding (or the paid date), plus a job-level **Total Outstanding** and the earliest invoice issued date. Row links go to the existing invoicing page (`/quotes/[id]/invoices`) where invoices are printed or marked paid.
+
+Controls live client-side in `components/receivables-table.tsx`: a preset period filter (All time / This month / Last 30 days / This quarter / This year, scoped by the job's earliest invoice issued date) and a sort (oldest first / largest outstanding / newest / client). The page (`app/receivables/page.tsx`, `force-dynamic`) queries accepted quotes with `invoice_data` not null, flattens each into a `ReceivableJob` (reusing `outstandingCents`, `isFullyPaid`, `computeInvoiceAmounts`, `invoiceReference`, plus `invoiceOutstandingCents` for per-invoice balances), and hands them to the table. No new tables or RLS policies. Summary cards at the top show total invoiced, total outstanding (emphasized), and total paid.
 
 ## Pricing and calculation logic
 
@@ -326,11 +334,11 @@ Done:
 - Quote status pipeline: draft, prepared, accepted with manual stage buttons on the dashboard and saved-quote page
 - Invoicing from accepted quotes: contract amount, 50/50 rough-in/finish split (editable), permit fee, two invoices (initial = rough-in + permit, finish = remainder), paid/unpaid tracking, printable invoices, outstanding balance on the dashboard
 - Pricing admin (`/pricing-admin`): all pricing (line items, pricing levels, contingencies, project types) and business info / default quote notes / invoice payment terms moved out of the static `lib/seed-data.ts` file into Supabase tables, editable in the running app. Deactivate-only (no hard delete), editable sort order, active/inactive badges. Builder and print pages read live from Supabase via `lib/pricing.ts`.
+- Accounts Receivable (`/receivables`): collections view over every accepted quote with invoice setup. Two stacked tables — Pending Payments (anything still outstanding) and Historical Paid (paid in full) — one row per job with separate rough-in and finish columns showing amount + paid/outstanding status, plus a job-level total outstanding. Preset period filter (All time / This month / Last 30 days / This quarter / This year) and sort (oldest first / largest outstanding / newest / client). Read-only, derived entirely from `quotes.invoice_data`; no new tables.
 
 Pending (rough priority):
 - Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the layouts are finalized
 - Invoice enhancements: deposit invoice, more than two invoices, dedicated sequential invoice numbers, reset-paid button
-- Accounts receivable view: a dedicated table page (e.g. `/receivables`) that aggregates every invoice across accepted quotes for a chosen period and shows paid vs unpaid side by side, with the primary focus on **outstanding balances to chase down**. Columns: client, quote id, invoice references (initial/finish), invoice amount, paid status, amount outstanding, issued/paid dates. Filter by date range / period, sort by outstanding (largest or oldest first), and a period total of paid vs outstanding. Built entirely from the existing `quotes.invoice_data` JSONB (no new table); the per-invoice paid status, `outstandingCents`, and `isFullyPaid` helpers in `lib/invoice-calculations.ts` already provide the data. Add a dashboard shortcut to it.
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
 - Access-level restriction: only admin may pull a quote back out of the invoicing lifecycle (the "Reopen as prepared" and "Move back to drafts" actions on Client Accepted / Pending Payments / Paid in Full quotes). Non-admin users can move quotes forward but not reopen an invoiced or paid quote. Gate the `QuoteStatusButton` instances that set `newStatus` to `prepared` or `draft` on an accepted quote (in `app/quotes/[id]/page.tsx` and `components/dashboard-quote-section.tsx`) behind an admin-role check once auth exists. Pairs with the RLS tightening item below.
 - **Review this Pending list on every change** and remove (or mark complete) any item that has been accomplished, so the list stays accurate and does not drift.
@@ -357,3 +365,4 @@ Pending (rough priority):
 - 2026-06-19: Added a pending item and standing practice note: only admin may pull a quote back out of the invoicing lifecycle once access levels exist (gate the "Reopen as prepared" / "Move back to drafts" buttons on accepted, pending-payment, and paid-in-full quotes), and the Pending list should be reviewed on every change so accomplished items are removed or marked complete.
 - 2026-06-19: Added the printable Summary Quote page (`/quotes/[id]/summary`). Condensed customer-facing companion to the Detailed Quote: one row per pricing category with its subtotal, then the quote total. No unit prices are shown. New `summarizeByCategory` helper in `lib/calculations.ts` groups `clientFacingLines` by category and sums client-facing totals (post pricing-level/contingency multiplier), preserving first-appearance order and dropping zero-total categories. Reuses `PrintQuoteButton` and the `.print-document` browser-print pattern. "Print Summary Quote" links added to the saved-quote page (prepared and accepted branches) and "Summary" links to the prepared and accepted dashboard cards. Marked the "PDF export: Summary Quote next" pending item complete; the only remaining PDF work is the optional react-pdf one-click-download upgrade.
 - 2026-06-19: Moved all pricing and customer-facing text out of the static `lib/seed-data.ts` file into Supabase, with an admin UI. New `/pricing-admin` route edits line items, pricing levels, contingencies, project types, and the business-info / default-quote-notes / invoice-payment-terms settings row (deactivate-only, no hard delete; editable sort order). New `lib/pricing.ts` (`getSettings`, `getPricingCatalog`) reads the catalog server-side; the builder pages and the three print pages now read live from Supabase (`force-dynamic`). `calculateQuote` takes the items/levels/contingencies arrays as parameters and resolves level/contingency by stable id with explicit default-id fallbacks. `quote-builder` and `quote-line-item-picker` take the catalog as props; dropdowns show active rows plus the currently-selected value so old quotes still resolve. `lib/seed-data.ts` was deleted. Owner ran the one-time SQL (five tables + seed + anon RLS policies) in Supabase beforehand. Marked the "Pricing admin" pending item complete.
+- 2026-06-19: Added the Accounts Receivable view (`/receivables`). Collections page over every accepted quote with invoice setup, split into two stacked tables: Pending Payments (any job with an outstanding balance, including partially-paid) and Historical Paid (fully paid; a job moves here automatically once the last invoice is paid). One row per job with separate rough-in and finish columns (amount + Paid/Unpaid badge + per-invoice outstanding or paid date), plus a job-level total outstanding and the earliest invoice issued date. Preset period filter (All time / This month / Last 30 days / This quarter / This year) and sort (oldest first / largest outstanding / newest / client), applied client-side. New `app/receivables/page.tsx` (server, `force-dynamic`, queries accepted quotes with `invoice_data` not null), `components/receivables-table.tsx` (client filter/sort/partition), `ReceivableInvoice`/`ReceivableJob` types, and small helpers `invoiceOutstandingCents` (`lib/invoice-calculations.ts`) and `formatDate` (`lib/currency.ts`). Reuses `outstandingCents`, `isFullyPaid`, `computeInvoiceAmounts`, `invoiceReference`. Read-only — no new tables or RLS policies. Added a Receivables nav link and a dashboard shortcut. Marked the "Accounts receivable view" pending item complete.
