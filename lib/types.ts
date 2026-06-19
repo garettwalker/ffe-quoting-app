@@ -2,6 +2,25 @@ export type UnitType = "per_sqft" | "per_unit" | "flat" | "per_hour";
 
 export type BasePricingMode = "auto" | "builder" | "manual";
 
+// Row-level quote lifecycle. Lives on the Supabase `quotes` row, not on QuoteFormState.
+export type QuoteStatus = "draft" | "prepared" | "accepted";
+
+// The columns the dashboard selects from the quotes table.
+export type DashboardQuoteRow = {
+  id: string;
+  quote_id: string;
+  quote_date: string;
+  client_name: string;
+  project_street: string;
+  project_city: string;
+  project_state: string;
+  project_zip: string;
+  project_type: string;
+  client_quote_total_cents: number;
+  status: QuoteStatus;
+  created_at: string;
+};
+
 export type PricingItem = {
   id: string;
   category: string;

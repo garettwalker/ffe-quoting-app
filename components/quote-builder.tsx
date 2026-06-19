@@ -61,6 +61,8 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
     savedQuoteIdProp
   );
   const [completionMessage, setCompletionMessage] = useState("");
+  const [draftMessage, setDraftMessage] = useState("");
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [hasLoadedStoredQuote, setHasLoadedStoredQuote] = useState(() =>
     Boolean(initialQuote)
   );
@@ -104,6 +106,7 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
     value: QuoteFormState[K]
   ) {
     setCompletionMessage("");
+    setDraftMessage("");
     setQuote((current) => ({
       ...current,
       [key]: value
@@ -112,6 +115,7 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
 
   function handleAddLineItem(pricingItemId: string) {
     setCompletionMessage("");
+    setDraftMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: [
@@ -126,6 +130,7 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
 
   function handleUpdateQuantity(pricingItemId: string, quantity: number) {
     setCompletionMessage("");
+    setDraftMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: current.lineItems.map((lineItem) =>
@@ -141,6 +146,7 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
 
   function handleRemoveLineItem(pricingItemId: string) {
     setCompletionMessage("");
+    setDraftMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: current.lineItems.filter(
@@ -193,6 +199,94 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
 
     saveActiveQuote(quote, result, savedQuoteId);
     router.push("/quotes/review");
+  }
+
+  // Save the current form to Supabase as a draft (status: "draft"). Drafts
+  // only require a client name; the other fields keep whatever is entered (the
+  // table's NOT NULL columns accept empty strings and 0). On success the
+  // browser working copy is cleared and the saved row becomes the source of
+  // truth, so the builder switches to "editing a saved quote" mode.
+  async function saveDraftToSupabase() {
+    if (isSavingDraft) return;
+
+    if (!quote.clientName.trim()) {
+      setDraftMessage("Add a client name before saving a draft.");
+      return;
+    }
+
+    setIsSavingDraft(true);
+    setDraftMessage("");
+
+    const payload = {
+      quote_id: quote.quoteId,
+      quote_date: quote.quoteDate,
+      client_name: quote.clientName,
+      client_email: quote.clientEmail || null,
+      project_street: quote.projectStreet,
+      project_city: quote.projectCity,
+      project_state: quote.projectState,
+      project_zip: quote.projectZip,
+      project_type: quote.projectType,
+      square_footage: quote.squareFootage,
+      base_pricing_mode: quote.basePricingMode,
+      manual_base_rate_cents: quote.manualBaseRateCents,
+      high_ceiling_or_complex_switching: quote.highCeilingOrComplexSwitching,
+      pricing_level_id: quote.pricingLevelId,
+      contingency_id: quote.contingencyId,
+      internal_notes: quote.internalNotes || null,
+      quote_data: quote,
+      calculation_data: result,
+      client_quote_total_cents: result.clientQuoteTotalCents,
+      status: "draft",
+      updated_at: new Date().toISOString()
+    };
+
+    try {
+      if (savedQuoteId) {
+        // Update the existing saved row (could be a draft or a prepared quote
+        // reopened for editing). Saving as draft moves it back to In-progress.
+        const { error } = await supabase
+          .from("quotes")
+          .update(payload)
+          .eq("id", savedQuoteId);
+
+        if (error) {
+          setDraftMessage(`Draft update failed: ${error.message}`);
+          setIsSavingDraft(false);
+          return;
+        }
+      } else {
+        // Insert a new draft and remember its id so further saves update it.
+        const { data, error } = await supabase
+          .from("quotes")
+          .insert(payload)
+          .select("id")
+          .single();
+
+        if (error || !data) {
+          setDraftMessage(
+            `Draft save failed: ${error ? error.message : "Unknown error"}`
+          );
+          setIsSavingDraft(false);
+          return;
+        }
+
+        setSavedQuoteId(data.id);
+      }
+
+      clearActiveQuote();
+      setDraftMessage(
+        "Draft saved. Find it under In-progress on the dashboard."
+      );
+      setIsSavingDraft(false);
+    } catch (err) {
+      setDraftMessage(
+        `Draft save failed: ${
+          err instanceof Error ? err.message : "Unknown error"
+        }`
+      );
+      setIsSavingDraft(false);
+    }
   }
 
   if (!hasLoadedStoredQuote) {
@@ -535,21 +629,39 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>
               <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
-                Complete Quote
+                Save or complete
               </p>
               <p className="font-bold text-charcoal/70">
-                Review the live total, then complete the quote when ready.
+                Save a draft to keep working later, or complete the quote to
+                review and prepare it for the customer.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={completeQuote}
-              className="rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
-            >
-              Complete Quote
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={saveDraftToSupabase}
+                disabled={isSavingDraft}
+                className="rounded-full border border-pine/20 px-6 py-3 font-black text-deep-pine hover:bg-pine hover:text-whitewarm disabled:cursor-default disabled:opacity-60"
+              >
+                {isSavingDraft ? "Saving draft..." : "Save as draft"}
+              </button>
+
+              <button
+                type="button"
+                onClick={completeQuote}
+                className="rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
+              >
+                Complete Quote
+              </button>
+            </div>
           </div>
+
+          {draftMessage ? (
+            <div className="mt-5 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">
+              {draftMessage}
+            </div>
+          ) : null}
 
           {completionMessage ? (
             <div className="mt-5 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">

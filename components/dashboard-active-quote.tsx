@@ -2,10 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { formatCurrency } from "@/lib/currency";
-import { getActiveQuote, type StoredQuote } from "@/lib/quote-storage";
+import { useRouter } from "next/navigation";
+import {
+  getActiveQuote,
+  clearActiveQuote,
+  type StoredQuote
+} from "@/lib/quote-storage";
 
-export function DashboardActiveQuote() {
+// Slim one-line card. Shows only when there is an unsaved working copy in the
+// browser (a draft that has not been written to Supabase yet). Once a quote is
+// saved to Supabase, the dashboard works from the saved row instead, so this
+// card hides itself when savedQuoteId is set.
+export function DashboardResumeActiveQuote() {
+  const router = useRouter();
   const [storedQuote, setStoredQuote] = useState<StoredQuote | null>(null);
   const [hasLoaded, setHasLoaded] = useState(false);
 
@@ -14,85 +23,48 @@ export function DashboardActiveQuote() {
     setHasLoaded(true);
   }, []);
 
-  if (!hasLoaded || !storedQuote) {
-    return null;
+  if (!hasLoaded) return null;
+
+  // No working copy, or it is already tied to a saved Supabase row.
+  if (!storedQuote || storedQuote.savedQuoteId) return null;
+
+  const clientName = storedQuote.quote.clientName || "Unnamed client";
+
+  function handleDiscard() {
+    clearActiveQuote();
+    setStoredQuote(null);
+    router.refresh();
   }
 
-  const { quote, result } = storedQuote;
-
-  const fullAddress = [
-    quote.projectStreet,
-    quote.projectCity,
-    quote.projectState,
-    quote.projectZip
-  ]
-    .filter(Boolean)
-    .join(", ");
-
   return (
-    <section className="mb-8 rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft">
-      <div className="mb-5 flex flex-col justify-between gap-4 md:flex-row md:items-start">
-        <div>
-          <p className="mb-2 text-sm font-black uppercase tracking-[0.16em] text-clay">
-            Active Quote
+    <section className="mb-8 rounded-xl2 border border-pine/10 bg-whitewarm/80 p-5 shadow-soft">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+            Unsaved working copy
           </p>
-          <h2 className="font-display text-3xl font-bold tracking-[-0.035em] text-moss">
-            {quote.clientName || "Unnamed Client"}
-          </h2>
-          <p className="mt-2 max-w-2xl font-bold leading-7 text-charcoal/70">
-            {fullAddress || "No project address entered"}
+          <p className="font-bold text-charcoal">
+            Resume unsaved quote for{" "}
+            <span className="text-deep-pine">{clientName}</span>
           </p>
         </div>
 
-        <div className="rounded-xl1 border border-pine/10 bg-cream px-5 py-4">
-          <p className="text-xs font-black uppercase tracking-[0.14em] text-clay">
-            Quote Total
-          </p>
-          <p className="font-display text-3xl font-bold tracking-[-0.035em] text-deep-pine">
-            {formatCurrency(result.clientQuoteTotalCents)}
-          </p>
+        <div className="flex shrink-0 gap-2">
+          <Link
+            href="/quotes/new"
+            className="rounded-full bg-pine px-5 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
+          >
+            Resume
+          </Link>
+          <button
+            type="button"
+            onClick={handleDiscard}
+            className="rounded-full border border-pine/20 px-5 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+          >
+            Discard
+          </button>
         </div>
-      </div>
-
-      <div className="grid gap-3 md:grid-cols-4">
-        <InfoTile label="Quote ID" value={quote.quoteId} />
-        <InfoTile label="Project Type" value={quote.projectType} />
-        <InfoTile
-          label="Square Feet"
-          value={quote.squareFootage.toLocaleString()}
-        />
-        <InfoTile
-          label="Line Items"
-          value={result.clientFacingLines.length.toString()}
-        />
-      </div>
-
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-        <Link
-          href="/quotes/review"
-          className="rounded-full bg-pine px-6 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
-        >
-          Review Quote
-        </Link>
-
-        <Link
-          href="/quotes/new"
-          className="rounded-full border border-pine/20 px-6 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-        >
-          Edit Quote
-        </Link>
       </div>
     </section>
-  );
-}
-
-function InfoTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-soft border border-pine/10 bg-cream p-4">
-      <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
-        {label}
-      </p>
-      <p className="break-words font-black text-deep-pine">{value}</p>
-    </div>
   );
 }

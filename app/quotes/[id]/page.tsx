@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { DeleteQuoteButton } from "@/components/delete-quote-button";
+import { QuoteStatusButton } from "@/components/quote-status-button";
+import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
-import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
+import type {
+  QuoteCalculationResult,
+  QuoteFormState,
+  QuoteStatus
+} from "@/lib/types";
 
 type SavedQuoteRow = {
   id: string;
@@ -13,6 +19,16 @@ type SavedQuoteRow = {
   quote_data: QuoteFormState;
   calculation_data: QuoteCalculationResult;
 };
+
+// Treat any unexpected status (including legacy "completed") as prepared so
+// the owner still sees a sensible action set. The SQL migration moves
+// completed rows to prepared before deploy.
+function normalizeStatus(value: string): QuoteStatus {
+  if (value === "draft" || value === "prepared" || value === "accepted") {
+    return value;
+  }
+  return "prepared";
+}
 
 type PageProps = {
   params: { id: string };
@@ -55,6 +71,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const row = data as SavedQuoteRow;
   const quote = row.quote_data;
   const result = row.calculation_data;
+  const status = normalizeStatus(row.status);
 
   const fullAddress = [
     quote.projectStreet,
@@ -95,9 +112,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span className="rounded-full bg-sage/30 px-3 py-1 text-xs font-black uppercase tracking-[0.12em] text-deep-pine">
-              {row.status}
-            </span>
+            <StatusBadge status={status} />
             <span className="text-sm font-bold text-charcoal/60">
               Saved {createdDate}
             </span>
@@ -191,19 +206,75 @@ export default async function SavedQuotePage({ params }: PageProps) {
               Back to Dashboard
             </Link>
 
-            <Link
-              href={`/quotes/${row.id}/edit`}
-              className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-            >
-              Edit Saved Quote
-            </Link>
+            {status === "draft" ? (
+              <>
+                <Link
+                  href={`/quotes/${row.id}/edit`}
+                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                >
+                  Continue editing
+                </Link>
+                <QuoteStatusButton
+                  quoteId={row.id}
+                  newStatus="prepared"
+                  label="Prepare"
+                  variant="primary"
+                />
+              </>
+            ) : null}
 
-            <Link
-              href={`/quotes/${row.id}/print`}
-              className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
-            >
-              Print Detailed Quote
-            </Link>
+            {status === "prepared" ? (
+              <>
+                <Link
+                  href={`/quotes/${row.id}/edit`}
+                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                >
+                  Edit Saved Quote
+                </Link>
+                <QuoteStatusButton
+                  quoteId={row.id}
+                  newStatus="accepted"
+                  label="Mark accepted"
+                  variant="primary"
+                />
+                <Link
+                  href={`/quotes/${row.id}/print`}
+                  className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
+                >
+                  Print Detailed Quote
+                </Link>
+                <QuoteStatusButton
+                  quoteId={row.id}
+                  newStatus="draft"
+                  label="Move back to drafts"
+                  variant="secondary"
+                />
+              </>
+            ) : null}
+
+            {status === "accepted" ? (
+              <>
+                <Link
+                  href={`/quotes/${row.id}/print`}
+                  className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
+                >
+                  Print Detailed Quote
+                </Link>
+                <QuoteStatusButton
+                  quoteId={row.id}
+                  newStatus="prepared"
+                  label="Reopen as prepared"
+                  variant="secondary"
+                />
+                <QuoteStatusButton
+                  quoteId={row.id}
+                  newStatus="accepted"
+                  label="Start invoicing"
+                  variant="ghost"
+                  disabled
+                />
+              </>
+            ) : null}
           </div>
 
           <div className="mt-6">
@@ -211,8 +282,8 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </div>
 
           <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/70">
-            This saved quote loads directly from Supabase. Editing saved quotes
-            and PDF export are coming soon.
+            Status changes save instantly to Supabase and move the quote between
+            the In-progress, Prepared, and Accepted sections on the dashboard.
           </div>
         </aside>
       </div>

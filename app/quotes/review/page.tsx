@@ -53,7 +53,7 @@ export default function QuoteReviewPage() {
       quote_data: quote,
       calculation_data: result,
       client_quote_total_cents: result.clientQuoteTotalCents,
-      status: "completed",
+      status: "prepared",
       updated_at: new Date().toISOString()
     };
 
@@ -71,7 +71,7 @@ export default function QuoteReviewPage() {
       }
 
       clearActiveQuote();
-      setSaveStatus("Quote updated successfully.");
+      setSaveStatus("Prepared. It appears under Prepared on the dashboard.");
       setHasSaved(true);
       setIsSaving(false);
       return;
@@ -94,7 +94,7 @@ export default function QuoteReviewPage() {
 
     setStoredQuote({ ...storedQuote, savedQuoteId: data.id });
     clearActiveQuote();
-    setSaveStatus("Quote saved successfully.");
+    setSaveStatus("Prepared. It appears under Prepared on the dashboard.");
     setHasSaved(true);
     setIsSaving(false);
   }
@@ -145,12 +145,10 @@ export default function QuoteReviewPage() {
     .join(", ");
 
   const saveButtonLabel = hasSaved
-    ? savedQuoteId
-      ? "Updated"
-      : "Saved"
+    ? "Prepared"
     : savedQuoteId
-      ? "Update Quote"
-      : "Save Quote";
+      ? "Prepare"
+      : "Prepare";
 
   return (
     <AppShell>
@@ -172,8 +170,8 @@ export default function QuoteReviewPage() {
           </h1>
 
           <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
-            Review the quote details, save the quote, and then continue toward
-            PDF export.
+            Review the quote details, prepare the quote, and then continue
+            toward PDF export.
           </p>
         </div>
 
@@ -270,7 +268,7 @@ export default function QuoteReviewPage() {
               disabled={isSaving || hasSaved}
               className="rounded-full bg-pine px-5 py-3 font-black text-whitewarm hover:bg-deep-pine disabled:cursor-default disabled:bg-pine/50"
             >
-              {isSaving ? "Saving Quote..." : saveButtonLabel}
+              {isSaving ? "Preparing..." : saveButtonLabel}
             </button>
 
             {hasSaved && savedQuoteId ? (
