@@ -8,7 +8,6 @@ import { formatCurrency } from "@/lib/currency";
 import {
   clearActiveQuote,
   getActiveQuote,
-  saveActiveQuote,
   type StoredQuote
 } from "@/lib/quote-storage";
 import { supabase } from "@/lib/supabase";
@@ -71,14 +70,16 @@ export default function QuoteReviewPage() {
         return;
       }
 
+      clearActiveQuote();
       setSaveStatus("Quote updated successfully.");
       setHasSaved(true);
       setIsSaving(false);
       return;
     }
 
-    // Insert a new saved quote and remember its id so a second save updates
-    // instead of creating a duplicate.
+    // Insert a new saved quote and remember its id (in memory) so the View
+    // and Edit links work. Then clear the browser working copy so the owner
+    // works from the saved file going forward instead of the active quote.
     const { data, error } = await supabase
       .from("quotes")
       .insert(payload)
@@ -91,8 +92,8 @@ export default function QuoteReviewPage() {
       return;
     }
 
-    saveActiveQuote(quote, result, data.id);
     setStoredQuote({ ...storedQuote, savedQuoteId: data.id });
+    clearActiveQuote();
     setSaveStatus("Quote saved successfully.");
     setHasSaved(true);
     setIsSaving(false);

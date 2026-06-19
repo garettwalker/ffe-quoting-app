@@ -59,11 +59,11 @@ public
 ## How the quote flow works
 
 1. **Dashboard** (`/`) — owner starts a new quote or opens a saved one from history.
-2. **Build** (`/quotes/new`) — enter project and client info, pricing setup, adders, internal notes. The builder keeps a temporary working copy in the browser (`localStorage` key `ffe-active-quote`) so work is not lost when moving between builder and review.
+2. **Build** (`/quotes/new`) — enter project and client info, pricing setup, adders, internal notes. The builder keeps a temporary working copy in the browser (`localStorage` key `ffe-active-quote`) so work is not lost when moving between builder and review. This working copy is **cleared once the quote is saved to Supabase**; after that the owner works from the saved record. The active quote is purely a pre-save working copy. To abandon an unsaved working copy, use the builder's **Reset Quote** button.
 3. **Complete Quote** — validates required fields, saves the working copy, routes to `/quotes/review`.
 4. **Review** (`/quotes/review`) — review the customer-facing summary and final total, then save.
-5. **Save Quote** — writes to Supabase. If editing a saved quote, it **updates** the existing row; otherwise it **inserts** a new row and remembers the id so a second click will not create a duplicate. The button locks after a successful save.
-6. **Saved quote** (`/quotes/[id]`) — view, edit, or delete the saved quote.
+5. **Save Quote** — writes to Supabase. If editing a saved quote, it **updates** the existing row; otherwise it **inserts** a new row and remembers the id (in memory) so the View/Edit links work. The button locks after a successful save. **After saving, the browser working copy (active quote) is cleared**, so the owner works from the saved file going forward instead of the temporary form. The review page still shows the success message and links from in-memory state.
+6. **Saved quote** (`/quotes/[id]`) — view, edit, or delete the saved quote. From here on, the owner works from the saved file, not the active quote.
 
 ### Internal notes (owner only)
 The builder has an "Internal Notes" text box. These notes are saved with the quote and shown on the owner views (review and saved quote pages), clearly labeled as not shown to the customer. They are **not** included in customer-facing output. (Customer-facing PDF export is coming later and must continue to exclude them.)
@@ -202,3 +202,4 @@ Pending (rough priority):
 - 2026-06-18: Added owner-only Internal Notes text box in the builder; notes show on owner views (review, saved quote) but never on customer-facing output. No schema change (field already existed).
 - 2026-06-18: Enabled editing saved quotes (`/quotes/[id]/edit`) and deleting saved quotes (removes row from Supabase, with confirm). Save now upserts (update vs insert) which also prevents duplicate saves; the Save button locks after success. Added the anon delete RLS policy.
 - 2026-06-18: Removed the confusing "Clear Review Quote" button from the review page. After a successful save, the review page now shows "View saved quote" and "Start a new quote" links instead.
+- 2026-06-18: Clear the active quote (browser working copy) after a successful save, so the owner is not stuck in a loop with the saved quote still loaded as the active quote. From save onward, the owner works from the saved file via `/quotes/[id]` and `/quotes/[id]/edit`.
