@@ -184,6 +184,7 @@ Done:
 - Saved quote view (`/quotes/[id]`) and edit (`/quotes/[id]/edit`)
 - Delete quote from Supabase
 - Owner-only internal notes (not shown to customer)
+- Daily-sequence quote IDs (client-side): new quotes get the next number for today from Supabase (e.g. Q-20260618-001, -002, -003)
 
 Pending (rough priority):
 - PDF export: Detailed Quote, then Summary Quote, then Rough-In and Finish invoices
@@ -192,7 +193,7 @@ Pending (rough priority):
 - Tighten Supabase RLS for production
 - Pricing admin (move pricing to Supabase, active/inactive items, preserve historical snapshots)
 - Quote status management (draft, completed, sent, accepted, rejected, invoiced)
-- Real daily-sequence quote IDs (e.g. Q-YYYYMMDD-001) generated server-side instead of client-side
+- Move quote ID sequencing server-side for hard multi-user concurrency safety (the current client-side sequence is fine for a single owner)
 - Remove the temporary `dashboard-build-status.tsx` component once the build is complete
 
 ## Recent work (history)
@@ -203,3 +204,4 @@ Pending (rough priority):
 - 2026-06-18: Enabled editing saved quotes (`/quotes/[id]/edit`) and deleting saved quotes (removes row from Supabase, with confirm). Save now upserts (update vs insert) which also prevents duplicate saves; the Save button locks after success. Added the anon delete RLS policy.
 - 2026-06-18: Removed the confusing "Clear Review Quote" button from the review page. After a successful save, the review page now shows "View saved quote" and "Start a new quote" links instead.
 - 2026-06-18: Clear the active quote (browser working copy) after a successful save, so the owner is not stuck in a loop with the saved quote still loaded as the active quote. From save onward, the owner works from the saved file via `/quotes/[id]` and `/quotes/[id]/edit`.
+- 2026-06-18: Stop quote IDs from duplicating. New quotes now get a daily sequence number (Q-YYYYMMDD-001, -002, ...) by checking Supabase for today's highest number. Editing a saved quote keeps its existing ID.

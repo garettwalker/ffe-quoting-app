@@ -15,6 +15,7 @@ import {
   getActiveQuote,
   saveActiveQuote
 } from "@/lib/quote-storage";
+import { supabase } from "@/lib/supabase";
 import type { BasePricingMode, QuoteFormState } from "@/lib/types";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
@@ -78,9 +79,22 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
       if (storedQuote.savedQuoteId) {
         setSavedQuoteId(storedQuote.savedQuoteId);
       }
+      setHasLoadedStoredQuote(true);
+      return;
     }
 
+    // Truly new quote: assign a unique sequential quote id for today based on
+    // what is already saved in Supabase, so ids do not duplicate. Only update
+    // if the owner has not already typed a custom id into the field.
     setHasLoadedStoredQuote(true);
+    const placeholderId = quote.quoteId;
+    nextQuoteIdForToday().then((nextId) => {
+      setQuote((current) =>
+        current.quoteId === placeholderId
+          ? { ...current, quoteId: nextId }
+          : current
+      );
+    });
   }, [initialQuote]);
 
   const result = useMemo(() => calculateQuote(quote), [quote]);
@@ -569,4 +583,33 @@ function generateTemporaryQuoteId(): string {
   const date = new Date();
   const yyyymmdd = date.toISOString().slice(0, 10).replaceAll("-", "");
   return `Q-${yyyymmdd}-001`;
+}
+
+async function nextQuoteIdForToday(): Promise<string> {
+  const yyyymmdd = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const prefix = `Q-${yyyymmdd}-`;
+
+  try {
+    const { data, error } = await supabase
+      .from("quotes")
+      .select("quote_id")
+      .like("quote_id", `${prefix}%`);
+
+    if (error || !data) {
+      return `${prefix}001`;
+    }
+
+    let max = 0;
+    for (const row of data as { quote_id: string }[]) {
+      const n = parseInt(row.quote_id.slice(prefix.length), 10);
+      if (!Number.isNaN(n) && n > max) {
+        max = n;
+      }
+    }
+
+    const next = (max + 1).toString().padStart(3, "0");
+    return `${prefix}${next}`;
+  } catch {
+    return `${prefix}001`;
+  }
 }
