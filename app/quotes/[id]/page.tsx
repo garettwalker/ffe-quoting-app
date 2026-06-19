@@ -4,8 +4,10 @@ import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { QuoteStatusButton } from "@/components/quote-status-button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
+import { isFullyPaid, outstandingCents } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import type {
+  InvoiceData,
   QuoteCalculationResult,
   QuoteFormState,
   QuoteStatus
@@ -18,6 +20,7 @@ type SavedQuoteRow = {
   created_at: string;
   quote_data: QuoteFormState;
   calculation_data: QuoteCalculationResult;
+  invoice_data: InvoiceData | null;
 };
 
 // Treat any unexpected status (including legacy "completed") as prepared so
@@ -38,7 +41,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const { data, error } = await supabase
     .from("quotes")
     .select(
-      "id, quote_id, status, created_at, quote_data, calculation_data"
+      "id, quote_id, status, created_at, quote_data, calculation_data, invoice_data"
     )
     .eq("id", params.id)
     .single();
@@ -256,9 +259,15 @@ export default async function SavedQuotePage({ params }: PageProps) {
               <>
                 <Link
                   href={`/quotes/${row.id}/print`}
-                  className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
+                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
                 >
                   Print Detailed Quote
+                </Link>
+                <Link
+                  href={`/quotes/${row.id}/invoices`}
+                  className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
+                >
+                  Invoicing
                 </Link>
                 <QuoteStatusButton
                   quoteId={row.id}
@@ -266,16 +275,17 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   label="Reopen as prepared"
                   variant="secondary"
                 />
-                <QuoteStatusButton
-                  quoteId={row.id}
-                  newStatus="accepted"
-                  label="Start invoicing"
-                  variant="ghost"
-                  disabled
-                />
               </>
             ) : null}
           </div>
+
+          {status === "accepted" && row.invoice_data ? (
+            <p className="mt-4 rounded-soft bg-cream px-4 py-3 text-sm font-black text-deep-pine">
+              {isFullyPaid(row.invoice_data)
+                ? "Invoices: paid in full"
+                : `Outstanding: ${formatCurrency(outstandingCents(row.invoice_data))}`}
+            </p>
+          ) : null}
 
           <div className="mt-6">
             <DeleteQuoteButton quoteId={row.id} />

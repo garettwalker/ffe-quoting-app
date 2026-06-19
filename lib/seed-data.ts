@@ -436,3 +436,6 @@ export const businessInfo = {
   email: "freedomfamilyelectric@gmail.com",
   tagline: "Residential Electrical"
 };
+
+export const invoicePaymentTerms =
+  "Payment is due upon receipt of this invoice. Please contact Freedom Family Electric with any questions about this invoice. Thank you for your business.";

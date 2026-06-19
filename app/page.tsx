@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   const { data, error } = await supabase
     .from("quotes")
     .select(
-      "id, quote_id, quote_date, client_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, created_at"
+      "id, quote_id, quote_date, client_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
     )
     .order("created_at", { ascending: false })
     .limit(50);

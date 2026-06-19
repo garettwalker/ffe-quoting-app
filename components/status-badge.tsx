@@ -1,4 +1,4 @@
-import type { QuoteStatus } from "@/lib/types";
+import type { InvoiceStatus, QuoteStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<QuoteStatus, string> = {
   draft: "bg-sand text-deep-pine",
@@ -21,6 +21,23 @@ export function StatusBadge({ status }: { status: QuoteStatus }) {
       className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${style}`}
     >
       {label}
+    </span>
+  );
+}
+
+const INVOICE_STATUS_STYLES: Record<InvoiceStatus, string> = {
+  unpaid: "bg-sand text-deep-pine",
+  paid: "bg-pine text-whitewarm"
+};
+
+export function InvoicePaidBadge({ status }: { status: InvoiceStatus }) {
+  return (
+    <span
+      className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${
+        INVOICE_STATUS_STYLES[status]
+      }`}
+    >
+      {status === "paid" ? "Paid" : "Unpaid"}
     </span>
   );
 }

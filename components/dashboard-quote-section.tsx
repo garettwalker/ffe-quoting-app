@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
+import { isFullyPaid, outstandingCents } from "@/lib/invoice-calculations";
 import type { DashboardQuoteRow } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
 import { QuoteStatusButton } from "@/components/quote-status-button";
@@ -73,6 +74,18 @@ function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
           </div>
           <p className="mt-1 font-bold text-charcoal">{quote.client_name}</p>
           <p className="text-sm text-charcoal/70">{address}</p>
+
+          {quote.status === "accepted" && quote.invoice_data ? (
+            <p
+              className={`mt-1 text-sm font-black ${
+                isFullyPaid(quote.invoice_data) ? "text-deep-pine" : "text-clay"
+              }`}
+            >
+              {isFullyPaid(quote.invoice_data)
+                ? "Invoices paid in full"
+                : `Outstanding: ${formatCurrency(outstandingCents(quote.invoice_data))}`}
+            </p>
+          ) : null}
         </div>
 
         <p className="font-display text-lg font-bold text-deep-pine md:text-right">
@@ -151,14 +164,12 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
     <>
       {openLink}
       {printLink}
-      <QuoteStatusButton
-        quoteId={quote.id}
-        newStatus="accepted"
-        label="Start invoicing"
-        variant="ghost"
-        size="sm"
-        disabled
-      />
+      <Link
+        href={`/quotes/${quote.id}/invoices`}
+        className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
+      >
+        Invoicing
+      </Link>
     </>
   );
 }

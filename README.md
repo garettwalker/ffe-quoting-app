@@ -21,6 +21,8 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
 | `/quotes/[id]/edit` | Edit a saved quote. Loads it from Supabase into the builder; saving updates the existing row. |
 | `/quotes/[id]/print` | Printable Detailed Quote page (customer-facing). Opens the browser print dialog to save as PDF. |
+| `/quotes/[id]/invoices` | Invoicing page for an accepted quote. Set contract amount, rough-in/finish split, and permit fee; mark invoices paid; print invoices. |
+| `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). Browser print dialog, save as PDF. |
 
 ## File structure
 
@@ -34,22 +36,29 @@ app
     review/page.tsx             // Review + save
     [id]/page.tsx               // Saved quote view
     [id]/edit/page.tsx          // Saved quote editor
+    [id]/print/page.tsx         // Printable Detailed Quote
+    [id]/invoices/page.tsx      // Invoicing setup + invoice list
+    [id]/invoices/[kind]/print/page.tsx  // Printable invoice (initial/finish)
 
 components
   app-shell.tsx
   dashboard-active-quote.tsx     // slim resume card for unsaved working copies
   dashboard-quote-section.tsx   // one pipeline stage (Draft / Prepared / Client Accepted)
   dashboard-build-status.tsx     // TEMPORARY: internal build tracker, safe to delete later
-  status-badge.tsx              // color-coded draft/prepared/accepted badge
+  status-badge.tsx              // draft/prepared/accepted + invoice paid/unpaid badges
   quote-status-button.tsx       // client button that updates quote.status then refreshes
   quote-builder.tsx
   quote-line-item-picker.tsx
   quote-totals-panel.tsx
   delete-quote-button.tsx
+  invoice-builder.tsx           // invoice setup form (contract, split, permit)
+  invoice-paid-button.tsx       // toggles an invoice paid/unpaid
+  invoice-print-button.tsx      // window.print + back link for printable invoices
 
 lib
   calculations.ts
   currency.ts
+  invoice-calculations.ts       // invoice amount math + outstanding balance
   quote-storage.ts
   seed-data.ts
   supabase.ts
@@ -88,6 +97,24 @@ Status changes are made by `QuoteStatusButton`, a small client component that ru
 update quotes set status = 'prepared' where status = 'completed';
 ```
 This moves every previously saved quote (all stamped `completed`) into the Prepared section so nothing is orphaned.
+
+### Invoicing (accepted quotes)
+When a quote is Client Accepted, the saved-quote page and the dashboard Accepted card show an **Invoicing** link to `/quotes/[id]/invoices`. There the owner sets up invoicing:
+
+- **Contract amount** defaults to the accepted quote total and is editable.
+- **Rough-in / finish split** defaults to 50/50 and is editable. A warning appears if the two percentages do not total 100%.
+- **Permit fee** is entered as a dollar amount and shown as its own line on the initial invoice.
+- Two invoices are generated: the **initial invoice** (rough-in amount + permit fee) and the **finish invoice** (the remainder).
+- Each invoice can be marked **paid / unpaid**. The dashboard Accepted card and the invoicing page show the outstanding balance or "paid in full."
+- Each invoice has a printable page (`/quotes/[id]/invoices/[kind]/print`, kind = `initial` or `finish`) using the browser print dialog. Invoice references are `{quote_id}-R` (initial/rough-in) and `{quote_id}-F` (finish).
+
+Invoice setup is stored as JSONB in the `quotes.invoice_data` column (null until set up). Saving invoice setup preserves existing paid statuses by invoice kind. Invoicing math lives in `lib/invoice-calculations.ts`.
+
+**One-time SQL (run in the Supabase SQL Editor before deploying invoicing):**
+```sql
+alter table public.quotes add column if not exists invoice_data jsonb;
+```
+No new RLS policies are needed; the existing anon select/update policies cover the column.
 
 ## Pricing and calculation logic
 
@@ -151,6 +178,7 @@ create table if not exists public.quotes (
   calculation_data jsonb not null,
   client_quote_total_cents integer not null,
   status text not null default 'completed',
+  invoice_data jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -207,12 +235,13 @@ Done:
 - Daily-sequence quote IDs (client-side): new quotes get the next number for today from Supabase (e.g. Q-20260618-001, -002, -003)
 - Printable Detailed Quote page (`/quotes/[id]/print`) using the browser print dialog (no PDF dependency yet)
 - Quote status pipeline: draft, prepared, accepted with manual stage buttons on the dashboard and saved-quote page
+- Invoicing from accepted quotes: contract amount, 50/50 rough-in/finish split (editable), permit fee, two invoices (initial = rough-in + permit, finish = remainder), paid/unpaid tracking, printable invoices, outstanding balance on the dashboard
 
 Pending (rough priority):
-- Run the one-time SQL migration (`update quotes set status = 'prepared' where status = 'completed';`) before deploying the pipeline
-- PDF export: Summary Quote next (Detailed Quote is done as a printable page), then Rough-In and Finish invoices
-- Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the quote/invoice layouts are finalized
-- Invoice workflow (contract amount, permit fee, rough-in/finish percentages, warn if not 100%) starting from accepted quotes
+- Run the one-time SQL migrations before deploying: `update quotes set status = 'prepared' where status = 'completed';` and `alter table public.quotes add column if not exists invoice_data jsonb;`
+- PDF export: Summary Quote next (Detailed Quote and invoices are done as printable pages)
+- Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the layouts are finalized
+- Invoice enhancements: deposit invoice, more than two invoices, dedicated sequential invoice numbers, reset-paid button
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
 - Tighten Supabase RLS for production (remove anon policies, add auth)
 - Pricing admin (move pricing to Supabase, active/inactive items, preserve historical snapshots)
@@ -232,3 +261,4 @@ Pending (rough priority):
 - 2026-06-19: Added the printable Detailed Quote page (`/quotes/[id]/print`) with FFE branding, contact info, line items, total, and customer-facing notes. Uses the browser print dialog (Print / Save as PDF), no PDF dependency. Enabled Print buttons on the saved quote view and (after save) the review page. Internal notes are excluded (customer-facing only).
 - 2026-06-19: Added the quote status pipeline (draft, prepared, accepted). The dashboard is now an async server component that groups saved quotes into three stacked stages (Draft / Prepared / Client Accepted), each with a one-line description of its meaning. New `status-badge`, `quote-status-button`, and `dashboard-quote-section` components; the old self-fetching `dashboard-saved-quotes.tsx` was deleted. The builder gained a "Save as draft" button (status draft, client name required) that saves to Supabase and clears the browser working copy. The review page primary action is now "Prepare" and writes status prepared. The saved-quote page shows a color-coded badge and status-aware actions (Prepare, Mark accepted, Move back to drafts, Reopen as prepared, plus a disabled Start invoicing placeholder). Status changes use `supabase.update` + `router.refresh()`, which requires the anon update RLS policy. Owner must run `update quotes set status = 'prepared' where status = 'completed';` once before deploy so existing saved quotes land in Prepared.
 - 2026-06-19: Fixed the dashboard not showing newly saved drafts. Server-side Supabase reads were being cached by the Next.js Data Cache; the shared supabase client now forces `cache: "no-store"` so the dashboard always reflects the latest rows.
+- 2026-06-19: Added invoicing for accepted quotes. New `invoice_data` JSONB column on `quotes` (run `alter table public.quotes add column if not exists invoice_data jsonb;` once). New routes `/quotes/[id]/invoices` (setup + invoice list) and `/quotes/[id]/invoices/[kind]/print` (printable invoice). New `lib/invoice-calculations.ts` and components `invoice-builder`, `invoice-paid-button`, `invoice-print-button`, plus an `InvoicePaidBadge`. Initial invoice = rough-in (default 50% of contract, editable) + permit fee; finish invoice = remainder; warn if the split does not total 100%; mark each invoice paid/unpaid; dashboard Accepted card and saved-quote page show outstanding balance. Reuses the printable-document pattern and the client-mutation + router.refresh pattern. Owner must run the alter table SQL before deploy.
