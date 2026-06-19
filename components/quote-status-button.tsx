@@ -61,16 +61,22 @@ export function QuoteStatusButton({
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={disabled || isWorking}
-      title={errorMessage || undefined}
-      className={`rounded-full ${SIZE_CLASSES[size]} text-center font-black shadow-card transition disabled:cursor-default disabled:opacity-60 ${
-        VARIANT_CLASSES[disabled ? "ghost" : variant]
-      }`}
-    >
-      {isWorking ? `${label}...` : label}
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled || isWorking}
+        title={errorMessage || undefined}
+        className={`rounded-full ${SIZE_CLASSES[size]} text-center font-black shadow-card transition disabled:cursor-default disabled:opacity-60 ${
+          VARIANT_CLASSES[disabled ? "ghost" : variant]
+        }`}
+      >
+        {isWorking ? `${label}...` : label}
+      </button>
+
+      {errorMessage ? (
+        <p className="text-sm font-bold leading-5 text-clay">{errorMessage}</p>
+      ) : null}
+    </>
   );
 }
