@@ -65,7 +65,7 @@ export default async function SummaryQuotePage({ params }: PageProps) {
       <PrintQuoteButton quoteId={row.id} />
 
       <section className="print-document rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
-        <div className="flex items-start justify-between gap-6 border-b border-pine/10 pb-6">
+        <div className="flex flex-col gap-6 border-b border-pine/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">
             <Image
               src="/ffe-logo.png"
