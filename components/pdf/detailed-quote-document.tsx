@@ -77,8 +77,7 @@ const styles = StyleSheet.create({
   logo: {
     width: 48,
     height: 48,
-    marginRight: 14,
-    objectFit: "contain"
+    marginRight: 14
   },
   businessName: {
     fontFamily: "Times-Bold",

@@ -1,17 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import dynamic from "next/dynamic";
-import type { ReactElement } from "react";
-
-// react-pdf's PDFDownloadLink is a browser-only API (it generates the PDF in
-// the browser on click). Importing it during SSR/SSG throws, so we load it
-// dynamically with ssr: false. Combined with transpilePackages in next.config.js,
-// this is the documented working setup for @react-pdf/renderer in Next 14.
-const PDFDownloadLink = dynamic(
-  () => import("@react-pdf/renderer").then((mod) => mod.PDFDownloadLink),
-  { ssr: false, loading: () => <span className="text-sm font-black text-deep-pine">Preparing…</span> }
-);
+import { useState, type ReactElement } from "react";
 
 type DownloadPdfButtonProps = {
   document: ReactElement; // a react-pdf <Document> element
@@ -22,9 +12,17 @@ type DownloadPdfButtonProps = {
 };
 
 // Mirrors the old PrintQuoteButton top bar (a back link on the left, the action
-// button on the right), but the action downloads a real PDF instead of calling
-// window.print(). PDFDownloadLink invokes its child as a render-prop with a
-// `loading` flag, so we can show "Preparing PDF…" while the file is being built.
+// button on the right), but the action builds a real PDF in the browser and
+// downloads it instead of calling window.print().
+//
+// IMPORTANT: we deliberately do NOT use react-pdf's <PDFDownloadLink>, because
+// it renders the PDF eagerly on mount (to populate the link href). If that
+// render throws, React unmounts the whole route and the page goes blank.
+// Instead we generate the PDF on click via the imperative `pdf().toBlob()`
+// API, lazy-load @react-pdf/renderer only when the user clicks, and wrap the
+// whole thing in a try/catch so a generation failure shows a small inline
+// error instead of blanking the page. (This also makes page load instant —
+// react-pdf isn't loaded until you click Download PDF.)
 export function DownloadPdfButton({
   document,
   fileName,
@@ -32,6 +30,39 @@ export function DownloadPdfButton({
   backLabel = "Back to quote",
   buttonLabel = "Download PDF"
 }: DownloadPdfButtonProps) {
+  const [status, setStatus] = useState<"idle" | "working" | "error">("idle");
+  const [errorMsg, setErrorMsg] = useState<string>("");
+
+  async function handleDownload() {
+    if (status === "working") return;
+    setStatus("working");
+    setErrorMsg("");
+    try {
+      // Lazy-load react-pdf only on first click so page navigation stays fast
+      // and react-pdf never runs during SSR/hydration.
+      const { pdf } = await import("@react-pdf/renderer");
+      const instance = pdf(document);
+      const blob = await instance.toBlob();
+      const url = URL.createObjectURL(blob);
+      const anchor = window.document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      window.document.body.appendChild(anchor);
+      anchor.click();
+      window.document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+      setStatus("idle");
+    } catch (err) {
+      // Show the actual error on screen (not just the console) so it can be
+      // reported without opening dev tools. Also log the full object.
+      const message = err instanceof Error ? err.message : String(err);
+      // eslint-disable-next-line no-console
+      console.error("PDF generation failed:", err);
+      setErrorMsg(message);
+      setStatus("error");
+    }
+  }
+
   return (
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <Link
@@ -41,23 +72,21 @@ export function DownloadPdfButton({
         {backLabel}
       </Link>
 
-      <PDFDownloadLink
-        document={document}
-        fileName={fileName}
-        style={{
-          display: "inline-flex",
-          borderRadius: 9999,
-          backgroundColor: "#344236",
-          padding: "8px 24px",
-          fontSize: "0.875rem",
-          fontWeight: 900,
-          color: "#fffdf8",
-          boxShadow: "0 18px 50px rgba(29,33,29,0.08)",
-          textDecoration: "none"
-        }}
-      >
-        {({ loading }: { loading: boolean }) => (loading ? "Preparing PDF…" : buttonLabel)}
-      </PDFDownloadLink>
+      <div className="flex flex-wrap items-center gap-3">
+        {status === "error" ? (
+          <span className="max-w-md text-sm font-black text-clay">
+            Could not build the PDF: {errorMsg}
+          </span>
+        ) : null}
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={status === "working"}
+          className="rounded-full bg-pine px-6 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {status === "working" ? "Preparing PDF…" : buttonLabel}
+        </button>
+      </div>
     </div>
   );
 }
