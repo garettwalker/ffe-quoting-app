@@ -461,6 +461,30 @@ export function QuoteBuilder() {
           </div>
         </section>
 
+        <section className="rounded-xl2 border border-clay/25 bg-whitewarm/75 p-6 shadow-card">
+          <div className="mb-4">
+            <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+              Internal Notes
+            </p>
+            <h2 className="font-display text-2xl font-bold tracking-[-0.03em] text-moss">
+              Owner notes (not shown to customer)
+            </h2>
+            <p className="mt-2 text-sm font-bold text-charcoal/60">
+              Any reminders or context for you. These stay private and will not
+              appear on customer-facing quotes or PDFs.
+            </p>
+          </div>
+
+          <textarea
+            value={quote.internalNotes}
+            onChange={(event) =>
+              updateQuote("internalNotes", event.target.value)
+            }
+            placeholder="Optional notes for the owner only..."
+            className="form-input min-h-32 resize-y py-3"
+          />
+        </section>
+
         <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
             <div>

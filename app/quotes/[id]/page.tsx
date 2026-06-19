@@ -216,6 +216,17 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </div>
         </aside>
       </div>
+
+      {quote.internalNotes.trim() ? (
+        <section className="mt-8 rounded-xl2 border border-clay/25 bg-cream/60 p-6 shadow-soft">
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.16em] text-clay">
+            Internal Notes (not shown to customer)
+          </p>
+          <p className="whitespace-pre-wrap font-bold leading-7 text-charcoal/80">
+            {quote.internalNotes}
+          </p>
+        </section>
+      ) : null}
     </AppShell>
   );
 }

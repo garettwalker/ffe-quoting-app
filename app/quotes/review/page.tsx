@@ -256,12 +256,19 @@ export default function QuoteReviewPage() {
             </div>
           ) : null}
 
-          <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/70">
-            Saved quotes are now written to Supabase. Next, we will make the
-            dashboard read saved quotes from the database.
-          </div>
         </aside>
       </div>
+
+      {quote.internalNotes.trim() ? (
+        <section className="mt-8 rounded-xl2 border border-clay/25 bg-cream/60 p-6 shadow-soft">
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.16em] text-clay">
+            Internal Notes (not shown to customer)
+          </p>
+          <p className="whitespace-pre-wrap font-bold leading-7 text-charcoal/80">
+            {quote.internalNotes}
+          </p>
+        </section>
+      ) : null}
     </AppShell>
   );
 }
