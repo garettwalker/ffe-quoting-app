@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
-import { isFullyPaid, outstandingCents } from "@/lib/invoice-calculations";
+import { isFullyPaid, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import type { DashboardQuoteRow } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
 import { QuoteStatusButton } from "@/components/quote-status-button";
@@ -70,7 +70,7 @@ function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{quote.quote_id}</span>
-            <StatusBadge status={quote.status} />
+            <StatusBadge stage={lifecycleStage(quote.status, quote.invoice_data)} />
           </div>
           <p className="mt-1 font-bold text-charcoal">{quote.client_name}</p>
           <p className="text-sm text-charcoal/70">{address}</p>

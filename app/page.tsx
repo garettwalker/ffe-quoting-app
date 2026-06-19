@@ -3,6 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { DashboardResumeActiveQuote } from "@/components/dashboard-active-quote";
 import { DashboardBuildStatus } from "@/components/dashboard-build-status";
 import { DashboardQuoteSection } from "@/components/dashboard-quote-section";
+import { lifecycleStage } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import type { DashboardQuoteRow, QuoteStatus } from "@/lib/types";
 
@@ -28,16 +29,20 @@ export default async function DashboardPage() {
     );
   }
 
-  // Group rows in memory by lifecycle status. Cast status to the union; any
-  // unexpected value falls back to "draft" so the row still renders.
+  // Group rows in memory by lifecycle stage. Cast status to the union; any
+  // unexpected value falls back to "prepared" so the row still renders. For
+  // accepted quotes the stage is derived from the invoice setup: no invoices
+  // yet = Client Accepted, invoices with money outstanding = Pending Payments,
+  // every invoice paid = Paid in Full.
   const rows = (data ?? []) as DashboardQuoteRow[];
-  const drafts = rows.filter((row) => normalizeStatus(row.status) === "draft");
-  const prepared = rows.filter(
-    (row) => normalizeStatus(row.status) === "prepared"
-  );
-  const accepted = rows.filter(
-    (row) => normalizeStatus(row.status) === "accepted"
-  );
+  const stageOf = (row: DashboardQuoteRow) =>
+    lifecycleStage(normalizeStatus(row.status), row.invoice_data);
+
+  const drafts = rows.filter((row) => stageOf(row) === "draft");
+  const prepared = rows.filter((row) => stageOf(row) === "prepared");
+  const accepted = rows.filter((row) => stageOf(row) === "accepted");
+  const pending = rows.filter((row) => stageOf(row) === "pending_payment");
+  const paid = rows.filter((row) => stageOf(row) === "paid_in_full");
 
   return (
     <AppShell>
@@ -66,7 +71,23 @@ export default async function DashboardPage() {
         title="Client Accepted"
         description="Billing and invoicing start here."
         quotes={accepted}
-        emptyCopy="No accepted quotes yet. When a client approves, mark a prepared quote accepted and it appears here. Billing and invoicing start from this stage."
+        emptyCopy="No accepted quotes yet. When a client approves, mark a prepared quote accepted and it appears here. Invoicing starts from this stage."
+      />
+
+      <DashboardQuoteSection
+        eyebrow="Stage 4"
+        title="Pending Payments"
+        description="Accepted quotes with invoices set up. Mark each invoice paid as it comes in."
+        quotes={pending}
+        emptyCopy="No quotes awaiting payment. Set up invoices on an accepted quote and it moves here."
+      />
+
+      <DashboardQuoteSection
+        eyebrow="Stage 5"
+        title="Paid in Full"
+        description="Every invoice on this job has been paid."
+        quotes={paid}
+        emptyCopy="No fully paid quotes yet. When every invoice on a job is marked paid, it lands here."
       />
 
       {/* TEMPORARY - remove this block and the DashboardBuildStatus
@@ -87,8 +108,9 @@ function DashboardHeader() {
           Quote Home
         </h2>
         <p className="mt-3 max-w-2xl text-base leading-7 text-charcoal/70">
-          Start a new quote, continue an active quote, or move quotes through
-          the pipeline from draft to prepared to client accepted.
+          Start a new quote, continue an active quote, or follow a job through
+          its whole life: draft, prepared, client accepted, pending payments,
+          and paid in full.
         </p>
       </div>
 

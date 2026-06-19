@@ -5,6 +5,18 @@ export type BasePricingMode = "auto" | "builder" | "manual";
 // Row-level quote lifecycle. Lives on the Supabase `quotes` row, not on QuoteFormState.
 export type QuoteStatus = "draft" | "prepared" | "accepted";
 
+// The full customer lifecycle shown on the dashboard. The first three come
+// straight from the row status. The last two are derived for accepted quotes
+// from the invoice setup (no invoices yet = accepted, invoices with money
+// outstanding = pending_payment, all invoices paid = paid_in_full). Nothing
+// extra is stored on the row; these two are computed on the fly.
+export type LifecycleStage =
+  | "draft"
+  | "prepared"
+  | "accepted"
+  | "pending_payment"
+  | "paid_in_full";
+
 // The columns the dashboard selects from the quotes table.
 export type DashboardQuoteRow = {
   id: string;

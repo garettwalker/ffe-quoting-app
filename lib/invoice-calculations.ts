@@ -1,4 +1,4 @@
-import type { InvoiceData, InvoiceKind } from "@/lib/types";
+import type { InvoiceData, InvoiceKind, LifecycleStage, QuoteStatus } from "@/lib/types";
 
 // All money here is integer cents, matching lib/currency.ts.
 
@@ -96,4 +96,19 @@ export function findInvoice(data: InvoiceData, kind: InvoiceKind) {
 // The invoice reference shown to the customer, e.g. Q-20260619-001-R.
 export function invoiceReference(quoteId: string, kind: InvoiceKind): string {
   return `${quoteId}-${kind === "initial" ? "R" : "F"}`;
+}
+
+// Map a quote to its dashboard lifecycle stage. Accepted quotes split into
+// three sub-stages based on the invoice setup: no invoices set up yet =
+// Client Accepted, invoices with money still outstanding = Pending Payments,
+// every invoice paid = Paid in Full. draft and prepared pass through
+// unchanged. This is derived on the fly from the row status + invoice_data,
+// so the dashboard always reflects reality without extra status writes.
+export function lifecycleStage(
+  status: QuoteStatus,
+  invoiceData: InvoiceData | null
+): LifecycleStage {
+  if (status !== "accepted") return status;
+  if (!invoiceData) return "accepted";
+  return isFullyPaid(invoiceData) ? "paid_in_full" : "pending_payment";
 }

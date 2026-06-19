@@ -4,7 +4,7 @@ import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { QuoteStatusButton } from "@/components/quote-status-button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
-import { isFullyPaid, outstandingCents } from "@/lib/invoice-calculations";
+import { isFullyPaid, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import type {
   InvoiceData,
@@ -115,7 +115,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <StatusBadge status={status} />
+            <StatusBadge stage={lifecycleStage(status, row.invoice_data)} />
             <span className="text-sm font-bold text-charcoal/60">
               Saved {createdDate}
             </span>
@@ -292,8 +292,11 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </div>
 
           <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/70">
-            Status changes save instantly to Supabase and move the quote between
-            the In-progress, Prepared, and Accepted sections on the dashboard.
+            Status changes save instantly to Supabase and move the quote through
+            the dashboard stages: Draft, Prepared, Client Accepted, Pending
+            Payments, and Paid in Full. Accepted quotes move into Pending
+            Payments once invoices are set up, and into Paid in Full once every
+            invoice is marked paid.
           </div>
         </aside>
       </div>

@@ -1,20 +1,24 @@
-import type { InvoiceStatus, QuoteStatus } from "@/lib/types";
+import type { InvoiceStatus, LifecycleStage } from "@/lib/types";
 
-const STATUS_STYLES: Record<QuoteStatus, string> = {
+const STAGE_STYLES: Record<LifecycleStage, string> = {
   draft: "bg-sand text-deep-pine",
   prepared: "bg-sage/40 text-deep-pine",
-  accepted: "bg-pine text-whitewarm"
+  accepted: "bg-pine text-whitewarm",
+  pending_payment: "bg-clay/20 text-clay",
+  paid_in_full: "bg-moss text-whitewarm"
 };
 
-const STATUS_LABELS: Record<QuoteStatus, string> = {
+const STAGE_LABELS: Record<LifecycleStage, string> = {
   draft: "Draft",
   prepared: "Prepared",
-  accepted: "Accepted"
+  accepted: "Accepted",
+  pending_payment: "Pending Payments",
+  paid_in_full: "Paid in Full"
 };
 
-export function StatusBadge({ status }: { status: QuoteStatus }) {
-  const style = STATUS_STYLES[status] ?? "bg-stone text-deep-pine";
-  const label = STATUS_LABELS[status] ?? status;
+export function StatusBadge({ stage }: { stage: LifecycleStage }) {
+  const style = STAGE_STYLES[stage] ?? "bg-stone text-deep-pine";
+  const label = STAGE_LABELS[stage] ?? stage;
 
   return (
     <span

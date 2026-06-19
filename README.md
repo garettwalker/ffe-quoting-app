@@ -15,7 +15,7 @@ This README is the long-term context file for the project. It is meant for both 
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Dashboard. Three-stage pipeline (Draft, Prepared, Client Accepted) reading saved quotes from Supabase, plus an optional unsaved-working-copy resume card and a temporary build-status panel. |
+| `/` | Dashboard. Five-stage lifecycle (Draft, Prepared, Client Accepted, Pending Payments, Paid in Full) reading saved quotes from Supabase, plus an optional unsaved-working-copy resume card and a temporary build-status panel. |
 | `/quotes/new` | Quote builder. Starts a fresh quote or resumes the active browser working copy. |
 | `/quotes/review` | Review the completed quote before saving. Reads the active working copy from browser storage. |
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
@@ -83,14 +83,18 @@ The builder has an "Internal Notes" text box. These notes are saved with the quo
 ### Deleting quotes
 The saved quote page has a Delete Quote button with a confirm step. It removes the row from Supabase. This requires a delete RLS policy (see Supabase setup below).
 
-### Quote status pipeline
-Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`. The dashboard groups saved quotes into three stacked stages by status: **Draft** (still being worked on), **Prepared** (ready to share with the client, or edit before sending), and **Client Accepted** (billing and invoicing start here).
+### Quote lifecycle pipeline
+Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`. The dashboard groups saved quotes into five stacked stages that tell the whole customer life cycle: **Draft** (still being worked on), **Prepared** (ready to share with the client, or edit before sending), **Client Accepted** (billing and invoicing start here), **Pending Payments** (invoices set up, money still outstanding), and **Paid in Full** (every invoice paid).
 
 - **Save as draft** (in the builder) writes a `draft` row to Supabase with only a client name required, so work-in-progress is saved cross-device instead of only in the browser. The browser working copy is cleared once the draft is saved.
 - **Complete Quote** then **Prepare** (on the review page) writes/updates the row as `prepared` and is the customer-ready state.
-- **Mark accepted** moves a prepared quote to `accepted`. Accepted quotes show a disabled **Start invoicing** placeholder (invoicing is not built yet).
+- **Mark accepted** moves a prepared quote to `accepted`. An accepted quote with no invoices yet shows in **Client Accepted**.
+- Once invoices are set up on an accepted quote, it automatically moves to **Pending Payments** (no button to click).
+- When every invoice on the quote is marked paid, it automatically moves to **Paid in Full** (no button to click).
 
-Status changes are made by `QuoteStatusButton`, a small client component that runs `supabase.update({status})` then `router.refresh()`. Because the dashboard query lives in the server component `app/page.tsx`, the refresh re-runs it and the quote moves between stages without a manual reload. The same pattern powers the status-aware actions on the saved-quote page.
+The last two stages are not stored on the row. They are derived on the fly from the row status plus `invoice_data` by `lifecycleStage()` in `lib/invoice-calculations.ts`: accepted + no invoice setup = Client Accepted; accepted + invoices with an outstanding balance = Pending Payments; accepted + all invoices paid = Paid in Full. Because it is derived, the dashboard always reflects the real payment state and can never disagree with the invoice records.
+
+Status changes (draft/prepared/accepted) are made by `QuoteStatusButton`, a small client component that runs `supabase.update({status})` then `router.refresh()`. Because the dashboard query lives in the server component `app/page.tsx`, the refresh re-runs it and the quote moves between stages without a manual reload. The same pattern powers the status-aware actions on the saved-quote page. `StatusBadge` now shows the derived lifecycle stage (Draft, Prepared, Accepted, Pending Payments, Paid in Full) rather than just the raw status.
 
 **One-time SQL migration (run in the Supabase SQL Editor before deploying this change):**
 ```sql
@@ -223,7 +227,7 @@ Preferences to follow when making changes:
 
 Done:
 - Next.js app foundation, FFE branding shell
-- Dashboard with three-stage status pipeline (Draft / Prepared / Client Accepted) reading saved quotes from Supabase
+- Dashboard with five-stage lifecycle pipeline (Draft / Prepared / Client Accepted / Pending Payments / Paid in Full) reading saved quotes from Supabase
 - Quote builder with pricing calculation, adders, internal notes, and Save as draft
 - Mobile layout
 - Review page (Prepare writes a prepared quote)
@@ -262,3 +266,4 @@ Pending (rough priority):
 - 2026-06-19: Added the quote status pipeline (draft, prepared, accepted). The dashboard is now an async server component that groups saved quotes into three stacked stages (Draft / Prepared / Client Accepted), each with a one-line description of its meaning. New `status-badge`, `quote-status-button`, and `dashboard-quote-section` components; the old self-fetching `dashboard-saved-quotes.tsx` was deleted. The builder gained a "Save as draft" button (status draft, client name required) that saves to Supabase and clears the browser working copy. The review page primary action is now "Prepare" and writes status prepared. The saved-quote page shows a color-coded badge and status-aware actions (Prepare, Mark accepted, Move back to drafts, Reopen as prepared, plus a disabled Start invoicing placeholder). Status changes use `supabase.update` + `router.refresh()`, which requires the anon update RLS policy. Owner must run `update quotes set status = 'prepared' where status = 'completed';` once before deploy so existing saved quotes land in Prepared.
 - 2026-06-19: Fixed the dashboard not showing newly saved drafts. Server-side Supabase reads were being cached by the Next.js Data Cache; the shared supabase client now forces `cache: "no-store"` so the dashboard always reflects the latest rows.
 - 2026-06-19: Added invoicing for accepted quotes. New `invoice_data` JSONB column on `quotes` (run `alter table public.quotes add column if not exists invoice_data jsonb;` once). New routes `/quotes/[id]/invoices` (setup + invoice list) and `/quotes/[id]/invoices/[kind]/print` (printable invoice). New `lib/invoice-calculations.ts` and components `invoice-builder`, `invoice-paid-button`, `invoice-print-button`, plus an `InvoicePaidBadge`. Initial invoice = rough-in (default 50% of contract, editable) + permit fee; finish invoice = remainder; warn if the split does not total 100%; mark each invoice paid/unpaid; dashboard Accepted card and saved-quote page show outstanding balance. Reuses the printable-document pattern and the client-mutation + router.refresh pattern. Owner must run the alter table SQL before deploy.
+- 2026-06-19: Extended the dashboard lifecycle from three stages to five by deriving two new stages from invoice setup. Accepted quotes now split into Client Accepted (no invoices yet), Pending Payments (invoices set up, money outstanding), and Paid in Full (every invoice paid). No schema change and no new buttons; the stages are computed on the fly by `lifecycleStage()` in `lib/invoice-calculations.ts` from the row status plus `invoice_data`. `StatusBadge` now shows the derived stage. The dashboard renders five stacked sections (Stage 1 Draft through Stage 5 Paid in Full), each with its own description and empty state.
