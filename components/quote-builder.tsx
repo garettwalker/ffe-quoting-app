@@ -17,6 +17,7 @@ import {
 } from "@/lib/quote-storage";
 import { supabase } from "@/lib/supabase";
 import type { BasePricingMode, QuoteFormState } from "@/lib/types";
+import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
 
@@ -446,16 +447,10 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Square Footage">
-              <input
-                type="number"
-                min="0"
-                value={quote.squareFootage === 0 ? "" : quote.squareFootage}
-                onChange={(event) =>
-                  updateQuote(
-                    "squareFootage",
-                    event.target.value === "" ? 0 : Number(event.target.value)
-                  )
-                }
+              <FormattedNumberInput
+                value={quote.squareFootage}
+                onChange={(value) => updateQuote("squareFootage", value)}
+                min={0}
                 placeholder="Enter sq ft"
                 className="form-input"
               />

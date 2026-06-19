@@ -6,6 +6,7 @@ import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import { computeInvoiceAmounts } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import type { InvoiceData, InvoiceKind, InvoiceRecord } from "@/lib/types";
+import { FormattedNumberInput } from "@/components/formatted-number-input";
 
 type InvoiceBuilderProps = {
   quoteId: string;
@@ -120,32 +121,22 @@ export function InvoiceBuilder({
 
       <div className="grid gap-4 md:grid-cols-2">
         <Field label="Contract Amount ($)">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={contractDollars === 0 ? "" : contractDollars}
-            onChange={(event) =>
-              setContractDollars(
-                event.target.value === "" ? 0 : Number(event.target.value)
-              )
-            }
+          <FormattedNumberInput
+            value={contractDollars}
+            onChange={setContractDollars}
+            allowDecimal
+            min={0}
             placeholder="Enter contract amount"
             className="form-input"
           />
         </Field>
 
         <Field label="Permit Fee ($)">
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={permitDollars === 0 ? "" : permitDollars}
-            onChange={(event) =>
-              setPermitDollars(
-                event.target.value === "" ? 0 : Number(event.target.value)
-              )
-            }
+          <FormattedNumberInput
+            value={permitDollars}
+            onChange={setPermitDollars}
+            allowDecimal
+            min={0}
             placeholder="0"
             className="form-input"
           />
