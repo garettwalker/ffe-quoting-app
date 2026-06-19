@@ -430,3 +430,9 @@ export const projectTypes = [
 
 export const defaultQuoteNotes =
   "This quote is based on the listed project scope and current material pricing. Additional owner-requested items, scope changes, hidden conditions, and material cost increases may require a written change order or surcharge before work proceeds.";
+
+export const businessInfo = {
+  name: "Freedom Family Electric",
+  email: "freedomfamilyelectric@gmail.com",
+  tagline: "Residential Electrical"
+};

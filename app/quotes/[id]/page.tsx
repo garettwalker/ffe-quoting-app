@@ -198,14 +198,12 @@ export default async function SavedQuotePage({ params }: PageProps) {
               Edit Saved Quote
             </Link>
 
-            <button
-              type="button"
-              disabled
-              className="cursor-not-allowed rounded-full border border-pine/15 px-5 py-3 font-black text-deep-pine/45"
-              title="Coming later"
+            <Link
+              href={`/quotes/${row.id}/print`}
+              className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
             >
-              Generate PDF
-            </button>
+              Print Detailed Quote
+            </Link>
           </div>
 
           <div className="mt-6">

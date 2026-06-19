@@ -20,6 +20,7 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/review` | Review the completed quote before saving. Reads the active working copy from browser storage. |
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
 | `/quotes/[id]/edit` | Edit a saved quote. Loads it from Supabase into the builder; saving updates the existing row. |
+| `/quotes/[id]/print` | Printable Detailed Quote page (customer-facing). Opens the browser print dialog to save as PDF. |
 
 ## File structure
 
@@ -185,9 +186,11 @@ Done:
 - Delete quote from Supabase
 - Owner-only internal notes (not shown to customer)
 - Daily-sequence quote IDs (client-side): new quotes get the next number for today from Supabase (e.g. Q-20260618-001, -002, -003)
+- Printable Detailed Quote page (`/quotes/[id]/print`) using the browser print dialog (no PDF dependency yet)
 
 Pending (rough priority):
-- PDF export: Detailed Quote, then Summary Quote, then Rough-In and Finish invoices
+- PDF export: Summary Quote next (Detailed Quote is done as a printable page), then Rough-In and Finish invoices
+- Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the quote/invoice layouts are finalized
 - Invoice workflow (contract amount, permit fee, rough-in/finish percentages, warn if not 100%)
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
 - Tighten Supabase RLS for production
@@ -205,3 +208,4 @@ Pending (rough priority):
 - 2026-06-18: Removed the confusing "Clear Review Quote" button from the review page. After a successful save, the review page now shows "View saved quote" and "Start a new quote" links instead.
 - 2026-06-18: Clear the active quote (browser working copy) after a successful save, so the owner is not stuck in a loop with the saved quote still loaded as the active quote. From save onward, the owner works from the saved file via `/quotes/[id]` and `/quotes/[id]/edit`.
 - 2026-06-18: Stop quote IDs from duplicating. New quotes now get a daily sequence number (Q-YYYYMMDD-001, -002, ...) by checking Supabase for today's highest number. Editing a saved quote keeps its existing ID.
+- 2026-06-19: Added the printable Detailed Quote page (`/quotes/[id]/print`) with FFE branding, contact info, line items, total, and customer-facing notes. Uses the browser print dialog (Print / Save as PDF), no PDF dependency. Enabled Print buttons on the saved quote view and (after save) the review page. Internal notes are excluded (customer-facing only).
