@@ -247,6 +247,8 @@ Pending (rough priority):
 - Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the layouts are finalized
 - Invoice enhancements: deposit invoice, more than two invoices, dedicated sequential invoice numbers, reset-paid button
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
+- Access-level restriction: only admin may pull a quote back out of the invoicing lifecycle (the "Reopen as prepared" and "Move back to drafts" actions on Client Accepted / Pending Payments / Paid in Full quotes). Non-admin users can move quotes forward but not reopen an invoiced or paid quote. Gate the `QuoteStatusButton` instances that set `newStatus` to `prepared` or `draft` on an accepted quote (in `app/quotes/[id]/page.tsx` and `components/dashboard-quote-section.tsx`) behind an admin-role check once auth exists. Pairs with the RLS tightening item below.
+- **Review this Pending list on every change** and remove (or mark complete) any item that has been accomplished, so the list stays accurate and does not drift.
 - Tighten Supabase RLS for production (remove anon policies, add auth)
 - Pricing admin (move pricing to Supabase, active/inactive items, preserve historical snapshots)
 - Move quote ID sequencing server-side for hard multi-user concurrency safety (the current client-side sequence is fine for a single owner)
