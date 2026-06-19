@@ -21,7 +21,7 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/review` | Review the completed quote before saving. Reads the active working copy from browser storage. |
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
 | `/quotes/[id]/edit` | Edit a saved quote. Loads it from Supabase into the builder; saving updates the existing row. |
-| `/quotes/[id]/print` | Printable Detailed Quote page (customer-facing). Opens the browser print dialog to save as PDF. |
+| `/quotes/[id]/print` | Printable Detailed Quote page (customer-facing). One-click **Download PDF** (generated in the browser with react-pdf); the on-screen layout is a preview of the PDF. |
 | `/quotes/[id]/summary` | Printable Summary Quote page (customer-facing). Condensed: one subtotal per pricing category plus the quote total, no unit prices. Browser print dialog. |
 | `/quotes/[id]/invoices` | Invoicing page for an accepted quote. Set contract amount, rough-in/finish split, and permit fee; mark invoices paid; print invoices. |
 | `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). Browser print dialog, save as PDF. |
@@ -69,11 +69,15 @@ components
   contingency-editor.tsx       // admin editor for contingency_options
   project-type-editor.tsx      // admin editor for project_types
   settings-editor.tsx           // admin editor for the single app_settings row
+  pdf/
+    download-pdf-button.tsx     // client wrapper: dynamic PDFDownloadLink (ssr:false) + back link
+    detailed-quote-document.tsx // react-pdf <Document> recreation of the Detailed Quote printable
 
 lib
   calculations.ts
   currency.ts
   invoice-calculations.ts       // invoice amount math + outstanding balance
+  pdf-logo.ts                   // server-only: reads /public/ffe-logo.png into a base64 data URI for react-pdf
   pricing.ts                    // server-side reads of the live pricing catalog + settings
   quote-storage.ts
   supabase.ts
@@ -340,7 +344,7 @@ Done:
 - Accounts Receivable (`/receivables`): collections view over every accepted quote with invoice setup. Two stacked tables — Pending Payments (anything still outstanding) and Historical Paid (paid in full) — one row per job with separate rough-in and finish columns showing amount + paid/outstanding status, plus a job-level total outstanding. Preset period filter (All time / This month / Last 30 days / This quarter / This year) and sort (oldest first / largest outstanding / newest / client). Read-only, derived entirely from `quotes.invoice_data`; no new tables.
 
 Pending (rough priority):
-- Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the layouts are finalized
+- PDF export upgrade: Detailed Quote is done (one-click Download PDF via react-pdf). Still TODO: replicate the same pattern to the Summary Quote and the two invoices, then remove the old browser-print buttons (`print-quote-button`, `invoice-print-button`) and the `.no-print` / `.print-document` print CSS. Possibly email the PDF to the client from the app (server-side send via an email provider; would need an API key in env and a verified sending domain).
 - Invoice enhancements: deposit invoice, more than two invoices, dedicated sequential invoice numbers, reset-paid button
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
 - Access-level restriction: only admin may pull a quote back out of the invoicing lifecycle (the "Reopen as prepared" and "Move back to drafts" actions on Client Accepted / Pending Payments / Paid in Full quotes). Non-admin users can move quotes forward but not reopen an invoiced or paid quote. Gate the `QuoteStatusButton` instances that set `newStatus` to `prepared` or `draft` on an accepted quote (in `app/quotes/[id]/page.tsx` and `components/dashboard-quote-section.tsx`) behind an admin-role check once auth exists. Pairs with the RLS tightening item below.
@@ -352,6 +356,7 @@ Pending (rough priority):
 
 ## Recent work (history)
 
+- 2026-06-19: Began the PDF export upgrade (pilot on the Detailed Quote). Added `@react-pdf/renderer` and `transpilePackages: ["@react-pdf/renderer"]` in `next.config.js`. New `components/pdf/detailed-quote-document.tsx` (a react-pdf `<Document>` recreation of the on-screen Detailed Quote: logo + business header, Quote id + date, Prepared For / Project, the line-items table, Quote Total, notes, footer — built-in Times-Bold/Helvetica fonts, brand palette hex). New `components/pdf/download-pdf-button.tsx` (client wrapper; dynamically imports `PDFDownloadLink` with `ssr:false` so it only runs in the browser; renders the back link + a "Download PDF" button that generates the file in-browser on click). New `lib/pdf-logo.ts` (server-only; reads `/public/ffe-logo.png` into a base64 data URI so react-pdf embeds the logo with no network fetch). `app/quotes/[id]/print/page.tsx` now builds plain pre-formatted props from the saved snapshot + settings and swaps the old `window.print()` button for `DownloadPdfButton`; the existing HTML layout stays on screen as a preview. Summary Quote and invoices still use the browser print dialog pending the follow-up pass.
 - 2026-06-18: Overhauled the dashboard to read saved quotes from Supabase (`dashboard-saved-quotes.tsx`), made it owner-focused with a compact removable build-status panel, removed the old marketing empty state.
 - 2026-06-18: Added saved quote route `/quotes/[id]` (server component, loads from Supabase, no localStorage) and wired the dashboard Open buttons to it.
 - 2026-06-18: Added owner-only Internal Notes text box in the builder; notes show on owner views (review, saved quote) but never on customer-facing output. No schema change (field already existed).

@@ -1,7 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { PrintQuoteButton } from "@/components/print-quote-button";
+import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
+import { DetailedQuotePdfDocument } from "@/components/pdf/detailed-quote-document";
 import { formatCurrency } from "@/lib/currency";
+import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
 import { supabase } from "@/lib/supabase";
 import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
@@ -60,9 +62,41 @@ export default async function PrintQuotePage({ params }: PageProps) {
     .filter(Boolean)
     .join(", ");
 
+  // Build the plain, pre-formatted props the react-pdf document needs. All
+  // money/date/locale formatting happens here (server-side) so the PDF
+  // component stays pure data-in, no Supabase or Date math.
+  const logoDataUri = getLogoDataUri();
+  const pdfProps = {
+    businessName: settings.businessName,
+    businessEmail: settings.businessEmail,
+    quoteId: quote.quoteId,
+    quoteDateLabel: formatQuoteDate(quote.quoteDate),
+    clientName: quote.clientName,
+    clientEmail: quote.clientEmail,
+    fullAddress,
+    projectType: quote.projectType,
+    squareFootageLabel: `${quote.squareFootage.toLocaleString()} sq ft`,
+    lines: result.clientFacingLines.map((line) => ({
+      name: line.name,
+      quantityLabel: line.quantity.toLocaleString(),
+      unitType: line.unitType,
+      unitPrice: formatCurrency(line.clientUnitPriceCents),
+      lineTotal: formatCurrency(line.clientLineTotalCents)
+    })),
+    quoteTotal: formatCurrency(result.clientQuoteTotalCents),
+    quoteNotes: settings.defaultQuoteNotes,
+    logoDataUri
+  };
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <PrintQuoteButton quoteId={row.id} />
+      <DownloadPdfButton
+        document={<DetailedQuotePdfDocument {...pdfProps} />}
+        fileName={`quote-${quote.quoteId}.pdf`}
+        backHref={`/quotes/${row.id}`}
+        backLabel="Back to quote"
+        buttonLabel="Download PDF"
+      />
 
       <section className="print-document rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
         <div className="flex flex-col gap-6 border-b border-pine/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
