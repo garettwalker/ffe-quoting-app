@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import { computeInvoiceAmounts } from "@/lib/invoice-calculations";
@@ -39,6 +39,13 @@ export function InvoiceBuilder({
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [saveError, setSaveError] = useState(false);
+
+  // Clear any stale save message as soon as the owner edits an input.
+  useEffect(() => {
+    setSaveMessage("");
+    setSaveError(false);
+  }, [contractDollars, roughInPercent, finishPercent, permitDollars]);
 
   // Build a preview InvoiceData from the current inputs so amounts update live.
   const previewData: InvoiceData = {
@@ -75,7 +82,17 @@ export function InvoiceBuilder({
   async function saveInvoices() {
     if (isSaving) return;
 
+    // Do not allow saving until the rough-in and finish split totals 100%.
+    if (!amounts.isBalanced) {
+      setSaveError(true);
+      setSaveMessage(
+        `The rough-in (${roughInPercent}%) and finish (${finishPercent}%) percentages must total 100% before saving. They currently total ${amounts.percentTotal}%.`
+      );
+      return;
+    }
+
     setIsSaving(true);
+    setSaveError(false);
     setSaveMessage("");
 
     const now = new Date().toISOString();
@@ -96,10 +113,12 @@ export function InvoiceBuilder({
     setIsSaving(false);
 
     if (error) {
+      setSaveError(true);
       setSaveMessage(`Save failed: ${error.message}`);
       return;
     }
 
+    setSaveError(false);
     setSaveMessage("Invoices saved. Adjust and save again any time.");
     router.refresh();
   }
@@ -230,7 +249,12 @@ export function InvoiceBuilder({
         <button
           type="button"
           onClick={saveInvoices}
-          disabled={isSaving}
+          disabled={isSaving || !amounts.isBalanced}
+          title={
+            amounts.isBalanced
+              ? undefined
+              : "The split must total 100% before saving"
+          }
           className="rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine disabled:cursor-default disabled:opacity-60"
         >
           {isSaving ? "Saving..." : existing ? "Save Changes" : "Save Invoices"}
@@ -238,7 +262,13 @@ export function InvoiceBuilder({
       </div>
 
       {saveMessage ? (
-        <div className="mt-4 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">
+        <div
+          className={`mt-4 rounded-soft border p-4 font-bold ${
+            saveError
+              ? "border-clay/30 bg-clay/10 text-clay"
+              : "border-pine/15 bg-sage/20 text-deep-pine"
+          }`}
+        >
           {saveMessage}
         </div>
       ) : null}
