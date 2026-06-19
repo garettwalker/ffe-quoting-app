@@ -47,7 +47,8 @@ export default async function DashboardPage() {
 
       <DashboardQuoteSection
         eyebrow="Stage 1"
-        title="In-progress"
+        title="Draft"
+        description="Quotes you are still working on. Save as a draft to keep them here."
         quotes={drafts}
         emptyCopy="No drafts yet. Start a new quote and save it as a draft to see it here."
       />
@@ -55,15 +56,17 @@ export default async function DashboardPage() {
       <DashboardQuoteSection
         eyebrow="Stage 2"
         title="Prepared"
+        description="Ready to share with the client, or edit before sending."
         quotes={prepared}
         emptyCopy="No prepared quotes. When a draft is ready to send, mark it prepared and it appears here."
       />
 
       <DashboardQuoteSection
         eyebrow="Stage 3"
-        title="Accepted"
+        title="Client Accepted"
+        description="Billing and invoicing start here."
         quotes={accepted}
-        emptyCopy="No accepted quotes yet. When a customer accepts, mark a prepared quote accepted and it appears here."
+        emptyCopy="No accepted quotes yet. When a client approves, mark a prepared quote accepted and it appears here. Billing and invoicing start from this stage."
       />
 
       {/* TEMPORARY - remove this block and the DashboardBuildStatus
@@ -85,7 +88,7 @@ function DashboardHeader() {
         </h2>
         <p className="mt-3 max-w-2xl text-base leading-7 text-charcoal/70">
           Start a new quote, continue an active quote, or move quotes through
-          the pipeline from draft to prepared to accepted.
+          the pipeline from draft to prepared to client accepted.
         </p>
       </div>
 

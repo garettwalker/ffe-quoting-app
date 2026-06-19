@@ -15,7 +15,7 @@ This README is the long-term context file for the project. It is meant for both 
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Dashboard. Three-stage pipeline (In-progress, Prepared, Accepted) reading saved quotes from Supabase, plus an optional unsaved-working-copy resume card and a temporary build-status panel. |
+| `/` | Dashboard. Three-stage pipeline (Draft, Prepared, Client Accepted) reading saved quotes from Supabase, plus an optional unsaved-working-copy resume card and a temporary build-status panel. |
 | `/quotes/new` | Quote builder. Starts a fresh quote or resumes the active browser working copy. |
 | `/quotes/review` | Review the completed quote before saving. Reads the active working copy from browser storage. |
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
@@ -38,7 +38,7 @@ app
 components
   app-shell.tsx
   dashboard-active-quote.tsx     // slim resume card for unsaved working copies
-  dashboard-quote-section.tsx   // one pipeline stage (In-progress / Prepared / Accepted)
+  dashboard-quote-section.tsx   // one pipeline stage (Draft / Prepared / Client Accepted)
   dashboard-build-status.tsx     // TEMPORARY: internal build tracker, safe to delete later
   status-badge.tsx              // color-coded draft/prepared/accepted badge
   quote-status-button.tsx       // client button that updates quote.status then refreshes
@@ -75,7 +75,7 @@ The builder has an "Internal Notes" text box. These notes are saved with the quo
 The saved quote page has a Delete Quote button with a confirm step. It removes the row from Supabase. This requires a delete RLS policy (see Supabase setup below).
 
 ### Quote status pipeline
-Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`. The dashboard groups saved quotes into three stacked stages by status: **In-progress** (drafts), **Prepared**, and **Accepted** (where quoting ends and invoicing will begin later).
+Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`. The dashboard groups saved quotes into three stacked stages by status: **Draft** (still being worked on), **Prepared** (ready to share with the client, or edit before sending), and **Client Accepted** (billing and invoicing start here).
 
 - **Save as draft** (in the builder) writes a `draft` row to Supabase with only a client name required, so work-in-progress is saved cross-device instead of only in the browser. The browser working copy is cleared once the draft is saved.
 - **Complete Quote** then **Prepare** (on the review page) writes/updates the row as `prepared` and is the customer-ready state.
@@ -195,7 +195,7 @@ Preferences to follow when making changes:
 
 Done:
 - Next.js app foundation, FFE branding shell
-- Dashboard with three-stage status pipeline (In-progress / Prepared / Accepted) reading saved quotes from Supabase
+- Dashboard with three-stage status pipeline (Draft / Prepared / Client Accepted) reading saved quotes from Supabase
 - Quote builder with pricing calculation, adders, internal notes, and Save as draft
 - Mobile layout
 - Review page (Prepare writes a prepared quote)
@@ -230,4 +230,5 @@ Pending (rough priority):
 - 2026-06-18: Clear the active quote (browser working copy) after a successful save, so the owner is not stuck in a loop with the saved quote still loaded as the active quote. From save onward, the owner works from the saved file via `/quotes/[id]` and `/quotes/[id]/edit`.
 - 2026-06-18: Stop quote IDs from duplicating. New quotes now get a daily sequence number (Q-YYYYMMDD-001, -002, ...) by checking Supabase for today's highest number. Editing a saved quote keeps its existing ID.
 - 2026-06-19: Added the printable Detailed Quote page (`/quotes/[id]/print`) with FFE branding, contact info, line items, total, and customer-facing notes. Uses the browser print dialog (Print / Save as PDF), no PDF dependency. Enabled Print buttons on the saved quote view and (after save) the review page. Internal notes are excluded (customer-facing only).
-- 2026-06-19: Added the quote status pipeline (draft, prepared, accepted). The dashboard is now an async server component that groups saved quotes into three stacked stages (In-progress / Prepared / Accepted). New `status-badge`, `quote-status-button`, and `dashboard-quote-section` components; the old self-fetching `dashboard-saved-quotes.tsx` was deleted. The builder gained a "Save as draft" button (status draft, client name required) that saves to Supabase and clears the browser working copy. The review page primary action is now "Prepare" and writes status prepared. The saved-quote page shows a color-coded badge and status-aware actions (Prepare, Mark accepted, Move back to drafts, Reopen as prepared, plus a disabled Start invoicing placeholder). Status changes use `supabase.update` + `router.refresh()`, which requires the anon update RLS policy. Owner must run `update quotes set status = 'prepared' where status = 'completed';` once before deploy so existing saved quotes land in Prepared.
+- 2026-06-19: Added the quote status pipeline (draft, prepared, accepted). The dashboard is now an async server component that groups saved quotes into three stacked stages (Draft / Prepared / Client Accepted), each with a one-line description of its meaning. New `status-badge`, `quote-status-button`, and `dashboard-quote-section` components; the old self-fetching `dashboard-saved-quotes.tsx` was deleted. The builder gained a "Save as draft" button (status draft, client name required) that saves to Supabase and clears the browser working copy. The review page primary action is now "Prepare" and writes status prepared. The saved-quote page shows a color-coded badge and status-aware actions (Prepare, Mark accepted, Move back to drafts, Reopen as prepared, plus a disabled Start invoicing placeholder). Status changes use `supabase.update` + `router.refresh()`, which requires the anon update RLS policy. Owner must run `update quotes set status = 'prepared' where status = 'completed';` once before deploy so existing saved quotes land in Prepared.
+- 2026-06-19: Fixed the dashboard not showing newly saved drafts. Server-side Supabase reads were being cached by the Next.js Data Cache; the shared supabase client now forces `cache: "no-store"` so the dashboard always reflects the latest rows.

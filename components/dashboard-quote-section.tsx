@@ -7,11 +7,13 @@ import { QuoteStatusButton } from "@/components/quote-status-button";
 export function DashboardQuoteSection({
   eyebrow,
   title,
+  description,
   quotes,
   emptyCopy
 }: {
   eyebrow: string;
   title: string;
+  description?: string;
   quotes: DashboardQuoteRow[];
   emptyCopy: string;
 }) {
@@ -25,6 +27,11 @@ export function DashboardQuoteSection({
           <h2 className="font-display text-2xl font-bold tracking-[-0.03em] text-moss">
             {title}
           </h2>
+          {description ? (
+            <p className="mt-1 text-sm font-bold text-charcoal/65">
+              {description}
+            </p>
+          ) : null}
         </div>
         <span className="rounded-full bg-sand px-3 py-1 text-xs font-black text-deep-pine">
           {quotes.length}
