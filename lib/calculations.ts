@@ -135,6 +135,15 @@ export function summarizeByCategory(result: QuoteCalculationResult) {
     .filter((entry) => entry.totalCents > 0);
 }
 
+// Friendly display name for a category on the customer-facing Summary Quote.
+// "Base" reads better as "Base Package"; every other category uses its raw
+// name. Shared by the on-screen Summary page and the Summary PDF helper so the
+// preview and the downloaded PDF can never disagree.
+export function categoryDisplayName(category: string): string {
+  if (category === "Base") return "Base Package";
+  return category;
+}
+
 function getBaseRate(quote: QuoteFormState): {
   cents: number;
   label: string;

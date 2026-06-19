@@ -1,17 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { PrintQuoteButton } from "@/components/print-quote-button";
-import { formatCurrency } from "@/lib/currency";
-import { summarizeByCategory } from "@/lib/calculations";
-import { getSettings } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
-import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
-
-type SavedQuoteRow = {
-  id: string;
-  quote_data: QuoteFormState;
-  calculation_data: QuoteCalculationResult;
-};
+import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
+import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
 
 type PageProps = {
   params: { id: string };
@@ -22,23 +12,16 @@ export const dynamic = "force-dynamic";
 
 // Printable Summary Quote: a condensed, customer-facing version of the quote
 // that shows one subtotal per pricing category instead of every line item.
-// Mirrors the Detailed Quote printable page (logo + business header, Prepared
-// For / Project blocks, total box, notes, footer) and reuses the same
-// browser-print pattern (PrintQuoteButton + .print-document). No unit prices
-// are shown, only category subtotals and the quote total.
+// The on-screen section below is a preview of the downloaded PDF; both render
+// from the same pre-formatted props built by loadSummaryQuotePdfInput, so they
+// can never drift apart. Clicking Download PDF hits the server route
+// /quotes/[id]/summary/pdf which renders the react-pdf document to a buffer and
+// streams it back as a file download. No unit prices are shown, only category
+// subtotals and the quote total.
 export default async function SummaryQuotePage({ params }: PageProps) {
-  const [quoteResult, settings] = await Promise.all([
-    supabase
-      .from("quotes")
-      .select("id, quote_data, calculation_data")
-      .eq("id", params.id)
-      .single(),
-    getSettings()
-  ]);
+  const input = await loadSummaryQuotePdfInput(params.id);
 
-  const { data, error } = quoteResult;
-
-  if (error || !data || !data.quote_data || !data.calculation_data) {
+  if (!input) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <p className="mb-4 font-display text-3xl font-bold text-moss">
@@ -54,23 +37,20 @@ export default async function SummaryQuotePage({ params }: PageProps) {
     );
   }
 
-  const row = data as SavedQuoteRow;
-  const quote = row.quote_data;
-  const result = row.calculation_data;
-  const categories = summarizeByCategory(result);
-
-  const fullAddress = [
-    quote.projectStreet,
-    quote.projectCity,
-    quote.projectState,
-    quote.projectZip
-  ]
+  const { quote, settings, fullAddress, quoteDateLabel, pdfProps } = input;
+  const categories = pdfProps.categories;
+  const projectSecondary = [quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
     .filter(Boolean)
-    .join(", ");
+    .join(" · ");
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <PrintQuoteButton quoteId={row.id} />
+      <DownloadPdfButton
+        href={`/quotes/${params.id}/summary/pdf`}
+        backHref={`/quotes/${params.id}`}
+        backLabel="Back to quote"
+        buttonLabel="Download PDF"
+      />
 
       <section className="print-document rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
         <div className="flex flex-col gap-6 border-b border-pine/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
@@ -100,9 +80,7 @@ export default async function SummaryQuotePage({ params }: PageProps) {
             <p className="mt-1 text-sm font-black text-deep-pine">
               {quote.quoteId}
             </p>
-            <p className="text-sm text-charcoal/70">
-              {formatQuoteDate(quote.quoteDate)}
-            </p>
+            <p className="text-sm text-charcoal/70">{quoteDateLabel}</p>
           </div>
         </div>
 
@@ -122,9 +100,9 @@ export default async function SummaryQuotePage({ params }: PageProps) {
               Project
             </p>
             <p className="font-bold text-charcoal">{fullAddress}</p>
-            <p className="text-sm text-charcoal/70">
-              {quote.projectType} · {quote.squareFootage.toLocaleString()} sq ft
-            </p>
+            {projectSecondary ? (
+              <p className="text-sm text-charcoal/70">{projectSecondary}</p>
+            ) : null}
           </div>
         </div>
 
@@ -140,11 +118,7 @@ export default async function SummaryQuotePage({ params }: PageProps) {
               </div>
             ) : (
               categories.map((entry) => (
-                <SummaryLine
-                  key={entry.category}
-                  label={categoryLabel(entry.category)}
-                  amount={formatCurrency(entry.totalCents)}
-                />
+                <SummaryLine key={entry.label} label={entry.label} amount={entry.amount} />
               ))
             )}
           </div>
@@ -157,7 +131,7 @@ export default async function SummaryQuotePage({ params }: PageProps) {
                 Quote Total
               </p>
               <p className="font-display text-2xl font-bold text-deep-pine">
-                {formatCurrency(result.clientQuoteTotalCents)}
+                {pdfProps.quoteTotal}
               </p>
             </div>
           </div>
@@ -183,22 +157,4 @@ function SummaryLine({ label, amount }: { label: string; amount: string }) {
       <span className="font-black text-deep-pine">{amount}</span>
     </div>
   );
-}
-
-// Friendly display names for categories on the summary. "Base" reads better as
-// "Base Package"; everything else uses its raw category name.
-function categoryLabel(category: string): string {
-  if (category === "Base") return "Base Package";
-  return category;
-}
-
-function formatQuoteDate(value: string): string {
-  if (!value) return "";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
 }
