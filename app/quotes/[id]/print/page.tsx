@@ -1,18 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
-import { DetailedQuotePdfDocument } from "@/components/pdf/detailed-quote-document";
 import { formatCurrency } from "@/lib/currency";
-import { getLogoDataUri } from "@/lib/pdf-logo";
-import { getSettings } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
-import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
-
-type SavedQuoteRow = {
-  id: string;
-  quote_data: QuoteFormState;
-  calculation_data: QuoteCalculationResult;
-};
+import { loadDetailedQuotePdfInput } from "@/lib/detailed-quote-pdf";
 
 type PageProps = {
   params: { id: string };
@@ -22,18 +12,9 @@ type PageProps = {
 export const dynamic = "force-dynamic";
 
 export default async function PrintQuotePage({ params }: PageProps) {
-  const [quoteResult, settings] = await Promise.all([
-    supabase
-      .from("quotes")
-      .select("id, quote_data, calculation_data")
-      .eq("id", params.id)
-      .single(),
-    getSettings()
-  ]);
+  const input = await loadDetailedQuotePdfInput(params.id);
 
-  const { data, error } = quoteResult;
-
-  if (error || !data || !data.quote_data || !data.calculation_data) {
+  if (!input) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <p className="mb-4 font-display text-3xl font-bold text-moss">
@@ -49,51 +30,13 @@ export default async function PrintQuotePage({ params }: PageProps) {
     );
   }
 
-  const row = data as SavedQuoteRow;
-  const quote = row.quote_data;
-  const result = row.calculation_data;
-
-  const fullAddress = [
-    quote.projectStreet,
-    quote.projectCity,
-    quote.projectState,
-    quote.projectZip
-  ]
-    .filter(Boolean)
-    .join(", ");
-
-  // Build the plain, pre-formatted props the react-pdf document needs. All
-  // money/date/locale formatting happens here (server-side) so the PDF
-  // component stays pure data-in, no Supabase or Date math.
-  const logoDataUri = getLogoDataUri();
-  const pdfProps = {
-    businessName: settings.businessName,
-    businessEmail: settings.businessEmail,
-    quoteId: quote.quoteId,
-    quoteDateLabel: formatQuoteDate(quote.quoteDate),
-    clientName: quote.clientName,
-    clientEmail: quote.clientEmail,
-    fullAddress,
-    projectType: quote.projectType,
-    squareFootageLabel: `${quote.squareFootage.toLocaleString()} sq ft`,
-    lines: result.clientFacingLines.map((line) => ({
-      name: line.name,
-      quantityLabel: line.quantity.toLocaleString(),
-      unitType: line.unitType,
-      unitPrice: formatCurrency(line.clientUnitPriceCents),
-      lineTotal: formatCurrency(line.clientLineTotalCents)
-    })),
-    quoteTotal: formatCurrency(result.clientQuoteTotalCents),
-    quoteNotes: settings.defaultQuoteNotes,
-    logoDataUri
-  };
+  const { quote, result, settings, fullAddress, quoteDateLabel } = input;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <DownloadPdfButton
-        document={<DetailedQuotePdfDocument {...pdfProps} />}
-        fileName={`quote-${quote.quoteId}.pdf`}
-        backHref={`/quotes/${row.id}`}
+        href={`/quotes/${params.id}/print/pdf`}
+        backHref={`/quotes/${params.id}`}
         backLabel="Back to quote"
         buttonLabel="Download PDF"
       />
@@ -126,9 +69,7 @@ export default async function PrintQuotePage({ params }: PageProps) {
             <p className="mt-1 text-sm font-black text-deep-pine">
               {quote.quoteId}
             </p>
-            <p className="text-sm text-charcoal/70">
-              {formatQuoteDate(quote.quoteDate)}
-            </p>
+            <p className="text-sm text-charcoal/70">{quoteDateLabel}</p>
           </div>
         </div>
 
@@ -208,15 +149,4 @@ export default async function PrintQuotePage({ params }: PageProps) {
       </section>
     </div>
   );
-}
-
-function formatQuoteDate(value: string): string {
-  if (!value) return "";
-  const date = new Date(`${value}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
 }

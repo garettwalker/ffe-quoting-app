@@ -41,7 +41,8 @@ app
     review/page.tsx             // Review + save
     [id]/page.tsx               // Saved quote view
     [id]/edit/page.tsx          // Saved quote editor
-    [id]/print/page.tsx         // Printable Detailed Quote
+    [id]/print/page.tsx         // Printable Detailed Quote (preview + Download PDF link)
+    [id]/print/pdf/route.tsx    // Server route: renders the Detailed Quote to a PDF buffer (react-pdf)
     [id]/summary/page.tsx       // Printable Summary Quote (category subtotals)
     [id]/invoices/page.tsx      // Invoicing setup + invoice list
     [id]/invoices/[kind]/print/page.tsx  // Printable invoice (initial/finish)
@@ -70,12 +71,13 @@ components
   project-type-editor.tsx      // admin editor for project_types
   settings-editor.tsx           // admin editor for the single app_settings row
   pdf/
-    download-pdf-button.tsx     // client wrapper: dynamic PDFDownloadLink (ssr:false) + back link
+    download-pdf-button.tsx     // plain link to the server PDF route + back link (no client-side react-pdf)
     detailed-quote-document.tsx // react-pdf <Document> recreation of the Detailed Quote printable
 
 lib
   calculations.ts
   currency.ts
+  detailed-quote-pdf.ts         // server: loads quote snapshot + settings, builds the react-pdf document props
   invoice-calculations.ts       // invoice amount math + outstanding balance
   pdf-logo.ts                   // server-only: reads /public/ffe-logo.png into a base64 data URI for react-pdf
   pricing.ts                    // server-side reads of the live pricing catalog + settings
@@ -356,7 +358,7 @@ Pending (rough priority):
 
 ## Recent work (history)
 
-- 2026-06-19: Began the PDF export upgrade (pilot on the Detailed Quote). Added `@react-pdf/renderer` and `transpilePackages: ["@react-pdf/renderer"]` in `next.config.js`. New `components/pdf/detailed-quote-document.tsx` (a react-pdf `<Document>` recreation of the on-screen Detailed Quote: logo + business header, Quote id + date, Prepared For / Project, the line-items table, Quote Total, notes, footer — built-in Times-Bold/Helvetica fonts, brand palette hex). New `components/pdf/download-pdf-button.tsx` (client wrapper; dynamically imports `PDFDownloadLink` with `ssr:false` so it only runs in the browser; renders the back link + a "Download PDF" button that generates the file in-browser on click). New `lib/pdf-logo.ts` (server-only; reads `/public/ffe-logo.png` into a base64 data URI so react-pdf embeds the logo with no network fetch). `app/quotes/[id]/print/page.tsx` now builds plain pre-formatted props from the saved snapshot + settings and swaps the old `window.print()` button for `DownloadPdfButton`; the existing HTML layout stays on screen as a preview. Summary Quote and invoices still use the browser print dialog pending the follow-up pass.
+- 2026-06-19: Began the PDF export upgrade (pilot on the Detailed Quote). Added `@react-pdf/renderer` and `experimental.serverComponentsExternalPackages: ["@react-pdf/renderer"]` in `next.config.js` (PDFs are rendered on the server, not in the browser). New `components/pdf/detailed-quote-document.tsx` (a react-pdf `<Document>` recreation of the on-screen Detailed Quote: logo + business header, Quote id + date, Prepared For / Project, the line-items table, Quote Total, notes, footer — built-in Times-Bold/Helvetica fonts, brand palette hex). New `lib/detailed-quote-pdf.ts` (server helper that loads the saved snapshot + live settings and builds the plain pre-formatted props the PDF needs; single source of truth shared by the preview page and the PDF route). New `lib/pdf-logo.ts` (server-only; reads `/public/ffe-logo.png` into a base64 data URI so react-pdf embeds the logo with no network fetch). New route handler `app/quotes/[id]/print/pdf/route.tsx` renders the document to a buffer with `renderToBuffer` and streams it back as a file download. New `components/pdf/download-pdf-button.tsx` is now just a plain link to that route (no client-side react-pdf). `app/quotes/[id]/print/page.tsx` uses the shared helper and swaps the old `window.print()` button for the Download PDF link; the existing HTML layout stays on screen as a preview. An earlier client-side attempt (PDFDownloadLink) blanked the page on load because it rendered the PDF eagerly on mount and threw; switched to server-side generation to avoid any client-side react-pdf. Summary Quote and invoices still use the browser print dialog pending the follow-up pass.
 - 2026-06-18: Overhauled the dashboard to read saved quotes from Supabase (`dashboard-saved-quotes.tsx`), made it owner-focused with a compact removable build-status panel, removed the old marketing empty state.
 - 2026-06-18: Added saved quote route `/quotes/[id]` (server component, loads from Supabase, no localStorage) and wired the dashboard Open buttons to it.
 - 2026-06-18: Added owner-only Internal Notes text box in the builder; notes show on owner views (review, saved quote) but never on customer-facing output. No schema change (field already existed).

@@ -1,5 +1,3 @@
-"use client";
-
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 
 // A react-pdf recreation of the on-screen Detailed Quote printable.
