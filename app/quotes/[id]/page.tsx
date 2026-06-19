@@ -61,10 +61,10 @@ export default async function SavedQuotePage({ params }: PageProps) {
             may be incorrect.
           </p>
           <Link
-            href="/"
+            href="/quotes"
             className="mt-6 inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
           >
-            Back to Dashboard
+            Back to Quotes
           </Link>
         </section>
       </AppShell>
@@ -96,10 +96,10 @@ export default async function SavedQuotePage({ params }: PageProps) {
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <Link
-            href="/"
+            href="/quotes"
             className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
           >
-            Back to dashboard
+            Back to quotes
           </Link>
 
           <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
@@ -203,10 +203,10 @@ export default async function SavedQuotePage({ params }: PageProps) {
 
           <div className="grid gap-3">
             <Link
-              href="/"
+              href="/quotes"
               className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
             >
-              Back to Dashboard
+              Back to Quotes
             </Link>
 
             {status === "draft" ? (

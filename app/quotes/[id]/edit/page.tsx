@@ -41,10 +41,10 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
             the link may be incorrect.
           </p>
           <Link
-            href="/"
+            href="/quotes"
             className="mt-6 inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
           >
-            Back to Dashboard
+            Back to Quotes
           </Link>
         </section>
       </AppShell>

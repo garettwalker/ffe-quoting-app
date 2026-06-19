@@ -38,10 +38,10 @@ export default async function PrintQuotePage({ params }: PageProps) {
           Quote not found.
         </p>
         <Link
-          href="/"
+          href="/quotes"
           className="inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
         >
-          Back to Dashboard
+          Back to Quotes
         </Link>
       </div>
     );

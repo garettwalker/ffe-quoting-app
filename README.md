@@ -15,7 +15,8 @@ This README is the long-term context file for the project. It is meant for both 
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Dashboard. Five-stage lifecycle (Draft, Prepared, Client Accepted, Pending Payments, Paid in Full) reading saved quotes from Supabase, plus an optional unsaved-working-copy resume card and a temporary build-status panel. |
+| `/` | Overview dashboard. Landing hub with quick actions (Start New Quote, Receivables, Manage Pricing), summary tiles (active quotes, awaiting payment + outstanding $, paid in full, pricing), an unsaved-working-copy resume card, and the 5 most recent quotes. Links into each tool. |
+| `/quotes` | The quoting tool. Full five-stage lifecycle pipeline (Draft, Prepared, Client Accepted, Pending Payments, Paid in Full) reading saved quotes from Supabase, plus a temporary build-status panel. |
 | `/quotes/new` | Quote builder. Starts a fresh quote or resumes the active browser working copy. |
 | `/quotes/review` | Review the completed quote before saving. Reads the active working copy from browser storage. |
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
@@ -33,8 +34,9 @@ This README is the long-term context file for the project. It is meant for both 
 app
   globals.css
   layout.tsx
-  page.tsx                      // Dashboard
+  page.tsx                      // Overview dashboard (hub)
   quotes
+    page.tsx                    // Quote lifecycle pipeline (5 stages)
     new/page.tsx                // Builder page
     review/page.tsx             // Review + save
     [id]/page.tsx               // Saved quote view
@@ -50,7 +52,7 @@ components
   app-shell.tsx
   dashboard-active-quote.tsx     // slim resume card for unsaved working copies
   dashboard-quote-section.tsx   // one pipeline stage (Draft / Prepared / Client Accepted)
-  dashboard-build-status.tsx     // TEMPORARY: internal build tracker, safe to delete later
+  dashboard-build-status.tsx     // TEMPORARY: internal build tracker, rendered on /quotes, safe to delete later
   status-badge.tsx              // draft/prepared/accepted + invoice paid/unpaid badges
   quote-status-button.tsx       // client button that updates quote.status then refreshes
   quote-builder.tsx
@@ -83,7 +85,7 @@ public
 
 ## How the quote flow works
 
-1. **Dashboard** (`/`) — owner starts a new quote or opens a saved one from history.
+1. **Dashboard** (`/`) — the overview hub. Owner starts a new quote, jumps to receivables or pricing, or picks a recent quote. The full quote list lives at **`/quotes`** (the quoting tool / lifecycle pipeline), where the owner also opens saved quotes from history.
 2. **Build** (`/quotes/new`) — enter project and client info, pricing setup, adders, internal notes. The builder keeps a temporary working copy in the browser (`localStorage` key `ffe-active-quote`) so work is not lost when moving between builder and review. This working copy is **cleared once the quote is saved to Supabase**; after that the owner works from the saved record. The active quote is purely a pre-save working copy. To abandon an unsaved working copy, use the builder's **Reset Quote** button.
 3. **Complete Quote** — validates required fields, saves the working copy, routes to `/quotes/review`.
 4. **Review** (`/quotes/review`) — review the customer-facing summary and final total, then save.
@@ -97,7 +99,7 @@ The builder has an "Internal Notes" text box. These notes are saved with the quo
 The saved quote page has a Delete Quote button with a confirm step. It removes the row from Supabase. This requires a delete RLS policy (see Supabase setup below).
 
 ### Quote lifecycle pipeline
-Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`. The dashboard groups saved quotes into five stacked stages that tell the whole customer life cycle: **Draft** (still being worked on), **Prepared** (ready to share with the client, or edit before sending), **Client Accepted** (billing and invoicing start here), **Pending Payments** (invoices set up, money still outstanding), and **Paid in Full** (every invoice paid).
+Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`. The `/quotes` pipeline groups saved quotes into five stacked stages that tell the whole customer life cycle: **Draft** (still being worked on), **Prepared** (ready to share with the client, or edit before sending), **Client Accepted** (billing and invoicing start here), **Pending Payments** (invoices set up, money still outstanding), and **Paid in Full** (every invoice paid). The overview dashboard (`/`) rolls these up into summary tiles (active quotes, awaiting payment, paid in full) with quick links into each tool.
 
 - **Save as draft** (in the builder) writes a `draft` row to Supabase with only a client name required, so work-in-progress is saved cross-device instead of only in the browser. The browser working copy is cleared once the draft is saved.
 - **Complete Quote** then **Prepare** (on the review page) writes/updates the row as `prepared` and is the customer-ready state.
@@ -105,9 +107,9 @@ Every saved quote has a row-level `status` of `draft`, `prepared`, or `accepted`
 - Once invoices are set up on an accepted quote, it automatically moves to **Pending Payments** (no button to click).
 - When every invoice on the quote is marked paid, it automatically moves to **Paid in Full** (no button to click).
 
-The last two stages are not stored on the row. They are derived on the fly from the row status plus `invoice_data` by `lifecycleStage()` in `lib/invoice-calculations.ts`: accepted + no invoice setup = Client Accepted; accepted + invoices with an outstanding balance = Pending Payments; accepted + all invoices paid = Paid in Full. Because it is derived, the dashboard always reflects the real payment state and can never disagree with the invoice records.
+The last two stages are not stored on the row. They are derived on the fly from the row status plus `invoice_data` by `lifecycleStage()` in `lib/invoice-calculations.ts`: accepted + no invoice setup = Client Accepted; accepted + invoices with an outstanding balance = Pending Payments; accepted + all invoices paid = Paid in Full. Because it is derived, the pipeline and dashboard always reflect the real payment state and can never disagree with the invoice records.
 
-Status changes (draft/prepared/accepted) are made by `QuoteStatusButton`, a small client component that runs `supabase.update({status})` then `router.refresh()`. Because the dashboard query lives in the server component `app/page.tsx`, the refresh re-runs it and the quote moves between stages without a manual reload. The same pattern powers the status-aware actions on the saved-quote page. `StatusBadge` now shows the derived lifecycle stage (Draft, Prepared, Accepted, Pending Payments, Paid in Full) rather than just the raw status.
+Status changes (draft/prepared/accepted) are made by `QuoteStatusButton`, a small client component that runs `supabase.update({status})` then `router.refresh()`. Because the pipeline query lives in the server component `app/quotes/page.tsx` (and the overview query lives in `app/page.tsx`), the refresh re-runs it and the quote moves between stages without a manual reload. The same pattern powers the status-aware actions on the saved-quote page. `StatusBadge` now shows the derived lifecycle stage (Draft, Prepared, Accepted, Pending Payments, Paid in Full) rather than just the raw status.
 
 **One-time SQL migration (run in the Supabase SQL Editor before deploying this change):**
 ```sql
@@ -116,13 +118,13 @@ update quotes set status = 'prepared' where status = 'completed';
 This moves every previously saved quote (all stamped `completed`) into the Prepared section so nothing is orphaned.
 
 ### Invoicing (accepted quotes)
-When a quote is Client Accepted, the saved-quote page and the dashboard Accepted card show an **Invoicing** link to `/quotes/[id]/invoices`. There the owner sets up invoicing:
+When a quote is Client Accepted, the saved-quote page and the `/quotes` Accepted card show an **Invoicing** link to `/quotes/[id]/invoices`. There the owner sets up invoicing:
 
 - **Contract amount** defaults to the accepted quote total and is editable.
 - **Rough-in / finish split** defaults to 50/50 and is editable. A warning appears if the two percentages do not total 100%.
 - **Permit fee** is entered as a dollar amount and shown as its own line on the initial invoice.
 - Two invoices are generated: the **initial invoice** (rough-in amount + permit fee) and the **finish invoice** (the remainder).
-- Each invoice can be marked **paid / unpaid**. The dashboard Accepted card and the invoicing page show the outstanding balance or "paid in full."
+- Each invoice can be marked **paid / unpaid**. The `/quotes` Accepted card, the overview "Awaiting payment" tile, and the invoicing page show the outstanding balance or "paid in full."
 - Each invoice has a printable page (`/quotes/[id]/invoices/[kind]/print`, kind = `initial` or `finish`) using the browser print dialog. Invoice references are `{quote_id}-R` (initial/rough-in) and `{quote_id}-F` (finish).
 
 Invoice setup is stored as JSONB in the `quotes.invoice_data` column (null until set up). Saving invoice setup preserves existing paid statuses by invoice kind. Invoicing math lives in `lib/invoice-calculations.ts`.
@@ -319,7 +321,8 @@ Preferences to follow when making changes:
 
 Done:
 - Next.js app foundation, FFE branding shell
-- Dashboard with five-stage lifecycle pipeline (Draft / Prepared / Client Accepted / Pending Payments / Paid in Full) reading saved quotes from Supabase
+- Overview dashboard at `/` (hub): quick actions, summary tiles (active quotes, awaiting payment + outstanding $, paid in full, pricing), unsaved-working-copy resume card, and 5 recent quotes
+- Quote lifecycle pipeline at `/quotes` (the quoting tool): five stacked stages (Draft / Prepared / Client Accepted / Pending Payments / Paid in Full) reading saved quotes from Supabase
 - Quote builder with pricing calculation, adders, internal notes, and Save as draft
 - Mobile layout
 - Review page (Prepare writes a prepared quote)
@@ -331,7 +334,7 @@ Done:
 - Daily-sequence quote IDs (client-side): new quotes get the next number for today from Supabase (e.g. Q-20260618-001, -002, -003)
 - Printable Detailed Quote page (`/quotes/[id]/print`) using the browser print dialog (no PDF dependency yet)
 - Printable Summary Quote page (`/quotes/[id]/summary`) using the browser print dialog. Condensed customer-facing version: one subtotal per pricing category plus the quote total, no unit prices. Reuses the printable-document pattern; category grouping via `summarizeByCategory` in `lib/calculations.ts`.
-- Quote status pipeline: draft, prepared, accepted with manual stage buttons on the dashboard and saved-quote page
+- Quote status pipeline: draft, prepared, accepted with manual stage buttons on the `/quotes` pipeline and saved-quote page
 - Invoicing from accepted quotes: contract amount, 50/50 rough-in/finish split (editable), permit fee, two invoices (initial = rough-in + permit, finish = remainder), paid/unpaid tracking, printable invoices, outstanding balance on the dashboard
 - Pricing admin (`/pricing-admin`): all pricing (line items, pricing levels, contingencies, project types) and business info / default quote notes / invoice payment terms moved out of the static `lib/seed-data.ts` file into Supabase tables, editable in the running app. Deactivate-only (no hard delete), editable sort order, active/inactive badges. Builder and print pages read live from Supabase via `lib/pricing.ts`.
 - Accounts Receivable (`/receivables`): collections view over every accepted quote with invoice setup. Two stacked tables — Pending Payments (anything still outstanding) and Historical Paid (paid in full) — one row per job with separate rough-in and finish columns showing amount + paid/outstanding status, plus a job-level total outstanding. Preset period filter (All time / This month / Last 30 days / This quarter / This year) and sort (oldest first / largest outstanding / newest / client). Read-only, derived entirely from `quotes.invoice_data`; no new tables.
@@ -366,3 +369,4 @@ Pending (rough priority):
 - 2026-06-19: Added the printable Summary Quote page (`/quotes/[id]/summary`). Condensed customer-facing companion to the Detailed Quote: one row per pricing category with its subtotal, then the quote total. No unit prices are shown. New `summarizeByCategory` helper in `lib/calculations.ts` groups `clientFacingLines` by category and sums client-facing totals (post pricing-level/contingency multiplier), preserving first-appearance order and dropping zero-total categories. Reuses `PrintQuoteButton` and the `.print-document` browser-print pattern. "Print Summary Quote" links added to the saved-quote page (prepared and accepted branches) and "Summary" links to the prepared and accepted dashboard cards. Marked the "PDF export: Summary Quote next" pending item complete; the only remaining PDF work is the optional react-pdf one-click-download upgrade.
 - 2026-06-19: Moved all pricing and customer-facing text out of the static `lib/seed-data.ts` file into Supabase, with an admin UI. New `/pricing-admin` route edits line items, pricing levels, contingencies, project types, and the business-info / default-quote-notes / invoice-payment-terms settings row (deactivate-only, no hard delete; editable sort order). New `lib/pricing.ts` (`getSettings`, `getPricingCatalog`) reads the catalog server-side; the builder pages and the three print pages now read live from Supabase (`force-dynamic`). `calculateQuote` takes the items/levels/contingencies arrays as parameters and resolves level/contingency by stable id with explicit default-id fallbacks. `quote-builder` and `quote-line-item-picker` take the catalog as props; dropdowns show active rows plus the currently-selected value so old quotes still resolve. `lib/seed-data.ts` was deleted. Owner ran the one-time SQL (five tables + seed + anon RLS policies) in Supabase beforehand. Marked the "Pricing admin" pending item complete.
 - 2026-06-19: Added the Accounts Receivable view (`/receivables`). Collections page over every accepted quote with invoice setup, split into two stacked tables: Pending Payments (any job with an outstanding balance, including partially-paid) and Historical Paid (fully paid; a job moves here automatically once the last invoice is paid). One row per job with separate rough-in and finish columns (amount + Paid/Unpaid badge + per-invoice outstanding or paid date), plus a job-level total outstanding and the earliest invoice issued date. Preset period filter (All time / This month / Last 30 days / This quarter / This year) and sort (oldest first / largest outstanding / newest / client), applied client-side. New `app/receivables/page.tsx` (server, `force-dynamic`, queries accepted quotes with `invoice_data` not null), `components/receivables-table.tsx` (client filter/sort/partition), `ReceivableInvoice`/`ReceivableJob` types, and small helpers `invoiceOutstandingCents` (`lib/invoice-calculations.ts`) and `formatDate` (`lib/currency.ts`). Reuses `outstandingCents`, `isFullyPaid`, `computeInvoiceAmounts`, `invoiceReference`. Read-only — no new tables or RLS policies. Added a Receivables nav link and a dashboard shortcut. Marked the "Accounts receivable view" pending item complete.
+- 2026-06-19: Restructured the app from a single "Dashboard" into a multi-tool suite. `/` is now an overview dashboard (hub): quick actions (Start New Quote, Receivables, Manage Pricing), four summary tiles (active quotes, awaiting payment + outstanding $, paid in full, manage pricing), the unsaved-working-copy resume card, and a 5-item recent quotes list. The quote lifecycle (the five stacked stages) moved to a new `/quotes` route (the quoting tool) with a "Back to dashboard" link and a Start New Quote button. Nav is now Dashboard / Quotes / Receivables / Pricing / Start New Quote. Quote-scoped back-links ("Back to dashboard") became "Back to quotes" → `/quotes`; pricing-admin and receivables keep "Back to dashboard" → `/`. New `app/quotes/page.tsx` (moved lifecycle + `QuotesHeader`); `app/page.tsx` rewritten as the overview. `DashboardResumeActiveQuote` moved to the overview; `DashboardBuildStatus` stays on `/quotes` (still temporary). No data or schema changes.

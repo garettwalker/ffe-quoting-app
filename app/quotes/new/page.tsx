@@ -14,10 +14,10 @@ export default async function NewQuotePage() {
     <AppShell>
       <div className="mb-8">
         <Link
-          href="/"
+          href="/quotes"
           className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
         >
-          Back to dashboard
+          Back to quotes
         </Link>
 
         <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
