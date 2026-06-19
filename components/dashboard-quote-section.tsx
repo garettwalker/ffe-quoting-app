@@ -119,6 +119,15 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
     </Link>
   );
 
+  const summaryLink = (
+    <Link
+      href={`/quotes/${quote.id}/summary`}
+      className="rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+    >
+      Summary
+    </Link>
+  );
+
   const continueLink = (
     <Link
       href={`/quotes/${quote.id}/edit`}
@@ -156,6 +165,7 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
           size="sm"
         />
         {printLink}
+        {summaryLink}
       </>
     );
   }
@@ -164,6 +174,7 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
     <>
       {openLink}
       {printLink}
+      {summaryLink}
       <Link
         href={`/quotes/${quote.id}/invoices`}
         className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"

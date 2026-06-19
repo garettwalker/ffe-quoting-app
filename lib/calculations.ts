@@ -91,6 +91,24 @@ export function calculateQuote(
   };
 }
 
+// Group the client-facing lines by category and sum each category's
+// client-facing total (post pricing-level/contingency multiplier), preserving
+// first-appearance order. The Base line (category "Base") is always first.
+// Categories that total zero are dropped so the summary stays clean. Used by
+// the printable Summary Quote.
+export function summarizeByCategory(result: QuoteCalculationResult) {
+  const order: string[] = [];
+  const totals = new Map<string, number>();
+  for (const line of result.clientFacingLines) {
+    const prev = totals.get(line.category) ?? 0;
+    totals.set(line.category, prev + line.clientLineTotalCents);
+    if (!order.includes(line.category)) order.push(line.category);
+  }
+  return order
+    .map((category) => ({ category, totalCents: totals.get(category) ?? 0 }))
+    .filter((entry) => entry.totalCents > 0);
+}
+
 function getBaseRate(quote: QuoteFormState): {
   cents: number;
   label: string;

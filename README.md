@@ -21,6 +21,7 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
 | `/quotes/[id]/edit` | Edit a saved quote. Loads it from Supabase into the builder; saving updates the existing row. |
 | `/quotes/[id]/print` | Printable Detailed Quote page (customer-facing). Opens the browser print dialog to save as PDF. |
+| `/quotes/[id]/summary` | Printable Summary Quote page (customer-facing). Condensed: one subtotal per pricing category plus the quote total, no unit prices. Browser print dialog. |
 | `/quotes/[id]/invoices` | Invoicing page for an accepted quote. Set contract amount, rough-in/finish split, and permit fee; mark invoices paid; print invoices. |
 | `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). Browser print dialog, save as PDF. |
 
@@ -37,6 +38,7 @@ app
     [id]/page.tsx               // Saved quote view
     [id]/edit/page.tsx          // Saved quote editor
     [id]/print/page.tsx         // Printable Detailed Quote
+    [id]/summary/page.tsx       // Printable Summary Quote (category subtotals)
     [id]/invoices/page.tsx      // Invoicing setup + invoice list
     [id]/invoices/[kind]/print/page.tsx  // Printable invoice (initial/finish)
 
@@ -238,11 +240,11 @@ Done:
 - Owner-only internal notes (not shown to customer)
 - Daily-sequence quote IDs (client-side): new quotes get the next number for today from Supabase (e.g. Q-20260618-001, -002, -003)
 - Printable Detailed Quote page (`/quotes/[id]/print`) using the browser print dialog (no PDF dependency yet)
+- Printable Summary Quote page (`/quotes/[id]/summary`) using the browser print dialog. Condensed customer-facing version: one subtotal per pricing category plus the quote total, no unit prices. Reuses the printable-document pattern; category grouping via `summarizeByCategory` in `lib/calculations.ts`.
 - Quote status pipeline: draft, prepared, accepted with manual stage buttons on the dashboard and saved-quote page
 - Invoicing from accepted quotes: contract amount, 50/50 rough-in/finish split (editable), permit fee, two invoices (initial = rough-in + permit, finish = remainder), paid/unpaid tracking, printable invoices, outstanding balance on the dashboard
 
 Pending (rough priority):
-- PDF export: Summary Quote next (Detailed Quote and invoices are done as printable pages)
 - Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the layouts are finalized
 - Invoice enhancements: deposit invoice, more than two invoices, dedicated sequential invoice numbers, reset-paid button
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
@@ -270,3 +272,4 @@ Pending (rough priority):
 - 2026-06-19: Extended the dashboard lifecycle from three stages to five by deriving two new stages from invoice setup. Accepted quotes now split into Client Accepted (no invoices yet), Pending Payments (invoices set up, money outstanding), and Paid in Full (every invoice paid). No schema change and no new buttons; the stages are computed on the fly by `lifecycleStage()` in `lib/invoice-calculations.ts` from the row status plus `invoice_data`. `StatusBadge` now shows the derived stage. The dashboard renders five stacked sections (Stage 1 Draft through Stage 5 Paid in Full), each with its own description and empty state.
 - 2026-06-19: Confirmed both one-time SQL migrations are applied in Supabase: zero rows still carry `status = 'completed'`, and the `invoice_data` jsonb column exists. The anon UPDATE policy is also present. Removed the pre-deploy migration reminder from the Pending list.
 - 2026-06-19: Added a pending item and standing practice note: only admin may pull a quote back out of the invoicing lifecycle once access levels exist (gate the "Reopen as prepared" / "Move back to drafts" buttons on accepted, pending-payment, and paid-in-full quotes), and the Pending list should be reviewed on every change so accomplished items are removed or marked complete.
+- 2026-06-19: Added the printable Summary Quote page (`/quotes/[id]/summary`). Condensed customer-facing companion to the Detailed Quote: one row per pricing category with its subtotal, then the quote total. No unit prices are shown. New `summarizeByCategory` helper in `lib/calculations.ts` groups `clientFacingLines` by category and sums client-facing totals (post pricing-level/contingency multiplier), preserving first-appearance order and dropping zero-total categories. Reuses `PrintQuoteButton` and the `.print-document` browser-print pattern. "Print Summary Quote" links added to the saved-quote page (prepared and accepted branches) and "Summary" links to the prepared and accepted dashboard cards. Marked the "PDF export: Summary Quote next" pending item complete; the only remaining PDF work is the optional react-pdf one-click-download upgrade.

@@ -246,6 +246,12 @@ export default async function SavedQuotePage({ params }: PageProps) {
                 >
                   Print Detailed Quote
                 </Link>
+                <Link
+                  href={`/quotes/${row.id}/summary`}
+                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                >
+                  Print Summary Quote
+                </Link>
                 <QuoteStatusButton
                   quoteId={row.id}
                   newStatus="draft"
@@ -262,6 +268,12 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
                 >
                   Print Detailed Quote
+                </Link>
+                <Link
+                  href={`/quotes/${row.id}/summary`}
+                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                >
+                  Print Summary Quote
                 </Link>
                 <Link
                   href={`/quotes/${row.id}/invoices`}
