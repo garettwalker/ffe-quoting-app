@@ -1,27 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { InvoicePrintButton } from "@/components/invoice-print-button";
-import { formatCurrency } from "@/lib/currency";
-import {
-  computeInvoiceAmounts,
-  invoiceReference
-} from "@/lib/invoice-calculations";
-import { getSettings } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
-import type {
-  InvoiceData,
-  InvoiceKind,
-  QuoteCalculationResult,
-  QuoteFormState
-} from "@/lib/types";
-
-type PrintRow = {
-  id: string;
-  quote_id: string;
-  quote_data: QuoteFormState;
-  calculation_data: QuoteCalculationResult;
-  invoice_data: InvoiceData | null;
-};
+import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
+import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
 
 type PageProps = {
   params: { id: string; kind: string };
@@ -30,60 +10,32 @@ type PageProps = {
 // Always read the live business info / payment terms from Supabase.
 export const dynamic = "force-dynamic";
 
+// Printable invoice (initial or finish). The on-screen section below is a
+// preview of the downloaded PDF; both render from the same pre-formatted props
+// built by loadInvoicePdfInput, so they can never drift apart. Clicking
+// Download PDF hits the server route /quotes/[id]/invoices/[kind]/pdf which
+// renders the react-pdf document to a buffer and streams it back as a file
+// download. kind is validated by the helper (returns null for anything other
+// than initial/finish, or when invoicing has not been set up).
 export default async function PrintInvoicePage({ params }: PageProps) {
-  const kind = params.kind;
-  if (kind !== "initial" && kind !== "finish") {
+  const input = await loadInvoicePdfInput(params.id, params.kind);
+  if (!input) {
     return <InvoiceNotFound />;
   }
 
-  const [quoteResult, settings] = await Promise.all([
-    supabase
-      .from("quotes")
-      .select("id, quote_id, quote_data, calculation_data, invoice_data")
-      .eq("id", params.id)
-      .single(),
-    getSettings()
-  ]);
-
-  const { data, error } = quoteResult;
-
-  if (
-    error ||
-    !data ||
-    !data.quote_data ||
-    !data.calculation_data ||
-    !data.invoice_data
-  ) {
-    return <InvoiceNotFound />;
-  }
-
-  const row = data as PrintRow;
-  const quote = row.quote_data;
-  const invoiceData = data.invoice_data as InvoiceData;
-  const invoice = invoiceData.invoices.find((entry) => entry.kind === kind);
-
-  if (!invoice) {
-    return <InvoiceNotFound />;
-  }
-
-  const amounts = computeInvoiceAmounts(invoiceData);
-  const reference = invoiceReference(row.quote_id, kind as InvoiceKind);
-  const invoiceDate = formatInvoiceDate(invoice.issuedAt ?? invoiceData.generatedAt);
-
-  const fullAddress = [
-    quote.projectStreet,
-    quote.projectCity,
-    quote.projectState,
-    quote.projectZip
-  ]
+  const { pdfProps } = input;
+  const projectSecondary = [pdfProps.projectType, pdfProps.squareFootageLabel]
     .filter(Boolean)
-    .join(", ");
-
-  const title = kind === "initial" ? "Initial Invoice" : "Finish Invoice";
+    .join(" · ");
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <InvoicePrintButton quoteId={row.id} />
+      <DownloadPdfButton
+        href={`/quotes/${params.id}/invoices/${params.kind}/pdf`}
+        backHref={`/quotes/${params.id}/invoices`}
+        backLabel="Back to invoices"
+        buttonLabel="Download PDF"
+      />
 
       <section className="print-document rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
         <div className="flex flex-col gap-6 border-b border-pine/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
@@ -98,10 +50,10 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             />
             <div>
               <p className="font-display text-2xl font-bold text-deep-pine">
-                {settings.businessName}
+                {pdfProps.businessName}
               </p>
               <p className="text-sm font-bold text-charcoal/70">
-                {settings.businessEmail}
+                {pdfProps.businessEmail}
               </p>
             </div>
           </div>
@@ -110,8 +62,8 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             <p className="font-display text-3xl font-bold tracking-[-0.03em] text-moss">
               Invoice
             </p>
-            <p className="mt-1 text-sm font-black text-deep-pine">{reference}</p>
-            <p className="text-sm text-charcoal/70">{invoiceDate}</p>
+            <p className="mt-1 text-sm font-black text-deep-pine">{pdfProps.reference}</p>
+            <p className="text-sm text-charcoal/70">{pdfProps.invoiceDateLabel}</p>
           </div>
         </div>
 
@@ -120,9 +72,9 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
               Bill To
             </p>
-            <p className="font-black text-deep-pine">{quote.clientName}</p>
-            {quote.clientEmail ? (
-              <p className="text-sm text-charcoal/70">{quote.clientEmail}</p>
+            <p className="font-black text-deep-pine">{pdfProps.clientName}</p>
+            {pdfProps.clientEmail ? (
+              <p className="text-sm text-charcoal/70">{pdfProps.clientEmail}</p>
             ) : null}
           </div>
 
@@ -130,48 +82,34 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
               Project
             </p>
-            <p className="font-bold text-charcoal">{fullAddress}</p>
-            <p className="text-sm text-charcoal/70">
-              {quote.projectType} · {quote.squareFootage.toLocaleString()} sq ft
-            </p>
+            <p className="font-bold text-charcoal">{pdfProps.fullAddress}</p>
+            {projectSecondary ? (
+              <p className="text-sm text-charcoal/70">{projectSecondary}</p>
+            ) : null}
           </div>
         </div>
 
         <p className="mb-3 text-sm font-black uppercase tracking-[0.12em] text-clay">
-          {title}
+          {pdfProps.title}
         </p>
 
         <div className="overflow-hidden rounded-xl1 border border-pine/10">
           <div className="divide-y divide-pine/10 bg-cream">
-            {kind === "initial" ? (
-              <>
-                <InvoiceLine
-                  label={`Rough-In (${invoiceData.roughInPercent}% of contract)`}
-                  amount={formatCurrency(amounts.roughInAmountCents)}
-                />
-                <InvoiceLine
-                  label="Permit Fee"
-                  amount={formatCurrency(invoiceData.permitFeeCents)}
-                />
-              </>
-            ) : (
-              <InvoiceLine
-                label={`Finish (${invoiceData.finishPercent}% of contract)`}
-                amount={formatCurrency(amounts.finishAmountCents)}
-              />
-            )}
+            {pdfProps.lines.map((line) => (
+              <InvoiceLine key={line.label} label={line.label} amount={line.amount} />
+            ))}
           </div>
         </div>
 
-        {kind === "finish" ? (
+        {pdfProps.previouslyInvoiced ? (
           <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
             <div className="flex items-center justify-between gap-4">
               <span>Previously invoiced (Rough-In + Permit)</span>
-              <span>{formatCurrency(amounts.initialInvoiceAmountCents)}</span>
+              <span>{pdfProps.previouslyInvoiced.previouslyInvoicedAmount}</span>
             </div>
             <div className="mt-1 flex items-center justify-between gap-4">
               <span>Contract total</span>
-              <span>{formatCurrency(invoiceData.contractAmountCents)}</span>
+              <span>{pdfProps.previouslyInvoiced.contractTotal}</span>
             </div>
           </div>
         ) : null}
@@ -183,18 +121,19 @@ export default async function PrintInvoicePage({ params }: PageProps) {
                 Amount Due
               </p>
               <p className="font-display text-2xl font-bold text-deep-pine">
-                {formatCurrency(invoice.amountCents)}
+                {pdfProps.amountDue}
               </p>
             </div>
           </div>
         </div>
 
         <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
-          {settings.invoicePaymentTerms}
+          {pdfProps.paymentTerms}
         </div>
 
         <div className="mt-8 border-t border-pine/10 pt-4 text-center text-xs font-bold text-charcoal/60">
-          {settings.businessName} · {settings.businessEmail} · Invoice {reference}
+          {pdfProps.businessName} · {pdfProps.businessEmail} · Invoice{" "}
+          {pdfProps.reference}
         </div>
       </section>
     </div>
@@ -227,14 +166,4 @@ function InvoiceNotFound() {
       </Link>
     </div>
   );
-}
-
-function formatInvoiceDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", {
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
 }

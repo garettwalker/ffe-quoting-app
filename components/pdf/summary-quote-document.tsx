@@ -1,11 +1,10 @@
 import React from "react";
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import { Document, Page } from "@react-pdf/renderer";
 import {
-  PDF_COLORS,
-  PDF_INK,
   PdfFooter,
   PdfHeader,
   PdfInfoGrid,
+  PdfList,
   PdfNotes,
   PdfSectionLabel,
   PdfTotalBox,
@@ -41,41 +40,6 @@ export type SummaryQuotePdfProps = {
   quoteNotes: string; // settings.defaultQuoteNotes
   logoDataUri: string | null;
 };
-
-const listStyles = StyleSheet.create({
-  list: {
-    borderWidth: 1,
-    borderColor: PDF_INK.borderPine,
-    borderRadius: 6
-  },
-  row: {
-    flexDirection: "row",
-    paddingVertical: 11,
-    paddingHorizontal: 14,
-    backgroundColor: PDF_COLORS.cream,
-    borderBottomWidth: 1,
-    borderBottomColor: PDF_INK.borderPineFaint
-  },
-  rowLabel: {
-    flex: 1,
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    color: PDF_COLORS.charcoal
-  },
-  rowAmount: {
-    width: 120,
-    textAlign: "right",
-    fontSize: 10,
-    fontFamily: "Helvetica-Bold",
-    color: PDF_COLORS.deepPine
-  },
-  empty: {
-    padding: 14,
-    fontSize: 9.5,
-    fontFamily: "Helvetica-Bold",
-    color: PDF_INK.textSofter
-  }
-});
 
 export function SummaryQuotePdfDocument(props: SummaryQuotePdfProps) {
   const {
@@ -122,27 +86,7 @@ export function SummaryQuotePdfDocument(props: SummaryQuotePdfProps) {
         />
 
         <PdfSectionLabel>SCOPE SUMMARY</PdfSectionLabel>
-        <View style={listStyles.list}>
-          {categories.length === 0 ? (
-            <View style={listStyles.empty}>
-              <Text>No priced items on this quote.</Text>
-            </View>
-          ) : (
-            categories.map((entry, index) => (
-              <View
-                key={`${entry.label}-${index}`}
-                style={{
-                  ...listStyles.row,
-                  borderBottomWidth:
-                    index === categories.length - 1 ? 0 : listStyles.row.borderBottomWidth
-                }}
-              >
-                <Text style={listStyles.rowLabel}>{entry.label}</Text>
-                <Text style={listStyles.rowAmount}>{entry.amount}</Text>
-              </View>
-            ))
-          )}
-        </View>
+        <PdfList items={categories} emptyLabel="No priced items on this quote." />
 
         <PdfTotalBox label="QUOTE TOTAL" value={quoteTotal} />
 

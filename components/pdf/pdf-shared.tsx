@@ -173,6 +173,77 @@ const styles = StyleSheet.create({
 
 export const pdfPageStyle = styles.page;
 
+// A bordered box of label/amount rows (one per line item / category), with a
+// faint divider between rows and none after the last. Used by the Summary
+// Quote (category subtotals) and the Invoice (charge lines). Empty state shows
+// a muted message instead of an empty box.
+const listStyles = StyleSheet.create({
+  list: {
+    borderWidth: 1,
+    borderColor: PDF_INK.borderPine,
+    borderRadius: 6
+  },
+  row: {
+    flexDirection: "row",
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    backgroundColor: PDF_COLORS.cream,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_INK.borderPineFaint
+  },
+  rowLabel: {
+    flex: 1,
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.charcoal
+  },
+  rowAmount: {
+    width: 120,
+    textAlign: "right",
+    fontSize: 10,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.deepPine
+  },
+  empty: {
+    padding: 14,
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_INK.textSofter
+  }
+});
+
+export function PdfList({
+  items,
+  emptyLabel
+}: {
+  items: Array<{ label: string; amount: string }>;
+  emptyLabel?: string;
+}) {
+  return (
+    <View style={listStyles.list}>
+      {items.length === 0 ? (
+        <View style={listStyles.empty}>
+          <Text>{emptyLabel ?? "No priced items on this quote."}</Text>
+        </View>
+      ) : (
+        items.map((entry, index) => (
+          <View
+            key={`${entry.label}-${index}`}
+            style={{
+              ...listStyles.row,
+              borderBottomWidth:
+                index === items.length - 1 ? 0 : listStyles.row.borderBottomWidth
+            }}
+          >
+            <Text style={listStyles.rowLabel}>{entry.label}</Text>
+            <Text style={listStyles.rowAmount}>{entry.amount}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}
+
 type HeaderProps = {
   businessName: string;
   businessEmail: string;
