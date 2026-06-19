@@ -24,6 +24,7 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/[id]/summary` | Printable Summary Quote page (customer-facing). Condensed: one subtotal per pricing category plus the quote total, no unit prices. Browser print dialog. |
 | `/quotes/[id]/invoices` | Invoicing page for an accepted quote. Set contract amount, rough-in/finish split, and permit fee; mark invoices paid; print invoices. |
 | `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). Browser print dialog, save as PDF. |
+| `/pricing-admin` | Pricing admin. Edit line items, pricing levels, contingencies, project types, and business info/quote notes/invoice terms stored in Supabase. Deactivate-only (no hard delete). |
 
 ## File structure
 
@@ -41,6 +42,7 @@ app
     [id]/summary/page.tsx       // Printable Summary Quote (category subtotals)
     [id]/invoices/page.tsx      // Invoicing setup + invoice list
     [id]/invoices/[kind]/print/page.tsx  // Printable invoice (initial/finish)
+  pricing-admin/page.tsx       // Pricing admin (items, levels, contingencies, project types, settings)
 
 components
   app-shell.tsx
@@ -56,13 +58,19 @@ components
   invoice-builder.tsx           // invoice setup form (contract, split, permit)
   invoice-paid-button.tsx       // toggles an invoice paid/unpaid
   invoice-print-button.tsx      // window.print + back link for printable invoices
+  pricing-admin-ui.tsx          // shared Field/buttons/badges for the admin editors
+  pricing-item-editor.tsx       // admin editor for pricing_items
+  pricing-level-editor.tsx      // admin editor for pricing_levels
+  contingency-editor.tsx       // admin editor for contingency_options
+  project-type-editor.tsx      // admin editor for project_types
+  settings-editor.tsx           // admin editor for the single app_settings row
 
 lib
   calculations.ts
   currency.ts
   invoice-calculations.ts       // invoice amount math + outstanding balance
+  pricing.ts                    // server-side reads of the live pricing catalog + settings
   quote-storage.ts
-  seed-data.ts
   supabase.ts
   types.ts
 
@@ -124,7 +132,9 @@ No new RLS policies are needed; the existing anon select/update policies cover t
 
 ## Pricing and calculation logic
 
-Pricing seed data lives in `lib/seed-data.ts` (41 items across categories: Base, Lighting, Outlets, Circuits, Panels & Service, Garage, EV, Generator, Specialty, Basement, Fans, Bath Fans, Service Work). Calculations live in `lib/calculations.ts`. Money is stored in cents; `lib/currency.ts` formats it.
+Pricing and customer-facing text now live in Supabase (not a static file) and are edited through the `/pricing-admin` page. The two builder entry points (`/quotes/new` and `/quotes/[id]/edit`) are async server components that call `getPricingCatalog()` in `lib/pricing.ts` and pass the catalog down into `<QuoteBuilder>`, which threads the items into the picker and the levels/contingencies into `calculateQuote`. The printable Detailed Quote, Summary Quote, and invoice pages call `getSettings()` for business name/email, default quote notes, and invoice payment terms. All of these read live on every request (`force-dynamic` + the shared client's `cache: "no-store"`), so a price change in `/pricing-admin` shows up the next time a quote is started or a printable is opened.
+
+Calculations live in `lib/calculations.ts`. Money is stored in cents; `lib/currency.ts` formats it. The catalog types (`PricingItem`, `PricingLevel`, `ContingencyOption`, `ProjectType`, `AppSettings`, `PricingCatalog`) are in `lib/types.ts`.
 
 Base rate (evaluated in order):
 - Manual mode = manual base rate
@@ -133,12 +143,7 @@ Base rate (evaluated in order):
 - High Ceiling / Complex Switching = $6.50 / sq ft
 - Default = $6.00 / sq ft
 
-Pricing levels (adjustment multipliers, not literal gross margin):
-- Contractor/Builder = 90%
-- Standard/Custom = 100%
-- Premium/High-End = 120%
-
-Contingency options: 0% (1.00), 5% (1.05), 10% (1.10), 15% (1.15).
+Pricing levels and contingency options are multiplier rows in Supabase (edited in `/pricing-admin`). The seeded defaults are: levels Contractor/Builder 0.90, Standard/Custom 1.00, Premium/High-End 1.20; contingencies 0% / 5% / 10% / 15% (1.00 / 1.05 / 1.10 / 1.15). Project types default to Custom Home, Spec Home, New Build, Remodel, Service Work.
 
 Calculation:
 ```
@@ -149,7 +154,84 @@ combined multiplier = pricing level multiplier * contingency multiplier
 final quote         = total before client * combined multiplier
 ```
 
-Do not delete existing pricing item names once quotes exist. The plan is to add an `active` flag later so old quotes stay historically accurate. Saved quotes already store full `quote_data` and `calculation_data` JSONB snapshots, which protects historical pricing.
+`calculateQuote` resolves the pricing level and contingency by stable id, falling back to an explicit default id (not array index) so reordering or deactivating rows never silently changes a quote. The builder dropdowns show rows where `active` is true **plus** the quote's currently-selected value, so editing an old quote that references a now-inactive level/item still resolves and displays it. Quotes store the project-type **display name** (not the row id) for backward compatibility with existing saved quotes.
+
+Pricing rows are deactivated, never hard-deleted, so old quotes and drafts keep resolving. Saved quotes already store full `quote_data` and `calculation_data` JSONB snapshots, which protects historical pricing: only the live builder re-resolves pricing; saved views and printables always render from the snapshot.
+
+**One-time SQL (run in the Supabase SQL Editor before deploying pricing admin):**
+```sql
+create table if not exists public.pricing_items (
+  id text primary key,
+  category text not null,
+  name text not null,
+  unit_type text not null,
+  base_price_cents integer not null default 0,
+  active boolean not null default true,
+  sort_order integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.pricing_levels (
+  id text primary key,
+  name text not null,
+  multiplier numeric not null default 1,
+  description text not null default '',
+  active boolean not null default true,
+  sort_order integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.contingency_options (
+  id text primary key,
+  name text not null,
+  multiplier numeric not null default 1,
+  active boolean not null default true,
+  sort_order integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.project_types (
+  id text primary key,
+  name text not null,
+  active boolean not null default true,
+  sort_order integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.app_settings (
+  id integer primary key default 1,
+  business_name text not null default '',
+  business_email text not null default '',
+  business_tagline text not null default '',
+  default_quote_notes text not null default '',
+  invoice_payment_terms text not null default '',
+  updated_at timestamptz not null default now()
+);
+```
+Then seed the five tables from the current values (the 41 pricing items, 3 levels, 4 contingencies, 5 project types, and the business info / default quote notes / invoice payment terms that used to live in `lib/seed-data.ts`). Enable RLS and add permissive anon policies per table (mirroring the `quotes` policies) for the build phase:
+```sql
+alter table public.pricing_items       enable row level security;
+alter table public.pricing_levels      enable row level security;
+alter table public.contingency_options enable row level security;
+alter table public.project_types       enable row level security;
+alter table public.app_settings        enable row level security;
+
+create policy "Allow browser insert pricing during app build" on public.pricing_items       for insert to anon with check (true);
+create policy "Allow browser read pricing during app build"   on public.pricing_items       for select to anon using (true);
+create policy "Allow browser update pricing during app build" on public.pricing_items       for update to anon using (true) with check (true);
+create policy "Allow browser insert pricing during app build" on public.pricing_levels      for insert to anon with check (true);
+create policy "Allow browser read pricing during app build"   on public.pricing_levels      for select to anon using (true);
+create policy "Allow browser update pricing during app build" on public.pricing_levels      for update to anon using (true) with check (true);
+create policy "Allow browser insert pricing during app build" on public.contingency_options for insert to anon with check (true);
+create policy "Allow browser read pricing during app build"   on public.contingency_options for select to anon using (true);
+create policy "Allow browser update pricing during app build" on public.contingency_options for update to anon using (true) with check (true);
+create policy "Allow browser insert pricing during app build" on public.project_types       for insert to anon with check (true);
+create policy "Allow browser read pricing during app build"   on public.project_types       for select to anon using (true);
+create policy "Allow browser update pricing during app build" on public.project_types       for update to anon using (true) with check (true);
+create policy "Allow browser read settings during app build"  on public.app_settings        for select to anon using (true);
+create policy "Allow browser update settings during app build" on public.app_settings       for update to anon using (true) with check (true);
+```
+If the migration is skipped, the builder shows an empty picker plus a "Pricing not configured" banner, and print pages show empty business info. No new policies are needed beyond these dev-permissive anon ones; they must be tightened (and `/pricing-admin` gated to admin) alongside the existing RLS-tightening item before production.
 
 ## Supabase setup
 
@@ -243,6 +325,7 @@ Done:
 - Printable Summary Quote page (`/quotes/[id]/summary`) using the browser print dialog. Condensed customer-facing version: one subtotal per pricing category plus the quote total, no unit prices. Reuses the printable-document pattern; category grouping via `summarizeByCategory` in `lib/calculations.ts`.
 - Quote status pipeline: draft, prepared, accepted with manual stage buttons on the dashboard and saved-quote page
 - Invoicing from accepted quotes: contract amount, 50/50 rough-in/finish split (editable), permit fee, two invoices (initial = rough-in + permit, finish = remainder), paid/unpaid tracking, printable invoices, outstanding balance on the dashboard
+- Pricing admin (`/pricing-admin`): all pricing (line items, pricing levels, contingencies, project types) and business info / default quote notes / invoice payment terms moved out of the static `lib/seed-data.ts` file into Supabase tables, editable in the running app. Deactivate-only (no hard delete), editable sort order, active/inactive badges. Builder and print pages read live from Supabase via `lib/pricing.ts`.
 
 Pending (rough priority):
 - Optional: upgrade printable pages to one-click downloaded PDFs (react-pdf) once the layouts are finalized
@@ -251,8 +334,7 @@ Pending (rough priority):
 - Owner/admin login (Supabase Auth), one owner + one builder/admin
 - Access-level restriction: only admin may pull a quote back out of the invoicing lifecycle (the "Reopen as prepared" and "Move back to drafts" actions on Client Accepted / Pending Payments / Paid in Full quotes). Non-admin users can move quotes forward but not reopen an invoiced or paid quote. Gate the `QuoteStatusButton` instances that set `newStatus` to `prepared` or `draft` on an accepted quote (in `app/quotes/[id]/page.tsx` and `components/dashboard-quote-section.tsx`) behind an admin-role check once auth exists. Pairs with the RLS tightening item below.
 - **Review this Pending list on every change** and remove (or mark complete) any item that has been accomplished, so the list stays accurate and does not drift.
-- Tighten Supabase RLS for production (remove anon policies, add auth)
-- Pricing admin (move pricing to Supabase, active/inactive items, preserve historical snapshots)
+- Tighten Supabase RLS for production (remove anon policies, add auth) — includes the five new pricing tables and `app_settings`; gate `/pricing-admin` to admin once auth exists
 - Move quote ID sequencing server-side for hard multi-user concurrency safety (the current client-side sequence is fine for a single owner)
 - Optional: change the `quotes.status` column default from `completed` to `draft`
 - Remove the temporary `dashboard-build-status.tsx` component once the build is complete
@@ -274,3 +356,4 @@ Pending (rough priority):
 - 2026-06-19: Confirmed both one-time SQL migrations are applied in Supabase: zero rows still carry `status = 'completed'`, and the `invoice_data` jsonb column exists. The anon UPDATE policy is also present. Removed the pre-deploy migration reminder from the Pending list.
 - 2026-06-19: Added a pending item and standing practice note: only admin may pull a quote back out of the invoicing lifecycle once access levels exist (gate the "Reopen as prepared" / "Move back to drafts" buttons on accepted, pending-payment, and paid-in-full quotes), and the Pending list should be reviewed on every change so accomplished items are removed or marked complete.
 - 2026-06-19: Added the printable Summary Quote page (`/quotes/[id]/summary`). Condensed customer-facing companion to the Detailed Quote: one row per pricing category with its subtotal, then the quote total. No unit prices are shown. New `summarizeByCategory` helper in `lib/calculations.ts` groups `clientFacingLines` by category and sums client-facing totals (post pricing-level/contingency multiplier), preserving first-appearance order and dropping zero-total categories. Reuses `PrintQuoteButton` and the `.print-document` browser-print pattern. "Print Summary Quote" links added to the saved-quote page (prepared and accepted branches) and "Summary" links to the prepared and accepted dashboard cards. Marked the "PDF export: Summary Quote next" pending item complete; the only remaining PDF work is the optional react-pdf one-click-download upgrade.
+- 2026-06-19: Moved all pricing and customer-facing text out of the static `lib/seed-data.ts` file into Supabase, with an admin UI. New `/pricing-admin` route edits line items, pricing levels, contingencies, project types, and the business-info / default-quote-notes / invoice-payment-terms settings row (deactivate-only, no hard delete; editable sort order). New `lib/pricing.ts` (`getSettings`, `getPricingCatalog`) reads the catalog server-side; the builder pages and the three print pages now read live from Supabase (`force-dynamic`). `calculateQuote` takes the items/levels/contingencies arrays as parameters and resolves level/contingency by stable id with explicit default-id fallbacks. `quote-builder` and `quote-line-item-picker` take the catalog as props; dropdowns show active rows plus the currently-selected value so old quotes still resolve. `lib/seed-data.ts` was deleted. Owner ran the one-time SQL (five tables + seed + anon RLS policies) in Supabase beforehand. Marked the "Pricing admin" pending item complete.

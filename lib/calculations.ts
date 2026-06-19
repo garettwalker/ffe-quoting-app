@@ -1,11 +1,8 @@
-import {
-  contingencyOptions,
-  pricingItems,
-  pricingLevels
-} from "@/lib/seed-data";
 import type {
   CalculatedLineItem,
+  ContingencyOption,
   PricingItem,
+  PricingLevel,
   QuoteCalculationResult,
   QuoteFormState
 } from "@/lib/types";
@@ -15,16 +12,45 @@ const SMALL_HOME_RATE_CENTS = 700;
 const HIGH_COMPLEXITY_RATE_CENTS = 650;
 const DEFAULT_RATE_CENTS = 600;
 
+// Fallbacks used when a quote references a pricing level or contingency that no
+// longer exists (or the catalog is empty). Both default to a 1.0 multiplier so a
+// missing/renamed row never silently zeroes out a quote. Previously these fell
+// back to a fixed array index, which broke if rows were reordered or
+// deactivated; looking up by stable id is safe against that.
+const DEFAULT_PRICING_LEVEL: PricingLevel = {
+  id: "standard-custom",
+  name: "Standard/Custom",
+  multiplier: 1,
+  description: "",
+  active: true,
+  sortOrder: 0
+};
+
+const DEFAULT_CONTINGENCY: ContingencyOption = {
+  id: "contingency-0",
+  name: "0%",
+  multiplier: 1,
+  active: true,
+  sortOrder: 0
+};
+
 export function calculateQuote(
-  quote: QuoteFormState
+  quote: QuoteFormState,
+  items: PricingItem[],
+  levels: PricingLevel[],
+  contingencies: ContingencyOption[]
 ): QuoteCalculationResult {
   const pricingLevel =
-    pricingLevels.find((item) => item.id === quote.pricingLevelId) ??
-    pricingLevels[1];
+    levels.find((level) => level.id === quote.pricingLevelId) ??
+    levels.find((level) => level.id === DEFAULT_PRICING_LEVEL.id) ??
+    levels[0] ??
+    DEFAULT_PRICING_LEVEL;
 
   const contingency =
-    contingencyOptions.find((item) => item.id === quote.contingencyId) ??
-    contingencyOptions[0];
+    contingencies.find((option) => option.id === quote.contingencyId) ??
+    contingencies.find((option) => option.id === DEFAULT_CONTINGENCY.id) ??
+    contingencies[0] ??
+    DEFAULT_CONTINGENCY;
 
   const baseRate = getBaseRate(quote);
   const combinedClientMultiplier =
@@ -36,7 +62,7 @@ export function calculateQuote(
 
   const selectedAdders = quote.lineItems
     .map((line) => {
-      const item = pricingItems.find(
+      const item = items.find(
         (pricingItem) => pricingItem.id === line.pricingItemId
       );
 

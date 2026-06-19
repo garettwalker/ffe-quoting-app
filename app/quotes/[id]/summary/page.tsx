@@ -3,7 +3,7 @@ import Link from "next/link";
 import { PrintQuoteButton } from "@/components/print-quote-button";
 import { formatCurrency } from "@/lib/currency";
 import { summarizeByCategory } from "@/lib/calculations";
-import { businessInfo, defaultQuoteNotes } from "@/lib/seed-data";
+import { getSettings } from "@/lib/pricing";
 import { supabase } from "@/lib/supabase";
 import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
 
@@ -17,6 +17,9 @@ type PageProps = {
   params: { id: string };
 };
 
+// Always read the live business info / quote notes from Supabase.
+export const dynamic = "force-dynamic";
+
 // Printable Summary Quote: a condensed, customer-facing version of the quote
 // that shows one subtotal per pricing category instead of every line item.
 // Mirrors the Detailed Quote printable page (logo + business header, Prepared
@@ -24,11 +27,16 @@ type PageProps = {
 // browser-print pattern (PrintQuoteButton + .print-document). No unit prices
 // are shown, only category subtotals and the quote total.
 export default async function SummaryQuotePage({ params }: PageProps) {
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("id, quote_data, calculation_data")
-    .eq("id", params.id)
-    .single();
+  const [quoteResult, settings] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id, quote_data, calculation_data")
+      .eq("id", params.id)
+      .single(),
+    getSettings()
+  ]);
+
+  const { data, error } = quoteResult;
 
   if (error || !data || !data.quote_data || !data.calculation_data) {
     return (
@@ -77,10 +85,10 @@ export default async function SummaryQuotePage({ params }: PageProps) {
             />
             <div>
               <p className="font-display text-2xl font-bold text-deep-pine">
-                {businessInfo.name}
+                {settings.businessName}
               </p>
               <p className="text-sm font-bold text-charcoal/70">
-                {businessInfo.email}
+                {settings.businessEmail}
               </p>
             </div>
           </div>
@@ -156,11 +164,11 @@ export default async function SummaryQuotePage({ params }: PageProps) {
         </div>
 
         <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
-          {defaultQuoteNotes}
+          {settings.defaultQuoteNotes}
         </div>
 
         <div className="mt-8 border-t border-pine/10 pt-4 text-center text-xs font-bold text-charcoal/60">
-          {businessInfo.name} · {businessInfo.email} · Summary Quote{" "}
+          {settings.businessName} · {settings.businessEmail} · Summary Quote{" "}
           {quote.quoteId}
         </div>
       </section>

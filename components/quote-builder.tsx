@@ -1,22 +1,17 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { calculateQuote } from "@/lib/calculations";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
-import {
-  contingencyOptions,
-  defaultQuoteNotes,
-  pricingLevels,
-  projectTypes
-} from "@/lib/seed-data";
 import {
   clearActiveQuote,
   getActiveQuote,
   saveActiveQuote
 } from "@/lib/quote-storage";
 import { supabase } from "@/lib/supabase";
-import type { BasePricingMode, QuoteFormState } from "@/lib/types";
+import type { BasePricingMode, PricingCatalog, QuoteFormState } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
@@ -51,9 +46,17 @@ type QuoteBuilderProps = {
   initialQuote?: QuoteFormState;
   // The Supabase row id of the saved quote being edited, if any.
   savedQuoteId?: string;
+  // The live pricing catalog (items, levels, contingencies, project types,
+  // settings) fetched from Supabase by the server-component page and passed
+  // down. Replaces the old static lib/seed-data.ts imports.
+  catalog: PricingCatalog;
 };
 
-export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: QuoteBuilderProps = {}) {
+export function QuoteBuilder({
+  initialQuote,
+  savedQuoteId: savedQuoteIdProp,
+  catalog
+}: QuoteBuilderProps) {
   const router = useRouter();
   const [quote, setQuote] = useState<QuoteFormState>(
     () => initialQuote ?? createDraftQuote()
@@ -100,7 +103,11 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
     });
   }, [initialQuote]);
 
-  const result = useMemo(() => calculateQuote(quote), [quote]);
+  const result = useMemo(
+    () =>
+      calculateQuote(quote, catalog.items, catalog.levels, catalog.contingencies),
+    [quote, catalog]
+  );
 
   function updateQuote<K extends keyof QuoteFormState>(
     key: K,
@@ -308,6 +315,16 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
           </div>
         ) : null}
 
+        {catalog.items.length === 0 ? (
+          <div className="rounded-soft border border-clay/30 bg-clay/10 px-4 py-3 text-sm font-black text-clay">
+            Pricing is not configured. Add pricing items in the{" "}
+            <Link href="/pricing-admin" className="underline">
+              pricing admin
+            </Link>{" "}
+            page before building a quote.
+          </div>
+        ) : null}
+
         <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
           <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
@@ -425,11 +442,17 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
                 }
                 className="form-input"
               >
-                {projectTypes.map((projectType) => (
-                  <option key={projectType} value={projectType}>
-                    {projectType}
-                  </option>
-                ))}
+                {catalog.projectTypes
+                  .filter(
+                    (projectType) =>
+                      projectType.active ||
+                      projectType.name === quote.projectType
+                  )
+                  .map((projectType) => (
+                    <option key={projectType.id} value={projectType.name}>
+                      {projectType.name}
+                    </option>
+                  ))}
               </select>
             </Field>
           </div>
@@ -522,11 +545,15 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
                 }
                 className="form-input"
               >
-                {pricingLevels.map((level) => (
-                  <option key={level.id} value={level.id}>
-                    {level.name} - {level.description}
-                  </option>
-                ))}
+                {catalog.levels
+                  .filter(
+                    (level) => level.active || level.id === quote.pricingLevelId
+                  )
+                  .map((level) => (
+                    <option key={level.id} value={level.id}>
+                      {level.name} - {level.description}
+                    </option>
+                  ))}
               </select>
             </Field>
 
@@ -538,17 +565,23 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
                 }
                 className="form-input"
               >
-                {contingencyOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
+                {catalog.contingencies
+                  .filter(
+                    (option) =>
+                      option.active || option.id === quote.contingencyId
+                  )
+                  .map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.name}
+                    </option>
+                  ))}
               </select>
             </Field>
           </div>
         </section>
 
         <QuoteLineItemPicker
+          items={catalog.items}
           lineItems={quote.lineItems}
           onAddLineItem={handleAddLineItem}
           onUpdateQuantity={handleUpdateQuantity}
@@ -592,7 +625,7 @@ export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: Q
           </div>
 
           <div className="mt-5 rounded-soft bg-sand p-4 text-sm font-bold text-charcoal/75">
-            {defaultQuoteNotes}
+            {catalog.settings.defaultQuoteNotes}
           </div>
         </section>
 

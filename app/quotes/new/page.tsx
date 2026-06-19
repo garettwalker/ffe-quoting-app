@@ -1,8 +1,15 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
+import { getPricingCatalog } from "@/lib/pricing";
 
-export default function NewQuotePage() {
+// Always read the live pricing catalog from Supabase (no caching), so a price
+// change made in /pricing-admin is reflected immediately when starting a quote.
+export const dynamic = "force-dynamic";
+
+export default async function NewQuotePage() {
+  const catalog = await getPricingCatalog();
+
   return (
     <AppShell>
       <div className="mb-8">
@@ -27,7 +34,7 @@ export default function NewQuotePage() {
         </p>
       </div>
 
-      <QuoteBuilder />
+      <QuoteBuilder catalog={catalog} />
     </AppShell>
   );
 }

@@ -1,10 +1,14 @@
 "use client";
 
-import { pricingItems } from "@/lib/seed-data";
-import type { QuoteLineInput } from "@/lib/types";
+import type { PricingItem, QuoteLineInput } from "@/lib/types";
 import { formatCurrency } from "@/lib/currency";
 
 type QuoteLineItemPickerProps = {
+  // The full pricing-items catalog (active + inactive), fetched from Supabase
+  // and passed down from the builder. The "available to add" list filters to
+  // active non-Base items; already-selected lines resolve from the full list so
+  // an inactive selected item still displays.
+  items: PricingItem[];
   lineItems: QuoteLineInput[];
   onAddLineItem: (pricingItemId: string) => void;
   onUpdateQuantity: (pricingItemId: string, quantity: number) => void;
@@ -12,12 +16,13 @@ type QuoteLineItemPickerProps = {
 };
 
 export function QuoteLineItemPicker({
+  items,
   lineItems,
   onAddLineItem,
   onUpdateQuantity,
   onRemoveLineItem
 }: QuoteLineItemPickerProps) {
-  const activeAdders = pricingItems.filter(
+  const activeAdders = items.filter(
     (item) => item.active && item.category !== "Base"
   );
 
@@ -68,7 +73,7 @@ export function QuoteLineItemPicker({
         ) : (
           <div className="divide-y divide-pine/10">
             {lineItems.map((lineItem) => {
-              const item = pricingItems.find(
+              const item = items.find(
                 (pricingItem) => pricingItem.id === lineItem.pricingItemId
               );
 

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
+import { getPricingCatalog } from "@/lib/pricing";
 import { supabase } from "@/lib/supabase";
 import type { QuoteFormState } from "@/lib/types";
 
@@ -13,12 +14,17 @@ type PageProps = {
   params: { id: string };
 };
 
+// Always read the live pricing catalog from Supabase (no caching), so a price
+// change made in /pricing-admin is reflected immediately when editing a quote.
+export const dynamic = "force-dynamic";
+
 export default async function EditSavedQuotePage({ params }: PageProps) {
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("id, quote_data")
-    .eq("id", params.id)
-    .single();
+  const [quoteResult, catalog] = await Promise.all([
+    supabase.from("quotes").select("id, quote_data").eq("id", params.id).single(),
+    getPricingCatalog()
+  ]);
+
+  const { data, error } = quoteResult;
 
   if (error || !data || !data.quote_data) {
     return (
@@ -72,7 +78,11 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
         </p>
       </div>
 
-      <QuoteBuilder initialQuote={quote} savedQuoteId={row.id} />
+      <QuoteBuilder
+        initialQuote={quote}
+        savedQuoteId={row.id}
+        catalog={catalog}
+      />
     </AppShell>
   );
 }

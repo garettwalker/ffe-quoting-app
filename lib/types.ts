@@ -79,12 +79,47 @@ export type PricingLevel = {
   name: string;
   multiplier: number;
   description: string;
+  active: boolean;
+  sortOrder: number;
 };
 
 export type ContingencyOption = {
   id: string;
   name: string;
   multiplier: number;
+  active: boolean;
+  sortOrder: number;
+};
+
+// A selectable project-type row. Quotes store the display `name` (not the id)
+// in quote_data.projectType, for backward compatibility with existing saved
+// quotes, so the builder dropdown emits the name.
+export type ProjectType = {
+  id: string;
+  name: string;
+  active: boolean;
+  sortOrder: number;
+};
+
+// The single app_settings row: business identity + customer-facing boilerplate
+// text shown on printable quotes and invoices. Lives in the app_settings table.
+export type AppSettings = {
+  businessName: string;
+  businessEmail: string;
+  businessTagline: string;
+  defaultQuoteNotes: string;
+  invoicePaymentTerms: string;
+};
+
+// The full live-pricing catalog, fetched server-side from Supabase and passed
+// into the builder. List arrays include inactive rows so the builder can still
+// resolve and display values referenced by an edited quote.
+export type PricingCatalog = {
+  items: PricingItem[];
+  levels: PricingLevel[];
+  contingencies: ContingencyOption[];
+  projectTypes: ProjectType[];
+  settings: AppSettings;
 };
 
 export type QuoteLineInput = {

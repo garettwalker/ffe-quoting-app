@@ -6,7 +6,7 @@ import {
   computeInvoiceAmounts,
   invoiceReference
 } from "@/lib/invoice-calculations";
-import { businessInfo, invoicePaymentTerms } from "@/lib/seed-data";
+import { getSettings } from "@/lib/pricing";
 import { supabase } from "@/lib/supabase";
 import type {
   InvoiceData,
@@ -27,17 +27,25 @@ type PageProps = {
   params: { id: string; kind: string };
 };
 
+// Always read the live business info / payment terms from Supabase.
+export const dynamic = "force-dynamic";
+
 export default async function PrintInvoicePage({ params }: PageProps) {
   const kind = params.kind;
   if (kind !== "initial" && kind !== "finish") {
     return <InvoiceNotFound />;
   }
 
-  const { data, error } = await supabase
-    .from("quotes")
-    .select("id, quote_id, quote_data, calculation_data, invoice_data")
-    .eq("id", params.id)
-    .single();
+  const [quoteResult, settings] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id, quote_id, quote_data, calculation_data, invoice_data")
+      .eq("id", params.id)
+      .single(),
+    getSettings()
+  ]);
+
+  const { data, error } = quoteResult;
 
   if (
     error ||
@@ -90,10 +98,10 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             />
             <div>
               <p className="font-display text-2xl font-bold text-deep-pine">
-                {businessInfo.name}
+                {settings.businessName}
               </p>
               <p className="text-sm font-bold text-charcoal/70">
-                {businessInfo.email}
+                {settings.businessEmail}
               </p>
             </div>
           </div>
@@ -182,11 +190,11 @@ export default async function PrintInvoicePage({ params }: PageProps) {
         </div>
 
         <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
-          {invoicePaymentTerms}
+          {settings.invoicePaymentTerms}
         </div>
 
         <div className="mt-8 border-t border-pine/10 pt-4 text-center text-xs font-bold text-charcoal/60">
-          {businessInfo.name} · {businessInfo.email} · Invoice {reference}
+          {settings.businessName} · {settings.businessEmail} · Invoice {reference}
         </div>
       </section>
     </div>
