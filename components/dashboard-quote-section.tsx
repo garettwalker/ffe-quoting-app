@@ -115,7 +115,7 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
       href={`/quotes/${quote.id}/print`}
       className="rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
     >
-      Print
+      PDF
     </Link>
   );
 

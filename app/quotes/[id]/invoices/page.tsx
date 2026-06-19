@@ -193,7 +193,7 @@ function InvoiceCard({
           href={`/quotes/${quoteId}/invoices/${kind}/print`}
           className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
         >
-          Print
+          PDF
         </Link>
         <InvoicePaidButton quoteId={quoteId} invoiceData={invoiceData} kind={kind} />
       </div>

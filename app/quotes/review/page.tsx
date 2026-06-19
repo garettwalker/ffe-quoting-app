@@ -276,16 +276,16 @@ export default function QuoteReviewPage() {
                 href={`/quotes/${savedQuoteId}/print`}
                 className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
               >
-                Print Detailed Quote
+                Detailed Quote PDF
               </Link>
             ) : (
               <button
                 type="button"
                 disabled
                 className="cursor-not-allowed rounded-full border border-pine/15 px-5 py-3 font-black text-deep-pine/45"
-                title="Save the quote first to print"
+                title="Save the quote first to download"
               >
-                Print Detailed Quote
+                Detailed Quote PDF
               </button>
             )}
           </div>
