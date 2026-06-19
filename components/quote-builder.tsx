@@ -43,21 +43,45 @@ function createDraftQuote(): QuoteFormState {
   };
 }
 
-export function QuoteBuilder() {
+type QuoteBuilderProps = {
+  // When provided, the builder opens in edit mode prefilled with this saved
+  // quote and ignores the browser's active-quote storage for initial load.
+  initialQuote?: QuoteFormState;
+  // The Supabase row id of the saved quote being edited, if any.
+  savedQuoteId?: string;
+};
+
+export function QuoteBuilder({ initialQuote, savedQuoteId: savedQuoteIdProp }: QuoteBuilderProps = {}) {
   const router = useRouter();
-  const [quote, setQuote] = useState<QuoteFormState>(() => createDraftQuote());
+  const [quote, setQuote] = useState<QuoteFormState>(
+    () => initialQuote ?? createDraftQuote()
+  );
+  const [savedQuoteId, setSavedQuoteId] = useState<string | undefined>(
+    savedQuoteIdProp
+  );
   const [completionMessage, setCompletionMessage] = useState("");
-  const [hasLoadedStoredQuote, setHasLoadedStoredQuote] = useState(false);
+  const [hasLoadedStoredQuote, setHasLoadedStoredQuote] = useState(() =>
+    Boolean(initialQuote)
+  );
 
   useEffect(() => {
+    if (initialQuote) {
+      // Edit mode: initial state was set from the prop. Do not pull from storage.
+      setHasLoadedStoredQuote(true);
+      return;
+    }
+
     const storedQuote = getActiveQuote();
 
     if (storedQuote) {
       setQuote(storedQuote.quote);
+      if (storedQuote.savedQuoteId) {
+        setSavedQuoteId(storedQuote.savedQuoteId);
+      }
     }
 
     setHasLoadedStoredQuote(true);
-  }, []);
+  }, [initialQuote]);
 
   const result = useMemo(() => calculateQuote(quote), [quote]);
 
@@ -113,6 +137,7 @@ export function QuoteBuilder() {
 
   function resetQuote() {
     clearActiveQuote();
+    setSavedQuoteId(undefined);
     setCompletionMessage("");
     setQuote(createDraftQuote());
   }
@@ -152,7 +177,7 @@ export function QuoteBuilder() {
       return;
     }
 
-    saveActiveQuote(quote, result);
+    saveActiveQuote(quote, result, savedQuoteId);
     router.push("/quotes/review");
   }
 
@@ -167,6 +192,13 @@ export function QuoteBuilder() {
   return (
     <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="min-w-0 space-y-6">
+        {savedQuoteId ? (
+          <div className="rounded-soft border border-clay/25 bg-cream/70 px-4 py-3 text-sm font-black text-clay">
+            Editing a saved quote. Saving will update the existing quote
+            instead of creating a new one.
+          </div>
+        ) : null}
+
         <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
           <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>

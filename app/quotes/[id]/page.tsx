@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { formatCurrency } from "@/lib/currency";
 import { supabase } from "@/lib/supabase";
 import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
@@ -191,14 +191,12 @@ export default async function SavedQuotePage({ params }: PageProps) {
               Back to Dashboard
             </Link>
 
-            <button
-              type="button"
-              disabled
-              className="cursor-not-allowed rounded-full border border-pine/15 px-5 py-3 font-black text-deep-pine/45"
-              title="Coming later"
+            <Link
+              href={`/quotes/${row.id}/edit`}
+              className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
             >
               Edit Saved Quote
-            </button>
+            </Link>
 
             <button
               type="button"
@@ -208,6 +206,10 @@ export default async function SavedQuotePage({ params }: PageProps) {
             >
               Generate PDF
             </button>
+          </div>
+
+          <div className="mt-6">
+            <DeleteQuoteButton quoteId={row.id} />
           </div>
 
           <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/70">

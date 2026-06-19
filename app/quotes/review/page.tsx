@@ -7,6 +7,7 @@ import { formatCurrency } from "@/lib/currency";
 import {
   clearActiveQuote,
   getActiveQuote,
+  saveActiveQuote,
   type StoredQuote
 } from "@/lib/quote-storage";
 import { supabase } from "@/lib/supabase";
@@ -16,6 +17,7 @@ export default function QuoteReviewPage() {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [saveStatus, setSaveStatus] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
 
   useEffect(() => {
     setStoredQuote(getActiveQuote());
@@ -28,9 +30,9 @@ export default function QuoteReviewPage() {
     setIsSaving(true);
     setSaveStatus("");
 
-    const { quote, result } = storedQuote;
+    const { quote, result, savedQuoteId } = storedQuote;
 
-    const { error } = await supabase.from("quotes").insert({
+    const payload = {
       quote_id: quote.quoteId,
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
@@ -50,8 +52,36 @@ export default function QuoteReviewPage() {
       quote_data: quote,
       calculation_data: result,
       client_quote_total_cents: result.clientQuoteTotalCents,
-      status: "completed"
-    });
+      status: "completed",
+      updated_at: new Date().toISOString()
+    };
+
+    if (savedQuoteId) {
+      // Update the existing saved quote row.
+      const { error } = await supabase
+        .from("quotes")
+        .update(payload)
+        .eq("id", savedQuoteId);
+
+      if (error) {
+        setSaveStatus(`Update failed: ${error.message}`);
+        setIsSaving(false);
+        return;
+      }
+
+      setSaveStatus("Quote updated successfully.");
+      setHasSaved(true);
+      setIsSaving(false);
+      return;
+    }
+
+    // Insert a new saved quote and remember its id so a second save updates
+    // instead of creating a duplicate.
+    const { data, error } = await supabase
+      .from("quotes")
+      .insert(payload)
+      .select("id")
+      .single();
 
     if (error) {
       setSaveStatus(`Save failed: ${error.message}`);
@@ -59,7 +89,10 @@ export default function QuoteReviewPage() {
       return;
     }
 
+    saveActiveQuote(quote, result, data.id);
+    setStoredQuote({ ...storedQuote, savedQuoteId: data.id });
     setSaveStatus("Quote saved successfully.");
+    setHasSaved(true);
     setIsSaving(false);
   }
 
@@ -97,7 +130,7 @@ export default function QuoteReviewPage() {
     );
   }
 
-  const { quote, result } = storedQuote;
+  const { quote, result, savedQuoteId } = storedQuote;
 
   const fullAddress = [
     quote.projectStreet,
@@ -108,12 +141,20 @@ export default function QuoteReviewPage() {
     .filter(Boolean)
     .join(", ");
 
+  const saveButtonLabel = hasSaved
+    ? savedQuoteId
+      ? "Updated"
+      : "Saved"
+    : savedQuoteId
+      ? "Update Quote"
+      : "Save Quote";
+
   return (
     <AppShell>
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <Link
-            href="/quotes/new"
+            href={savedQuoteId ? `/quotes/${savedQuoteId}/edit` : "/quotes/new"}
             className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
           >
             Back to quote builder
@@ -214,7 +255,7 @@ export default function QuoteReviewPage() {
 
           <div className="grid gap-3">
             <Link
-              href="/quotes/new"
+              href={savedQuoteId ? `/quotes/${savedQuoteId}/edit` : "/quotes/new"}
               className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
             >
               Edit Quote
@@ -223,10 +264,10 @@ export default function QuoteReviewPage() {
             <button
               type="button"
               onClick={saveQuoteToSupabase}
-              disabled={isSaving}
-              className="rounded-full bg-pine px-5 py-3 font-black text-whitewarm hover:bg-deep-pine disabled:cursor-wait disabled:bg-pine/50"
+              disabled={isSaving || hasSaved}
+              className="rounded-full bg-pine px-5 py-3 font-black text-whitewarm hover:bg-deep-pine disabled:cursor-default disabled:bg-pine/50"
             >
-              {isSaving ? "Saving Quote..." : "Save Quote"}
+              {isSaving ? "Saving Quote..." : saveButtonLabel}
             </button>
 
             <button
@@ -253,9 +294,16 @@ export default function QuoteReviewPage() {
           {saveStatus ? (
             <div className="mt-5 rounded-soft border border-pine/15 bg-sage/20 p-4 font-bold text-deep-pine">
               {saveStatus}
+              {hasSaved && savedQuoteId ? (
+                <Link
+                  href={`/quotes/${savedQuoteId}`}
+                  className="mt-3 inline-flex font-black text-clay underline decoration-clay/40 decoration-2 underline-offset-4"
+                >
+                  View saved quote
+                </Link>
+              ) : null}
             </div>
           ) : null}
-
         </aside>
       </div>
 
