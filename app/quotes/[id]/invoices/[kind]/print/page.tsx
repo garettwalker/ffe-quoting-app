@@ -37,7 +37,7 @@ export default async function PrintInvoicePage({ params }: PageProps) {
         buttonLabel="Download PDF"
       />
 
-      <section className="print-document rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
+      <section className="rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
         <div className="flex flex-col gap-6 border-b border-pine/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-center gap-4">
             <Image
