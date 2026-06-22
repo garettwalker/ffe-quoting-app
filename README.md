@@ -297,6 +297,20 @@ create table if not exists public.quotes (
 );
 ```
 
+`quote_id` is unique per quote. The server-side sequence guarantees no two auto-generated IDs collide, but the owner can type a custom ID (used as-is, without advancing the counter), so a custom ID that happens to match a past or future `Q-YYYYMMDD-NNN` could otherwise produce a duplicate row. A unique constraint is the database-level guard. Run once in the Supabase SQL Editor — first confirm there are no existing duplicates, then add the constraint:
+```sql
+-- 1. Confirm there are no duplicate quote_ids (must return 0 rows):
+select quote_id, count(*)
+from public.quotes
+group by quote_id
+having count(*) > 1;
+
+-- 2. Add the unique constraint (only if step 1 returned nothing):
+alter table public.quotes
+  add constraint quotes_quote_id_key unique (quote_id);
+```
+If step 1 ever returns rows, resolve the duplicates (edit or delete the wrong row) before adding the constraint, or the `alter table` will fail. Once the constraint exists, a colliding insert/update throws and the app surfaces it as a "Save failed" error (the save paths in `quote-builder.tsx` and `review/page.tsx` already report insert errors).
+
 The quote ID is a daily sequence (`Q-YYYYMMDD-NNN`) assigned **server-side at save time** so two people saving at the same instant can never collide. The builder leaves the Quote ID blank (placeholder "Assigned on save") until the quote is actually saved; the owner may type a custom ID, which is used as-is. The server side is a small per-day counter table plus a `security definer` function that atomically increments it via `INSERT ... ON CONFLICT ... RETURNING` and returns the formatted ID. The function bypasses RLS on the counter table, so the table itself has no policies (direct anon access is denied; only the function can touch it). Run once in the Supabase SQL Editor before deploying the server-side sequencing:
 ```sql
 create table if not exists public.quote_sequences (
@@ -308,7 +322,7 @@ alter table public.quote_sequences enable row level security;
 -- No policies: direct anon access is denied. The security-definer function
 -- below is the only path that can read/write the counter.
 
-create or replace function public.next_quote_id()
+create or replace function public.next_quote_id(p_day text)
 returns text
 language plpgsql
 security definer
@@ -318,7 +332,7 @@ declare
   v_day text;
   v_seq integer;
 begin
-  v_day := to_char(now(), 'YYYYMMDD');
+  v_day := p_day;
   insert into public.quote_sequences (day, seq) values (v_day, 1)
     on conflict (day) do update set seq = public.quote_sequences.seq + 1
     returning seq into v_seq;
@@ -326,14 +340,20 @@ begin
 end;
 $$;
 
-grant execute on function public.next_quote_id() to anon;
+grant execute on function public.next_quote_id(text) to anon;
 
 -- Defensive default: a raw insert that omits status lands as draft, not the
 -- legacy 'completed'. (Every app insert sets status explicitly, so this only
 -- guards direct/SQL inserts.)
 alter table public.quotes alter column status set default 'draft';
 ```
-The day prefix uses the database `now()` (UTC on Supabase), which matches the client-side `quote_date` the builder already sets from `new Date().toISOString()` (also UTC), so a quote's ID prefix and its `quote_date` always agree.
+The day prefix is the quote's own `quote_date` (passed in as `p_day`), not the database `now()`, so a quote's ID prefix and its `quote_date` always agree even if the owner backdates the quote or saves a tab left open across midnight. The counter is keyed by that day, so two quotes sharing a `quote_date` get sequential numbers.
+
+If you are upgrading from the earlier no-argument `next_quote_id()`, drop the old overload first and grant the new one (the parameter changes the function signature, so the old grant does not carry over):
+```sql
+drop function if exists public.next_quote_id();
+grant execute on function public.next_quote_id(text) to anon;
+```
 
 RLS is enabled. Development policies (anon can insert, select, update, delete). These are intentionally permissive for the build phase and **must be tightened before production** (add auth, limit to owner/admin, move writes through server actions if possible). Current dev policies:
 ```sql

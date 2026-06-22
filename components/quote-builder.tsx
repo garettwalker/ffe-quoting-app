@@ -225,7 +225,7 @@ export function QuoteBuilder({
     // form so a follow-up re-save reuses it instead of asking again).
     let resolvedQuoteId: string;
     try {
-      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId);
+      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId, quote.quoteDate);
     } catch (err) {
       setDraftMessage(
         `Draft save failed: ${

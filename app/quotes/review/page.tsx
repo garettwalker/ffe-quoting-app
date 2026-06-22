@@ -39,7 +39,7 @@ export default function QuoteReviewPage() {
     // built so the assigned id is what gets persisted.
     let resolvedQuoteId: string;
     try {
-      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId);
+      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId, quote.quoteDate);
     } catch (err) {
       setSaveStatus(
         `Save failed: ${err instanceof Error ? err.message : "Unknown error"}`
