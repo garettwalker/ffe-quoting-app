@@ -5,7 +5,7 @@ import { InvoiceBuilder } from "@/components/invoice-builder";
 import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
-import { invoiceReference, outstandingCents, isFullyPaid } from "@/lib/invoice-calculations";
+import { invoiceReference, outstandingCents, isPaidInFull } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import type {
   InvoiceData,
@@ -81,7 +81,7 @@ export default async function InvoicingPage({ params }: PageProps) {
 
         {invoiceData ? (
           <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
-            {isFullyPaid(invoiceData)
+            {isPaidInFull(invoiceData)
               ? "Paid in full"
               : `Outstanding: ${formatCurrency(outstandingCents(invoiceData))}`}
           </p>

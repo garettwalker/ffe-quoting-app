@@ -4,7 +4,7 @@ import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { QuoteStatusButton } from "@/components/quote-status-button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
-import { isFullyPaid, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
+import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import type {
   InvoiceData,
@@ -293,7 +293,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
 
           {status === "accepted" && row.invoice_data ? (
             <p className="mt-4 rounded-soft bg-cream px-4 py-3 text-sm font-black text-deep-pine">
-              {isFullyPaid(row.invoice_data)
+              {isPaidInFull(row.invoice_data)
                 ? "Invoices: paid in full"
                 : `Outstanding: ${formatCurrency(outstandingCents(row.invoice_data))}`}
             </p>

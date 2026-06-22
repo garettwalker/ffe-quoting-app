@@ -96,6 +96,19 @@ export function isFullyPaid(data: InvoiceData | null): boolean {
   return data.invoices.length > 0 && data.invoices.every((invoice) => invoice.status === "paid");
 }
 
+// True when the job has real invoiced money AND nothing is outstanding. This is
+// the single definition of "paid in full" shared by the dashboard lifecycle, the
+// invoicing page, the saved-quote page, and Accounts Receivable. It keys on the
+// outstanding balance (not the per-invoice paid flags) and requires real invoiced
+// money, so a $0-contract quote ($0 outstanding but also $0 invoiced) is NOT paid
+// in full and does not count as Pending Payments — matching the AR table, which
+// excludes $0 jobs entirely. It also treats a job with a positive paid invoice
+// plus a $0 unpaid invoice as paid in full (nothing is owed), again matching AR.
+export function isPaidInFull(data: InvoiceData | null): boolean {
+  if (!data) return false;
+  return computeInvoiceAmounts(data).totalInvoicedCents > 0 && outstandingCents(data) === 0;
+}
+
 // Find a single invoice record by kind, with a safe fallback.
 export function findInvoice(data: InvoiceData, kind: InvoiceKind) {
   return data.invoices.find((invoice) => invoice.kind === kind) ?? null;
@@ -118,5 +131,12 @@ export function lifecycleStage(
 ): LifecycleStage {
   if (status !== "accepted") return status;
   if (!invoiceData) return "accepted";
-  return isFullyPaid(invoiceData) ? "paid_in_full" : "pending_payment";
+  // Match the Accounts Receivable partition exactly. Only quotes with real
+  // invoiced money (totalInvoicedCents > 0) count as Pending Payments or Paid in
+  // Full; a $0-contract quote has nothing owed and nothing collected, so it
+  // stays in Client Accepted instead of showing "Pending Payments $0.00". Within
+  // real invoices, nothing outstanding = paid in full, something outstanding =
+  // pending.
+  if (computeInvoiceAmounts(invoiceData).totalInvoicedCents <= 0) return "accepted";
+  return isPaidInFull(invoiceData) ? "paid_in_full" : "pending_payment";
 }

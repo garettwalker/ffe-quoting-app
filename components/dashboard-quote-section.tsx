@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
-import { isFullyPaid, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
+import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import type { DashboardQuoteRow } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
 import { QuoteStatusButton } from "@/components/quote-status-button";
@@ -78,10 +78,10 @@ function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
           {quote.status === "accepted" && quote.invoice_data ? (
             <p
               className={`mt-1 text-sm font-black ${
-                isFullyPaid(quote.invoice_data) ? "text-deep-pine" : "text-clay"
+                isPaidInFull(quote.invoice_data) ? "text-deep-pine" : "text-clay"
               }`}
             >
-              {isFullyPaid(quote.invoice_data)
+              {isPaidInFull(quote.invoice_data)
                 ? "Invoices paid in full"
                 : `Outstanding: ${formatCurrency(outstandingCents(quote.invoice_data))}`}
             </p>
