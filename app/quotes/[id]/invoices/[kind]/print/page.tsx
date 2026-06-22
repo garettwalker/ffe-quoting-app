@@ -127,9 +127,11 @@ export default async function PrintInvoicePage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
-          {pdfProps.paymentTerms}
-        </div>
+        {pdfProps.paymentTerms ? (
+          <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
+            {pdfProps.paymentTerms}
+          </div>
+        ) : null}
 
         <div className="mt-8 border-t border-pine/10 pt-4 text-center text-xs font-bold text-charcoal/60">
           {pdfProps.businessName} · {pdfProps.businessEmail} · Invoice{" "}

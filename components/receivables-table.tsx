@@ -312,7 +312,7 @@ function JobRow({ job }: { job: ReceivableJob }) {
       </td>
 
       <td className="py-4 pr-4 text-sm font-bold text-charcoal/70">
-        {formatDate(job.earliestIssuedAt) || "—"}
+        {formatDate(job.earliestIssuedAt) || "N/A"}
       </td>
 
       <td className="py-4">
@@ -335,7 +335,7 @@ function InvoiceCell({
   label: string;
 }) {
   if (!invoice) {
-    return <span className="text-sm font-bold text-charcoal/40">—</span>;
+    return <span className="text-sm font-bold text-charcoal/40">N/A</span>;
   }
 
   return (

@@ -36,23 +36,33 @@ export const PDF_INK = {
 };
 
 const styles = StyleSheet.create({
+  // Top/bottom padding reserves space for the fixed header/footer (see the
+  // header/footer styles below), which are absolutely positioned so they
+  // overlay every page without consuming flow space. Without this reserved
+  // space, page 2+ content would slide under the repeated header/footer.
   page: {
-    paddingTop: 48,
-    paddingBottom: 48,
+    paddingTop: 112,
+    paddingBottom: 56,
     paddingHorizontal: 48,
     fontSize: 10.5,
     fontFamily: "Helvetica",
     color: PDF_COLORS.charcoal,
     backgroundColor: PDF_COLORS.whitewarm
   },
+  // fixed + absolute: repeats on every page, pinned to the top. Taken out of
+  // normal flow so it doesn't double up the page's top padding on page 1.
   header: {
+    position: "absolute",
+    top: 0,
+    left: 48,
+    right: 48,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingBottom: 18,
+    paddingTop: 34,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: PDF_INK.borderPine,
-    marginBottom: 24
+    borderBottomColor: PDF_INK.borderPine
   },
   headerLeft: {
     flexDirection: "row",
@@ -159,9 +169,15 @@ const styles = StyleSheet.create({
     color: PDF_INK.textStrong,
     fontFamily: "Helvetica-Bold"
   },
+  // fixed + absolute: repeats on every page, pinned to the bottom. Page
+  // numbers are appended via the render prop, but only on docs >1 page.
   footer: {
-    marginTop: 36,
+    position: "absolute",
+    bottom: 0,
+    left: 48,
+    right: 48,
     paddingTop: 10,
+    paddingBottom: 8,
     borderTopWidth: 1,
     borderTopColor: PDF_INK.borderPine,
     textAlign: "center",
@@ -264,7 +280,7 @@ export function PdfHeader({
   titleSize = 26
 }: HeaderProps) {
   return (
-    <View style={styles.header}>
+    <View style={styles.header} fixed>
       <View style={styles.headerLeft}>
         {logoDataUri ? <Image style={styles.logo} src={logoDataUri} /> : null}
         <View>
@@ -339,8 +355,14 @@ export function PdfNotes({ children }: { children: string }) {
 
 export function PdfFooter({ children }: { children: string }) {
   return (
-    <View style={styles.footer}>
-      <Text>{children}</Text>
+    <View style={styles.footer} fixed>
+      <Text
+        render={({ pageNumber, totalPages }) =>
+          totalPages > 1
+            ? `${children} · Page ${pageNumber} of ${totalPages}`
+            : children
+        }
+      />
     </View>
   );
 }

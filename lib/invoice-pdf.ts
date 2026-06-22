@@ -92,10 +92,16 @@ export async function loadInvoicePdfInput(
             label: `Rough-In (${invoiceData.roughInPercent}% of contract)`,
             amount: formatCurrency(amounts.roughInAmountCents)
           },
-          {
-            label: "Permit Fee",
-            amount: formatCurrency(invoiceData.permitFeeCents)
-          }
+          // Only show the permit fee line when there is one; a $0 permit fee
+          // would just print "Permit Fee $0.00" as noise.
+          ...(invoiceData.permitFeeCents > 0
+            ? [
+                {
+                  label: "Permit Fee",
+                  amount: formatCurrency(invoiceData.permitFeeCents)
+                }
+              ]
+            : [])
         ]
       : [
           {
@@ -132,7 +138,7 @@ export async function loadInvoicePdfInput(
 
   return {
     pdfProps,
-    fileName: `${reference}.pdf`
+    fileName: `invoice-${reference}.pdf`
   };
 }
 

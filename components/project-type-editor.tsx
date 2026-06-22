@@ -125,8 +125,8 @@ export function ProjectTypeEditor({ projectTypes }: ProjectTypeEditorProps) {
           Project type options
         </h2>
         <p className="mt-2 text-sm font-bold text-charcoal/65">
-          Quotes store the display name, so renaming only affects new quotes —
-          existing saved quotes keep their original value.
+          Quotes store the display name, so renaming only affects new quotes.
+          Existing saved quotes keep their original value.
         </p>
       </div>
 

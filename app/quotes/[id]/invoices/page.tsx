@@ -109,7 +109,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     invoiceData={invoiceData}
                     kind="initial"
                     reference={invoiceReference(row.quote_id, "initial")}
-                    title="Invoice 1 — Rough-In (Initial)"
+                    title="Invoice 1: Rough-In (Initial)"
                     amountCents={initialInvoice.amountCents}
                     status={initialInvoice.status}
                   />
@@ -121,7 +121,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     invoiceData={invoiceData}
                     kind="finish"
                     reference={invoiceReference(row.quote_id, "finish")}
-                    title="Invoice 2 — Finish"
+                    title="Invoice 2: Finish"
                     amountCents={finishInvoice.amountCents}
                     status={finishInvoice.status}
                   />

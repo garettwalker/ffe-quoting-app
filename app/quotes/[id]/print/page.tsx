@@ -31,6 +31,9 @@ export default async function PrintQuotePage({ params }: PageProps) {
   }
 
   const { quote, result, settings, fullAddress, quoteDateLabel } = input;
+  const projectSecondary = [quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
@@ -89,9 +92,9 @@ export default async function PrintQuotePage({ params }: PageProps) {
               Project
             </p>
             <p className="font-bold text-charcoal">{fullAddress}</p>
-            <p className="text-sm text-charcoal/70">
-              {quote.projectType} · {quote.squareFootage.toLocaleString()} sq ft
-            </p>
+            {projectSecondary ? (
+              <p className="text-sm text-charcoal/70">{projectSecondary}</p>
+            ) : null}
           </div>
         </div>
 
@@ -107,21 +110,32 @@ export default async function PrintQuotePage({ params }: PageProps) {
               </tr>
             </thead>
             <tbody className="divide-y divide-pine/10 bg-cream">
-              {result.clientFacingLines.map((line) => (
-                <tr key={line.pricingItemId}>
-                  <td className="p-3 font-bold text-charcoal">{line.name}</td>
-                  <td className="p-3 text-right">
-                    {line.quantity.toLocaleString()}
-                  </td>
-                  <td className="p-3">{line.unitType}</td>
-                  <td className="p-3 text-right">
-                    {formatCurrency(line.clientUnitPriceCents)}
-                  </td>
-                  <td className="p-3 text-right font-black text-deep-pine">
-                    {formatCurrency(line.clientLineTotalCents)}
+              {result.clientFacingLines.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="p-3 text-sm font-bold text-charcoal/60"
+                  >
+                    No priced items on this quote.
                   </td>
                 </tr>
-              ))}
+              ) : (
+                result.clientFacingLines.map((line) => (
+                  <tr key={line.pricingItemId}>
+                    <td className="p-3 font-bold text-charcoal">{line.name}</td>
+                    <td className="p-3 text-right">
+                      {line.quantity.toLocaleString()}
+                    </td>
+                    <td className="p-3">{line.unitType}</td>
+                    <td className="p-3 text-right">
+                      {formatCurrency(line.clientUnitPriceCents)}
+                    </td>
+                    <td className="p-3 text-right font-black text-deep-pine">
+                      {formatCurrency(line.clientLineTotalCents)}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -139,9 +153,11 @@ export default async function PrintQuotePage({ params }: PageProps) {
           </div>
         </div>
 
-        <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
-          {settings.defaultQuoteNotes}
-        </div>
+        {settings.defaultQuoteNotes ? (
+          <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
+            {settings.defaultQuoteNotes}
+          </div>
+        ) : null}
 
         <div className="mt-8 border-t border-pine/10 pt-4 text-center text-xs font-bold text-charcoal/60">
           {settings.businessName} · {settings.businessEmail} · Quote {quote.quoteId}

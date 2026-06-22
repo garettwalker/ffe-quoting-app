@@ -153,7 +153,7 @@ export function PricingItemEditor({ items }: PricingItemEditorProps) {
           Pricing items (adders + base)
         </h2>
         <p className="mt-2 text-sm font-bold text-charcoal/65">
-          Deactivate instead of deleting — old quotes that reference a
+          Deactivate instead of deleting. Old quotes that reference a
           deactivated item still display correctly.
         </p>
       </div>

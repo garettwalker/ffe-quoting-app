@@ -51,23 +51,33 @@ const COL = {
 };
 
 const styles = StyleSheet.create({
+  // Top/bottom padding reserves space for the fixed header/footer (see the
+  // header/footer styles below), which are absolutely positioned so they
+  // overlay every page without consuming flow space. Without this reserved
+  // space, page 2+ content would slide under the repeated header/footer.
   page: {
-    paddingTop: 48,
-    paddingBottom: 48,
+    paddingTop: 112,
+    paddingBottom: 56,
     paddingHorizontal: 48,
     fontSize: 10.5,
     fontFamily: "Helvetica",
     color: COLORS.charcoal,
     backgroundColor: COLORS.whitewarm
   },
+  // fixed + absolute: repeats on every page, pinned to the top. Taken out of
+  // normal flow so it doesn't double up the page's top padding on page 1.
   header: {
+    position: "absolute",
+    top: 0,
+    left: 48,
+    right: 48,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    paddingBottom: 18,
+    paddingTop: 34,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e0e1db",
-    marginBottom: 24
+    borderBottomColor: "#e0e1db"
   },
   headerLeft: {
     flexDirection: "row",
@@ -217,9 +227,15 @@ const styles = StyleSheet.create({
     color: "#4a4d49",
     fontFamily: "Helvetica-Bold"
   },
+  // fixed + absolute: repeats on every page, pinned to the bottom. Page
+  // numbers are appended via the render prop, but only on docs >1 page.
   footer: {
-    marginTop: 36,
+    position: "absolute",
+    bottom: 0,
+    left: 48,
+    right: 48,
     paddingTop: 10,
+    paddingBottom: 8,
     borderTopWidth: 1,
     borderTopColor: "#e0e1db",
     textAlign: "center",
@@ -253,8 +269,9 @@ export function DetailedQuotePdfDocument(props: DetailedQuotePdfProps) {
       subject="Quote"
     >
       <Page size="LETTER" style={styles.page}>
-        {/* Header: logo + business on the left, "Quote" + id + date on the right */}
-        <View style={styles.header}>
+        {/* Header: logo + business on the left, "Quote" + id + date on the right.
+            fixed so it repeats on every page (multi-page quotes). */}
+        <View style={styles.header} fixed>
           <View style={styles.headerLeft}>
             {logoDataUri ? <Image style={styles.logo} src={logoDataUri} /> : null}
             <View>
@@ -351,11 +368,15 @@ export function DetailedQuotePdfDocument(props: DetailedQuotePdfProps) {
           </View>
         ) : null}
 
-        {/* Footer */}
-        <View style={styles.footer}>
-          <Text>
-            {businessName} · {businessEmail} · Quote {quoteId}
-          </Text>
+        {/* Footer: fixed so it repeats on every page; page numbers only when >1 page. */}
+        <View style={styles.footer} fixed>
+          <Text
+            render={({ pageNumber, totalPages }) =>
+              totalPages > 1
+                ? `${businessName} · ${businessEmail} · Quote ${quoteId} · Page ${pageNumber} of ${totalPages}`
+                : `${businessName} · ${businessEmail} · Quote ${quoteId}`
+            }
+          />
         </View>
       </Page>
     </Document>

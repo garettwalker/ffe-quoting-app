@@ -201,7 +201,7 @@ export function PricingLevelEditor({ levels }: PricingLevelEditorProps) {
                     <div className="min-w-0">
                       <p className="font-black text-deep-pine">{level.name}</p>
                       <p className="text-sm font-bold text-charcoal/60">
-                        multiplier {level.multiplier} • {level.description || "—"}{" "}
+                        multiplier {level.multiplier} • {level.description || "none"}{" "}
                         • order {level.sortOrder}
                       </p>
                     </div>
