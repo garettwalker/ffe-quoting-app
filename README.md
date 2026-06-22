@@ -16,7 +16,7 @@ This README is the long-term context file for the project. It is meant for both 
 | Route | Purpose |
 | --- | --- |
 | `/` | Overview dashboard. Landing hub with quick actions (Start New Quote, Receivables, Manage Pricing), summary tiles (active quotes, awaiting payment + outstanding $, paid in full, pricing), an unsaved-working-copy resume card, and the 5 most recent quotes. Links into each tool. |
-| `/quotes` | The quoting tool. Full five-stage lifecycle pipeline (Draft, Prepared, Client Accepted, Pending Payments, Paid in Full) reading saved quotes from Supabase, plus a temporary build-status panel. |
+| `/quotes` | The quoting tool. Full five-stage lifecycle pipeline (Draft, Prepared, Client Accepted, Pending Payments, Paid in Full) reading saved quotes from Supabase. |
 | `/quotes/new` | Quote builder. Starts a fresh quote or resumes the active browser working copy. |
 | `/quotes/review` | Review the completed quote before saving. Reads the active working copy from browser storage. |
 | `/quotes/[id]` | View a saved quote loaded from Supabase by database id. Does not use browser storage. |
@@ -64,6 +64,7 @@ components
   quote-line-item-picker.tsx
   quote-totals-panel.tsx
   delete-quote-button.tsx
+  formatted-number-input.tsx    // currency/decimal input used by the builder + invoice setup
   invoice-builder.tsx           // invoice setup form (contract, split, permit)
   invoice-paid-button.tsx       // toggles an invoice paid/unpaid
   receivables-table.tsx         // AR tables: period/sort + pending vs paid partition
@@ -108,7 +109,7 @@ public
 6. **Saved quote** (`/quotes/[id]`) — view, edit, or delete the saved quote. From here on, the owner works from the saved file, not the active quote.
 
 ### Internal notes (owner only)
-The builder has an "Internal Notes" text box. These notes are saved with the quote and shown on the owner views (review and saved quote pages), clearly labeled as not shown to the customer. They are **not** included in customer-facing output. (Customer-facing PDF export is coming later and must continue to exclude them.)
+The builder has an "Internal Notes" text box. These notes are saved with the quote and shown on the owner views (review and saved quote pages), clearly labeled as not shown to the customer. They are **not** included in customer-facing output, including the customer-facing PDFs (Detailed Quote, Summary Quote, and invoices), which load only the safe fields from the saved snapshot.
 
 ### Deleting quotes
 The saved quote page has a Delete Quote button with a confirm step. It removes the row from Supabase. This requires a delete RLS policy (see Supabase setup below).
@@ -140,7 +141,7 @@ When a quote is Client Accepted, the saved-quote page and the `/quotes` Accepted
 - **Permit fee** is entered as a dollar amount and shown as its own line on the initial invoice.
 - Two invoices are generated: the **initial invoice** (rough-in amount + permit fee) and the **finish invoice** (the remainder).
 - Each invoice can be marked **paid / unpaid**. The `/quotes` Accepted card, the overview "Awaiting payment" tile, and the invoicing page show the outstanding balance or "paid in full."
-- Each invoice has a printable page (`/quotes/[id]/invoices/[kind]/print`, kind = `initial` or `finish`) using the browser print dialog. Invoice references are `{quote_id}-R` (initial/rough-in) and `{quote_id}-F` (finish).
+- Each invoice has a printable page (`/quotes/[id]/invoices/[kind]/print`, kind = `initial` or `finish`) with one-click Download PDF; the on-screen layout is a preview of the PDF. Invoice references are `{quote_id}-R` (initial/rough-in) and `{quote_id}-F` (finish).
 
 Invoice setup is stored as JSONB in the `quotes.invoice_data` column (null until set up). Saving invoice setup preserves existing paid statuses by invoice kind. Invoicing math lives in `lib/invoice-calculations.ts`.
 
@@ -407,8 +408,8 @@ Done:
 - Delete quote from Supabase
 - Owner-only internal notes (not shown to customer)
 - Daily-sequence quote IDs assigned server-side at save time: a Postgres `next_quote_id()` function atomically hands out `Q-YYYYMMDD-NNN` (e.g. Q-20260618-001, -002, -003), so two people saving at once can never collide. The builder leaves the Quote ID blank (placeholder "Assigned on save") until the quote is saved; a custom ID typed by the owner is used as-is. The number is reserved only when the quote is actually saved, so abandoned builder sessions do not create gaps in client-facing IDs.
-- Printable Detailed Quote page (`/quotes/[id]/print`) using the browser print dialog (no PDF dependency yet)
-- Printable Summary Quote page (`/quotes/[id]/summary`) using the browser print dialog. Condensed customer-facing version: one subtotal per pricing category plus the quote total, no unit prices. Reuses the printable-document pattern; category grouping via `summarizeByCategory` in `lib/calculations.ts`.
+- Printable Detailed Quote page (`/quotes/[id]/print`) with one-click Download PDF (rendered server-side with react-pdf); the on-screen layout is a preview of the PDF
+- Printable Summary Quote page (`/quotes/[id]/summary`) with one-click Download PDF. Condensed customer-facing version: one subtotal per pricing category plus the quote total, no unit prices. Category grouping via `summarizeByCategory` in `lib/calculations.ts`.
 - Quote status pipeline: draft, prepared, accepted with manual stage buttons on the `/quotes` pipeline and saved-quote page
 - Invoicing from accepted quotes: contract amount, 50/50 rough-in/finish split (editable), permit fee, two invoices (initial = rough-in + permit, finish = remainder), paid/unpaid tracking, printable invoices, outstanding balance on the dashboard
 - Pricing admin (`/pricing-admin`): all pricing (line items, pricing levels, contingencies, project types) and business info / default quote notes / invoice payment terms moved out of the static `lib/seed-data.ts` file into Supabase tables, editable in the running app. Deactivate-only (no hard delete), editable sort order, active/inactive badges. Builder and print pages read live from Supabase via `lib/pricing.ts`.
@@ -425,6 +426,7 @@ Pending (rough priority):
 
 ## Recent work (history)
 
+- 2026-06-22: README drift cleanup (documentation only, no code). Removed the stale "temporary build-status panel" from the `/quotes` route description. Rewrote the Detailed Quote and Summary Quote "Done" bullets (which still said "browser print dialog, no PDF dependency yet") to reflect the completed one-click Download PDF. Updated the Internal Notes section (PDF export is no longer "coming later"; it exists and excludes internal notes) and the Invoicing section (invoices use one-click Download PDF, not the browser print dialog). Added `components/formatted-number-input.tsx` to the file-structure tree. Left the dated history entries untouched as a timeline record.
 - 2026-06-22: Guarded editing a saved quote against silently reassigning its ID, and corrected the quote-ID sequencing wording. Previously, opening a saved quote in the builder, clearing the Quote ID field, and saving called `next_quote_id` and overwrote the row's `quote_id` with a brand-new number (changing the client-facing reference and burning a daily number). Now `resolveQuoteIdForSave(currentId, quoteDate, existingRowId)` keeps the existing row's `quote_id` when the field is cleared on an edit (both the builder Save-as-draft and the review Prepare paths pass `savedQuoteId`). A custom ID typed by the owner is still used as-is; a brand-new quote still mints a daily number. Also corrected the "server-side / no gaps" framing in `lib/quote-id.ts` and the README sequencing section: the RPC is invoked from the browser with the public anon key (the increment is atomic in Postgres, but it is not an authenticated server action, so anyone with the anon key can burn gaps until auth lands), and a save that fails after the increment can leave a gap (the number is reserved before the row is written). Abandoned pre-save sessions still do not burn a number.
 - 2026-06-22: Reconciled the dashboard lifecycle with Accounts Receivable so a $0-contract accepted quote can no longer show "Pending Payments $0.00" on the dashboard while being dropped from AR. Added a single shared definition of "paid in full" — `isPaidInFull(data)` in `lib/invoice-calculations.ts` — which is true only when there is real invoiced money (`totalInvoicedCents > 0`) and nothing is outstanding, keyed on the outstanding balance rather than the per-invoice paid flags. The dashboard `lifecycleStage`, the invoicing page badge, the saved-quote page badge, and the dashboard-card outstanding line all use it, so every surface agrees with the AR table (which already excluded $0 jobs). A $0-contract accepted quote now stays in Client Accepted instead of Pending Payments; a job with a positive paid invoice plus a $0 unpaid invoice now reads as paid in full (nothing is owed), matching AR.
 - 2026-06-22: Fixed a data-integrity bug in invoicing where a paid invoice's amount could silently change. Previously, editing the contract amount, rough-in/finish split, or permit fee and clicking Save Changes recomputed every invoice's amount from the new inputs but kept the old `status` ("paid") and `paidAt`. So a paid invoice's amount could be rewritten while it still showed "Paid {date}", which made Accounts Receivable and the dashboard report money that was never actually collected. Now `components/invoice-builder.tsx` resets any previously-paid invoice to unpaid (clearing `paidAt`) when its amount would change on save, forcing the owner to re-mark it paid against the new amount. Before saving, a plain-English warning lists which paid invoice(s) would change and that they will be reset, so it is never a surprise. Re-saving with no changes still keeps paid statuses (amounts match, nothing resets); editing an unpaid invoice's amount is unaffected.
