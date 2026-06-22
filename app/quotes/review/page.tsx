@@ -34,12 +34,13 @@ export default function QuoteReviewPage() {
 
     const { quote, result, savedQuoteId } = storedQuote;
 
-    // Resolve the quote id: keep a custom id the owner typed, otherwise ask the
-    // server for the next atomic daily number. Done before the payload is
+    // Resolve the quote id: keep a custom id the owner typed; otherwise, if we
+    // are updating an existing saved quote, keep its existing id; otherwise ask
+    // the server for the next atomic daily number. Done before the payload is
     // built so the assigned id is what gets persisted.
     let resolvedQuoteId: string;
     try {
-      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId, quote.quoteDate);
+      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId, quote.quoteDate, savedQuoteId);
     } catch (err) {
       setSaveStatus(
         `Save failed: ${err instanceof Error ? err.message : "Unknown error"}`

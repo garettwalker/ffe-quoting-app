@@ -219,13 +219,14 @@ export function QuoteBuilder({
     setIsSavingDraft(true);
     setDraftMessage("");
 
-    // Resolve the quote id: keep a custom id the owner typed, otherwise ask the
-    // server for the next atomic daily number. Done before the payload is
+    // Resolve the quote id: keep a custom id the owner typed; otherwise, if we
+    // are updating an existing saved quote, keep its existing id; otherwise ask
+    // the server for the next atomic daily number. Done before the payload is
     // built so the assigned id is what gets persisted (and remembered in the
     // form so a follow-up re-save reuses it instead of asking again).
     let resolvedQuoteId: string;
     try {
-      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId, quote.quoteDate);
+      resolvedQuoteId = await resolveQuoteIdForSave(quote.quoteId, quote.quoteDate, savedQuoteId);
     } catch (err) {
       setDraftMessage(
         `Draft save failed: ${
