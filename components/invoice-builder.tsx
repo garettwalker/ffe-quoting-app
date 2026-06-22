@@ -16,6 +16,11 @@ type InvoiceBuilderProps = {
   quoteTotalCents: number;
 };
 
+const KIND_LABEL: Record<InvoiceKind, string> = {
+  initial: "Initial (Rough-In)",
+  finish: "Finish"
+};
+
 export function InvoiceBuilder({
   quoteId,
   initialInvoiceData,
@@ -63,12 +68,48 @@ export function InvoiceBuilder({
     [contractDollars, roughInPercent, finishPercent, permitDollars, existing]
   );
 
+  // A paid invoice records money that was actually collected. If the owner's
+  // current inputs would give that invoice a different amount, saving must NOT
+  // silently rewrite the collected amount while leaving the "paid" badge in
+  // place (that would make AR and the dashboard report money never collected).
+  // Instead we flag those invoices here so we can (1) warn the owner before the
+  // save and (2) reset them to unpaid on save so they re-mark it paid at the new
+  // amount. Unpaid invoices are unaffected; an unchanged paid invoice is too.
+  const paidAmountChanges = useMemo(() => {
+    if (!existing) return [] as { kind: InvoiceKind; fromCents: number; toCents: number }[];
+    const changes: { kind: InvoiceKind; fromCents: number; toCents: number }[] = [];
+    for (const prev of existing.invoices) {
+      if (prev.status !== "paid") continue;
+      const toCents =
+        prev.kind === "initial"
+          ? amounts.initialInvoiceAmountCents
+          : amounts.finishInvoiceAmountCents;
+      if (prev.amountCents !== toCents) {
+        changes.push({ kind: prev.kind, fromCents: prev.amountCents, toCents });
+      }
+    }
+    return changes;
+  }, [existing, amounts]);
+
   function buildInvoiceRecord(kind: InvoiceKind, now: string): InvoiceRecord {
     const prev = existing?.invoices.find((invoice) => invoice.kind === kind);
     const amountCents =
       kind === "initial"
         ? amounts.initialInvoiceAmountCents
         : amounts.finishInvoiceAmountCents;
+
+    // Reset a previously-paid invoice when its amount changes (see note on
+    // paidAmountChanges). The owner must re-mark it paid against the new amount.
+    if (prev?.status === "paid" && prev.amountCents !== amountCents) {
+      return {
+        kind,
+        amountCents,
+        status: "unpaid",
+        issuedAt: prev.issuedAt ?? now,
+        paidAt: null
+      };
+    }
+
     return {
       kind,
       amountCents,
@@ -119,7 +160,21 @@ export function InvoiceBuilder({
     }
 
     setSaveError(false);
-    setSaveMessage("Invoices saved. Adjust and save again any time.");
+    if (paidAmountChanges.length > 0) {
+      const list = paidAmountChanges
+        .map((c) => {
+          const label = KIND_LABEL[c.kind];
+          const from = formatCurrency(c.fromCents);
+          const to = formatCurrency(c.toCents);
+          return `${label} (was ${from}, now ${to})`;
+        })
+        .join("; ");
+      setSaveMessage(
+        `Invoices saved. Paid invoice(s) whose amount changed were reset to unpaid so you can re-mark them paid at the new amount: ${list}.`
+      );
+    } else {
+      setSaveMessage("Invoices saved. Adjust and save again any time.");
+    }
     router.refresh();
   }
 
@@ -239,6 +294,25 @@ export function InvoiceBuilder({
           )}
         </div>
       </div>
+
+      {paidAmountChanges.length > 0 ? (
+        <div className="mt-5 rounded-soft border border-clay/30 bg-clay/10 p-4 text-sm font-bold leading-6 text-clay">
+          <p className="mb-2">
+            Heads up: your changes would change the amount of a paid invoice.
+            Saving resets it to unpaid so you can re-mark it paid at the new
+            amount (a paid invoice records money already collected, so its
+            amount is never changed silently).
+          </p>
+          <ul className="ml-4 list-disc space-y-1">
+            {paidAmountChanges.map((c) => (
+              <li key={c.kind}>
+                {KIND_LABEL[c.kind]}: paid at {formatCurrency(c.fromCents)}, would
+                become {formatCurrency(c.toCents)}.
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-bold text-charcoal/65">
