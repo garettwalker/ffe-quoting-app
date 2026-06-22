@@ -3,7 +3,8 @@ import { AppShell } from "@/components/app-shell";
 import { DashboardQuoteSection } from "@/components/dashboard-quote-section";
 import { lifecycleStage } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
-import type { DashboardQuoteRow, QuoteStatus } from "@/lib/types";
+import { normalizeStatus } from "@/lib/types";
+import type { DashboardQuoteRow } from "@/lib/types";
 
 // The quoting tool: the full quote lifecycle pipeline (Draft → Prepared →
 // Client Accepted → Pending Payments → Paid in Full), reading saved quotes
@@ -126,14 +127,4 @@ function QuotesHeader() {
       </Link>
     </div>
   );
-}
-
-function normalizeStatus(value: unknown): QuoteStatus {
-  if (value === "draft" || value === "prepared" || value === "accepted") {
-    return value;
-  }
-  // Anything unexpected (including legacy "completed") is treated as prepared
-  // so the owner still sees it. The SQL migration moves completed rows to
-  // prepared before deploy.
-  return "prepared";
 }

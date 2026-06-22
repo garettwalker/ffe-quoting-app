@@ -90,12 +90,6 @@ export function invoiceOutstandingCents(invoice: InvoiceRecord): number {
     : 0;
 }
 
-// True when every invoice is paid.
-export function isFullyPaid(data: InvoiceData | null): boolean {
-  if (!data) return false;
-  return data.invoices.length > 0 && data.invoices.every((invoice) => invoice.status === "paid");
-}
-
 // True when the job has real invoiced money AND nothing is outstanding. This is
 // the single definition of "paid in full" shared by the dashboard lifecycle, the
 // invoicing page, the saved-quote page, and Accounts Receivable. It keys on the

@@ -8,7 +8,8 @@ import {
   outstandingCents
 } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
-import type { DashboardQuoteRow, QuoteStatus } from "@/lib/types";
+import { normalizeStatus } from "@/lib/types";
+import type { DashboardQuoteRow } from "@/lib/types";
 
 // Overview dashboard: the landing hub for the whole app. At-a-glance tiles
 // link into each tool — Quotes (the lifecycle pipeline at /quotes), Receivables
@@ -242,14 +243,4 @@ function RecentQuoteRow({ row }: { row: DashboardQuoteRow }) {
       </div>
     </Link>
   );
-}
-
-function normalizeStatus(value: unknown): QuoteStatus {
-  if (value === "draft" || value === "prepared" || value === "accepted") {
-    return value;
-  }
-  // Anything unexpected (including legacy "completed") is treated as prepared
-  // so the owner still sees it. The SQL migration moves completed rows to
-  // prepared before deploy.
-  return "prepared";
 }

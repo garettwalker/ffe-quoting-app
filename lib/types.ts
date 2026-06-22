@@ -5,6 +5,18 @@ export type BasePricingMode = "auto" | "builder" | "manual";
 // Row-level quote lifecycle. Lives on the Supabase `quotes` row, not on QuoteFormState.
 export type QuoteStatus = "draft" | "prepared" | "accepted";
 
+// Coerce a raw `quotes.status` value (typed as unknown/string from Supabase)
+// into the QuoteStatus union. Anything unexpected — including the legacy
+// "completed" status — is treated as "prepared" so the owner still sees a
+// sensible action set. The SQL migration moves completed rows to prepared
+// before deploy; this is the runtime backstop for any straggler.
+export function normalizeStatus(value: unknown): QuoteStatus {
+  if (value === "draft" || value === "prepared" || value === "accepted") {
+    return value;
+  }
+  return "prepared";
+}
+
 // The full customer lifecycle shown on the dashboard. The first three come
 // straight from the row status. The last two are derived for accepted quotes
 // from the invoice setup (no invoices yet = accepted, invoices with money
@@ -79,8 +91,9 @@ export type ReceivableInvoice = {
 // One job (quote) flattened for the Accounts Receivable view: the two invoices
 // plus job-level totals. `earliestIssuedAt` is the min issuedAt across the job's
 // invoices and is the sort key for "oldest first". The AR page partitions jobs
-// into Pending Payments (totalOutstandingCents > 0) and Historical Paid (fully
-// paid with a real invoiced amount).
+// into Pending Payments (totalOutstandingCents > 0) and Historical Paid
+// (totalOutstandingCents === 0 with a real invoiced amount) directly off these
+// totals — matching lib/invoice-calculations `isPaidInFull`.
 export type ReceivableJob = {
   id: string;
   quoteId: string;
@@ -92,7 +105,6 @@ export type ReceivableJob = {
   totalPaidCents: number;
   totalOutstandingCents: number;
   earliestIssuedAt: string | null;
-  isFullyPaid: boolean;
 };
 
 export type PricingItem = {

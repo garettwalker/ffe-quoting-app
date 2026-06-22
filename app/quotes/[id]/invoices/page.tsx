@@ -14,6 +14,9 @@ import type {
   QuoteFormState
 } from "@/lib/types";
 
+// Always read the live quote row + invoice data from Supabase (no caching).
+export const dynamic = "force-dynamic";
+
 type InvoicePageRow = {
   id: string;
   quote_id: string;

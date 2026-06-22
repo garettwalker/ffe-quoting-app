@@ -6,7 +6,6 @@ import {
   computeInvoiceAmounts,
   invoiceOutstandingCents,
   invoiceReference,
-  isFullyPaid,
   outstandingCents
 } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
@@ -81,8 +80,7 @@ function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
     totalInvoicedCents,
     totalPaidCents: totalInvoicedCents - totalOutstandingCents,
     totalOutstandingCents,
-    earliestIssuedAt,
-    isFullyPaid: isFullyPaid(data)
+    earliestIssuedAt
   };
 }
 

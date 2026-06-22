@@ -6,12 +6,15 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
 import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
+import { normalizeStatus } from "@/lib/types";
 import type {
   InvoiceData,
   QuoteCalculationResult,
-  QuoteFormState,
-  QuoteStatus
+  QuoteFormState
 } from "@/lib/types";
+
+// Always read the live quote row + invoice data from Supabase (no caching).
+export const dynamic = "force-dynamic";
 
 type SavedQuoteRow = {
   id: string;
@@ -22,16 +25,6 @@ type SavedQuoteRow = {
   calculation_data: QuoteCalculationResult;
   invoice_data: InvoiceData | null;
 };
-
-// Treat any unexpected status (including legacy "completed") as prepared so
-// the owner still sees a sensible action set. The SQL migration moves
-// completed rows to prepared before deploy.
-function normalizeStatus(value: string): QuoteStatus {
-  if (value === "draft" || value === "prepared" || value === "accepted") {
-    return value;
-  }
-  return "prepared";
-}
 
 type PageProps = {
   params: { id: string };

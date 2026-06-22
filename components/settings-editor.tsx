@@ -36,16 +36,23 @@ export function SettingsEditor({ settings }: SettingsEditorProps) {
   async function save() {
     if (isSaving) return;
     setIsSaving(true);
+    // upsert (not update) so this self-heals if the id=1 seed row is ever
+    // missing: it inserts the row instead of silently matching 0 rows. Requires
+    // the app_settings insert anon policy (see README); without it the insert
+    // path is blocked by RLS, but the update path still works when the row exists.
     const { error } = await supabase
       .from("app_settings")
-      .update({
-        business_name: businessName,
-        business_email: businessEmail,
-        business_tagline: businessTagline,
-        default_quote_notes: defaultQuoteNotes,
-        invoice_payment_terms: invoicePaymentTerms
-      })
-      .eq("id", 1);
+      .upsert(
+        {
+          id: 1,
+          business_name: businessName,
+          business_email: businessEmail,
+          business_tagline: businessTagline,
+          default_quote_notes: defaultQuoteNotes,
+          invoice_payment_terms: invoicePaymentTerms
+        },
+        { onConflict: "id" }
+      );
     setIsSaving(false);
     if (error) {
       setMessage(`Save failed: ${error.message}`);
