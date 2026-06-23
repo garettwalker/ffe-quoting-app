@@ -21,7 +21,7 @@ export type Crew = {
 export type ScheduleAssignment = {
   id: string;
   quoteId: string | null; // null = free-form / service call
-  crewId: string;
+  crewIds: string[]; // one or more crew on this entry (multi-select)
   phase: SchedulePhase | null; // null = no phase
   title: string;
   location: string;
@@ -54,7 +54,6 @@ type CrewRow = {
 type AssignmentRow = {
   id: string;
   quote_id: string | null;
-  crew_id: string;
   phase: SchedulePhase | null;
   title: string;
   location: string;
@@ -63,6 +62,12 @@ type AssignmentRow = {
   end_time: string | null;
   notes: string;
   status: ScheduleStatus;
+};
+
+// One row per (assignment, crew) in the linking table.
+type AssignmentCrewRow = {
+  assignment_id: string;
+  crew_id: string;
 };
 
 type SchedulableJobRow = {
@@ -102,24 +107,45 @@ export async function getCrew(): Promise<Crew[]> {
   }));
 }
 
-// Every assignment in [from, to] inclusive (both YYYY-MM-DD). Unsorted beyond
-// work_date; the board groups by day and sorts within (crew order, all-day first,
-// then start time).
+// Every assignment in [from, to] inclusive (both YYYY-MM-DD), each with its crew
+// set. Crew is fetched from the schedule_assignment_crew linking table in a second
+// query (one assignment can have several crew). Unsorted beyond work_date; the
+// board groups by day and sorts within (all-day first, then start time).
 export async function getScheduleRange(from: string, to: string): Promise<ScheduleAssignment[]> {
   const { data, error } = await supabase
     .from("schedule_assignments")
     .select(
-      "id, quote_id, crew_id, phase, title, location, work_date, start_time, end_time, notes, status"
+      "id, quote_id, phase, title, location, work_date, start_time, end_time, notes, status"
     )
     .gte("work_date", from)
     .lte("work_date", to)
     .order("work_date", { ascending: true });
 
   if (error || !data) return [];
-  return (data as AssignmentRow[]).map((row) => ({
+  const rows = data as AssignmentRow[];
+  if (rows.length === 0) return [];
+
+  // Pull the crew links for just these assignments and group by assignment_id.
+  const { data: links, error: linkError } = await supabase
+    .from("schedule_assignment_crew")
+    .select("assignment_id, crew_id")
+    .in(
+      "assignment_id",
+      rows.map((r) => r.id)
+    );
+  const crewByAssignment = new Map<string, string[]>();
+  if (!linkError && links) {
+    for (const link of links as AssignmentCrewRow[]) {
+      const list = crewByAssignment.get(link.assignment_id) ?? [];
+      list.push(link.crew_id);
+      crewByAssignment.set(link.assignment_id, list);
+    }
+  }
+
+  return rows.map((row) => ({
     id: row.id,
     quoteId: row.quote_id,
-    crewId: row.crew_id,
+    crewIds: crewByAssignment.get(row.id) ?? [],
     phase: row.phase,
     title: row.title,
     location: row.location,
@@ -182,14 +208,16 @@ export function formatTimeRange(assignment: ScheduleAssignment): string {
   return start || end || "All day";
 }
 
-// True if two assignments on the same day overlap in time. All-day (no times) is
-// treated as non-overlapping with timed entries (a soft warning, not a block).
+// True if two entries share at least one crew member and overlap in time on the
+// same day. All-day (no times) is treated as non-overlapping with timed entries
+// (a soft warning, not a block). Used for the multi-crew overlap warning.
 export function overlaps(a: ScheduleAssignment, b: ScheduleAssignment): boolean {
   if (a.id === b.id) return false;
+  if (a.workDate !== b.workDate) return false;
   if (!a.startTime || !b.startTime) return false; // all-day doesn't conflict
-  const aStart = a.startTime;
+  const sharedCrew = a.crewIds.some((c) => b.crewIds.includes(c));
+  if (!sharedCrew) return false;
   const aEnd = a.endTime ?? "23:59";
-  const bStart = b.startTime;
   const bEnd = b.endTime ?? "23:59";
-  return aStart < bEnd && bStart < aEnd;
+  return a.startTime < bEnd && b.startTime < aEnd;
 }

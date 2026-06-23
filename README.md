@@ -376,7 +376,7 @@ The **update** policy is required for the status pipeline (`QuoteStatusButton`),
 
 ### Scheduling (crew + assignments)
 
-The owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form entries (service calls, warranty visits, supply runs) that have no quote. `crew` is a small editable list (managed under Pricing → Crew; deactivate instead of delete so past schedules keep their label). `schedule_assignments` is one row per crew member per day: `quote_id` and `phase` are both optional (null = a free-form/service-call entry with no phase), and `title`/`location` are always stored on the row as an editable snapshot, so editing them never touches the quote and deleting a quote (`on delete set null`) never wipes schedule history. Only `crew_id` and `work_date` are required. Run once in the Supabase SQL Editor:
+The owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form entries (service calls, warranty visits, supply runs) that have no quote. `crew` is a small editable list (managed under Pricing → Crew; deactivate instead of delete so past schedules keep their label). An assignment can carry **one or more** crew members (so two people can be sent to one job), tracked through the `schedule_assignment_crew` join table — `schedule_assignments` itself holds no crew column. `quote_id` and `phase` are both optional (null = a free-form/service-call entry with no phase), and `title`/`location` are always stored on the assignment as an editable snapshot, so editing them never touches the quote and deleting a quote (`on delete set null`) never wipes schedule history. Only `work_date` is required (plus at least one crew via the join table). Run once in the Supabase SQL Editor:
 ```sql
 create table if not exists public.crew (
   id uuid primary key default gen_random_uuid(),
@@ -391,7 +391,6 @@ create table if not exists public.crew (
 create table if not exists public.schedule_assignments (
   id uuid primary key default gen_random_uuid(),
   quote_id uuid references public.quotes(id) on delete set null,
-  crew_id uuid not null references public.crew(id) on delete cascade,
   phase text check (phase in ('rough_in','finish')),
   title text not null default '',
   location text not null default '',
@@ -405,12 +404,20 @@ create table if not exists public.schedule_assignments (
   check (start_time is null or end_time is null or end_time > start_time)
 );
 
+-- One row per (assignment, crew). An assignment can have several crew members.
+create table if not exists public.schedule_assignment_crew (
+  assignment_id uuid not null references public.schedule_assignments(id) on delete cascade,
+  crew_id uuid not null references public.crew(id) on delete cascade,
+  primary key (assignment_id, crew_id)
+);
+
 create index if not exists schedule_assignments_work_date_idx on public.schedule_assignments(work_date);
-create index if not exists schedule_assignments_crew_date_idx on public.schedule_assignments(crew_id, work_date);
 create index if not exists schedule_assignments_quote_idx on public.schedule_assignments(quote_id);
+create index if not exists schedule_assignment_crew_crew_idx on public.schedule_assignment_crew(crew_id);
 
 alter table public.crew enable row level security;
 alter table public.schedule_assignments enable row level security;
+alter table public.schedule_assignment_crew enable row level security;
 
 create policy "Allow browser read crew"  on public.crew for select to anon using (true);
 create policy "Allow browser insert crew" on public.crew for insert to anon with check (true);
@@ -421,6 +428,11 @@ create policy "Allow browser read assignments"  on public.schedule_assignments f
 create policy "Allow browser insert assignments" on public.schedule_assignments for insert to anon with check (true);
 create policy "Allow browser update assignments" on public.schedule_assignments for update to anon using (true) with check (true);
 create policy "Allow browser delete assignments" on public.schedule_assignments for delete to anon using (true);
+
+create policy "Allow browser read assignment crew"  on public.schedule_assignment_crew for select to anon using (true);
+create policy "Allow browser insert assignment crew" on public.schedule_assignment_crew for insert to anon with check (true);
+create policy "Allow browser update assignment crew" on public.schedule_assignment_crew for update to anon using (true) with check (true);
+create policy "Allow browser delete assignment crew" on public.schedule_assignment_crew for delete to anon using (true);
 ```
 Seed the crew (or add them via Pricing → Crew):
 ```sql
@@ -431,6 +443,32 @@ insert into public.crew (name, role, color, active, sort_order) values
 on conflict do nothing;
 ```
 These permissive anon policies mirror the rest of the dev posture and **must be tightened before production** (gate to owner/admin, scope employees to their own schedule) as part of the auth/RLS pass. Employee self-service access to the schedule is deferred until that pass; today the schedule is owner-only.
+
+If you ran an earlier version of this schema (where `schedule_assignments` had a single `crew_id` column), migrate to the join table with:
+```sql
+create table if not exists public.schedule_assignment_crew (
+  assignment_id uuid not null references public.schedule_assignments(id) on delete cascade,
+  crew_id uuid not null references public.crew(id) on delete cascade,
+  primary key (assignment_id, crew_id)
+);
+
+-- Move each existing crew assignment into the join table.
+insert into public.schedule_assignment_crew (assignment_id, crew_id)
+  select id, crew_id from public.schedule_assignments where crew_id is not null
+  on conflict do nothing;
+
+create index if not exists schedule_assignment_crew_crew_idx on public.schedule_assignment_crew(crew_id);
+
+alter table public.schedule_assignment_crew enable row level security;
+create policy "Allow browser read assignment crew"  on public.schedule_assignment_crew for select to anon using (true);
+create policy "Allow browser insert assignment crew" on public.schedule_assignment_crew for insert to anon with check (true);
+create policy "Allow browser update assignment crew" on public.schedule_assignment_crew for update to anon using (true) with check (true);
+create policy "Allow browser delete assignment crew" on public.schedule_assignment_crew for delete to anon using (true);
+
+-- Drop the now-redundant column and its index.
+drop index if exists public.schedule_assignments_crew_date_idx;
+alter table public.schedule_assignments drop column if exists crew_id;
+```
 
 ## Branding
 
@@ -491,7 +529,7 @@ Pending (rough priority):
 
 ## Recent work (history)
 
-- 2026-06-22: Added a scheduling tool (Phase 1: phone-first week list). New `/schedule` route (owner-only; employee self-service is deferred to the auth pass) where the owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form service calls. Two new tables — `crew` (editable list managed under Pricing → Crew; deactivate-only) and `schedule_assignments` (one row per crew member per day; `quote_id` and `phase` both optional so a service call has no quote/phase; `title`/`location` stored as an editable snapshot; optional clock times default all-day; status scheduled/completed/cancelled) — with permissive dev RLS policies to be tightened alongside the auth pass. New `lib/schedule.ts` (types + server fetchers `getCrew`/`getScheduleRange`/`getSchedulableJobs` + time/phase/overlap helpers), `app/schedule/page.tsx` (server, `force-dynamic`, fetches the current week), `components/schedule-board.tsx` (client week board: Prev/Today/Next nav, 7-day list that becomes a 7-column grid on desktop, add/edit modal, refetches the week on nav and after every save), `components/schedule-assignment-form.tsx` (client form with a Quote-job vs Service-call toggle; picking a quote pre-fills title/location and reveals a Rough-In/Finish phase; soft overlap warning), and `components/crew-editor.tsx` (admin editor mirroring the pricing editors). Added a Schedule nav link. Phase 2 (desktop week grid with native HTML5 drag-to-reschedule) to follow. Owner must run the crew + schedule_assignments SQL (DDL + policies + seed) in the Supabase SQL Editor before testing.
+- 2026-06-22: Added a scheduling tool (Phase 1: phone-first week list). New `/schedule` route (owner-only; employee self-service is deferred to the auth pass) where the owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form service calls. Two new tables — `crew` (editable list managed under Pricing → Crew; deactivate-only) and `schedule_assignments` (one row per day; `quote_id` and `phase` both optional so a service call has no quote/phase; `title`/`location` stored as an editable snapshot; optional clock times default all-day; status scheduled/completed/cancelled) — plus a `schedule_assignment_crew` join table so an entry can have **one or more** crew members, with permissive dev RLS policies to be tightened alongside the auth pass. New `lib/schedule.ts` (types + server fetchers `getCrew`/`getScheduleRange`/`getSchedulableJobs` + time/phase/overlap helpers), `app/schedule/page.tsx` (server, `force-dynamic`, fetches the current week), `components/schedule-board.tsx` (client week board: Prev/Today/Next nav, 7-day list that becomes a 7-column grid on desktop, add/edit modal, refetches the week on nav and after every save), `components/schedule-assignment-form.tsx` (client form with a Quote-job vs Service-call toggle; multi-select crew pills; picking a quote pre-fills title/location and reveals a Rough-In/Finish phase; soft overlap warning), and `components/crew-editor.tsx` (admin editor mirroring the pricing editors). Added a Schedule nav link. Phase 2 (desktop week grid with native HTML5 drag-to-reschedule) to follow. Owner must run the crew + schedule_assignments + schedule_assignment_crew SQL (DDL + policies + seed) in the Supabase SQL Editor before testing.
 - 2026-06-22: Minor code-hygiene pass (internal, no user-facing change). (1) Hoisted the duplicated `normalizeStatus` helper (was copy-pasted in `app/page.tsx`, `app/quotes/page.tsx`, and `app/quotes/[id]/page.tsx`) into a single `normalizeStatus` export in `lib/types.ts` next to the `QuoteStatus` type; the three pages now import it. (2) Removed the dead `isFullyPaid` function from `lib/invoice-calculations.ts` and the unused `isFullyPaid` field from the `ReceivableJob` type + its assignment in `app/receivables/page.tsx`. `isFullyPaid` (per-invoice paid flags) was superseded by the balance-based `isPaidInFull` in the 2026-06-22 reconciliation work but kept only for this unused field; the AR table already partitions off `totalOutstandingCents === 0 && totalInvoicedCents > 0`, which is `isPaidInFull`, so `isPaidInFull` is now the single "paid in full" definition with no leftover. (3) Switched the settings editor (`components/settings-editor.tsx`) from `.update().eq("id", 1)` to `.upsert({ id: 1, ... }, { onConflict: "id" })` so saving business info self-heals if the `app_settings` id=1 seed row is ever missing (previously the update silently matched 0 rows and reported "Settings saved" while saving nothing). The upsert's insert path requires an `app_settings` insert anon policy, which was missing from the README policy block and has been added; run the one-line `create policy ... for insert` SQL below if it has not been run. (4) Added `export const dynamic = "force-dynamic"` to `app/quotes/[id]/page.tsx` and `app/quotes/[id]/invoices/page.tsx`, which were relying only on the shared client's `cache: "no-store"`; the README's "all live-data pages force-dynamic" claim is now literally true.
 - 2026-06-22: Multi-page PDFs now repeat the header and footer on every page. Previously a quote or invoice that spilled onto a second page rendered page 2+ bare (no logo/business name at the top, no contact line at the bottom) because the header and footer were ordinary in-flow content that only rendered once. The header and footer `<View>`s in `components/pdf/pdf-shared.tsx` (Summary Quote + Invoice) and `components/pdf/detailed-quote-document.tsx` (Detailed Quote) are now `fixed` and absolutely pinned (top:0 / bottom:0), and the page top/bottom padding was raised (48 -> 112 top, 48 -> 56 bottom) to reserve space so the flowing line-item content never slides under the repeated header/footer. The footer also appends "Page X of Y", but only when the document is actually more than one page (a 1-page quote still shows just the contact line, no "Page 1 of 1"). Owner to visually verify on Vercel with a 2-page Detailed Quote. Remaining known limitation (not addressed): on a 2-page Detailed Quote the line-items table itself splits at the page break, so the bordered box and the column-header row (Item / Qty / Unit / Unit Price / Line Total) do not repeat on page 2 — the rows continue but without column headers.
 - 2026-06-22: Cosmetic polish pass. (1) Removed em dashes from user-facing app copy (README says none allowed): invoice card titles ("Invoice 1: Rough-In (Initial)"), receivables placeholders ("N/A" instead of an em dash for missing issued date / missing invoice), pricing-admin helper text, and the pricing-level description fallback. (2) Invoice PDF filename now prefixes `invoice-` (e.g. `invoice-Q-20260619-001-R.pdf`) so it is recognizably an invoice in a downloads folder. (3) The initial invoice PDF no longer prints a "Permit Fee $0.00" line when there is no permit fee; the on-screen preview matches (both render from the shared `lib/invoice-pdf.ts` props). (4) Fixed preview-vs-PDF drift: the on-screen notes/terms boxes on the Detailed Quote, Summary Quote, and invoice previews are now hidden when empty (matching the PDFs, which already hid them); the Detailed Quote preview now shows a "No priced items on this quote." row when empty (matching the PDF); and the Detailed Quote preview no longer leaves a leading " · " when project type is blank (now uses the same `filter(Boolean).join(" · ")` the Summary and invoice previews use).

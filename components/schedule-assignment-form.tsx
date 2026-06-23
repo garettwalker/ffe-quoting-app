@@ -34,20 +34,6 @@ const STATUSES: { value: ScheduleStatus; label: string }[] = [
   { value: "cancelled", label: "Cancelled" }
 ];
 
-const emptyForAdd = (presetDate: string, presetCrewId: string | null) => ({
-  mode: "quote" as Mode,
-  quoteId: "",
-  crewId: presetCrewId ?? "",
-  phase: "rough_in" as SchedulePhase | null,
-  title: "",
-  location: "",
-  workDate: presetDate,
-  startTime: "",
-  endTime: "",
-  status: "scheduled" as ScheduleStatus,
-  notes: ""
-});
-
 export function ScheduleAssignmentForm({
   crew,
   jobs,
@@ -61,7 +47,9 @@ export function ScheduleAssignmentForm({
   const existing = assignment;
   const [mode, setMode] = useState<Mode>(existing?.quoteId ? "quote" : "service");
   const [quoteId, setQuoteId] = useState<string>(existing?.quoteId ?? "");
-  const [crewId, setCrewId] = useState<string>(existing?.crewId ?? presetCrewId ?? "");
+  const [crewIds, setCrewIds] = useState<string[]>(
+    existing?.crewIds ?? (presetCrewId ? [presetCrewId] : [])
+  );
   const [phase, setPhase] = useState<SchedulePhase | null>(existing?.phase ?? "rough_in");
   const [title, setTitle] = useState<string>(existing?.title ?? "");
   const [location, setLocation] = useState<string>(existing?.location ?? "");
@@ -78,6 +66,12 @@ export function ScheduleAssignmentForm({
   function note(msg: string, error = false) {
     setMessage(msg);
     setIsError(error);
+  }
+
+  function toggleCrew(id: string) {
+    setCrewIds((prev) =>
+      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+    );
   }
 
   function onJobChange(value: string) {
@@ -103,11 +97,11 @@ export function ScheduleAssignmentForm({
     }
   }
 
-  // Soft overlap warning: same crew, same day, overlapping times.
+  // Soft overlap warning: any selected crew already on an overlapping entry.
   const draft: ScheduleAssignment = {
     id: existing?.id ?? "draft",
     quoteId: quoteId || null,
-    crewId,
+    crewIds,
     phase: mode === "service" ? null : phase,
     title,
     location,
@@ -117,17 +111,21 @@ export function ScheduleAssignmentForm({
     notes,
     status
   };
-  const conflicts = weekAssignments.filter(
-    (other) =>
-      other.crewId === crewId &&
-      other.workDate === workDate &&
-      overlaps(draft, other)
-  );
+  const conflicts = weekAssignments.filter((other) => overlaps(draft, other));
+
+  // Crew names shared with each conflicting entry, for the warning text.
+  const conflictSummary = conflicts.map((c) => {
+    const shared = c.crewIds
+      .filter((id) => crewIds.includes(id))
+      .map((id) => crew.find((m) => m.id === id)?.name ?? "crew")
+      .join(", ");
+    return { shared, time: formatTimeRange(c) };
+  });
 
   async function save() {
     if (isSaving) return;
-    if (!crewId) {
-      note("Pick a crew member.", true);
+    if (crewIds.length === 0) {
+      note("Pick at least one crew member.", true);
       return;
     }
     if (!workDate) {
@@ -143,9 +141,10 @@ export function ScheduleAssignmentForm({
       return;
     }
 
+    // The assignment row no longer holds crew directly; crew is written to the
+    // schedule_assignment_crew join table so an entry can have several crew.
     const row = {
       quote_id: mode === "service" ? null : quoteId || null,
-      crew_id: crewId,
       phase: mode === "service" ? null : phase,
       title: title.trim(),
       location: location.trim(),
@@ -157,12 +156,49 @@ export function ScheduleAssignmentForm({
     };
 
     setIsSaving(true);
+
+    // Build the crew-link rows once (used for both insert and update paths).
+    const links = crewIds.map((crew_id) => ({ crew_id }));
+
+    let assignmentId = existing?.id ?? null;
     let error;
+
     if (existing) {
-      ({ error } = await supabase.from("schedule_assignments").update(row).eq("id", existing.id));
+      // Update the assignment, then replace its crew set.
+      ({ error } = await supabase
+        .from("schedule_assignments")
+        .update(row)
+        .eq("id", existing.id));
+      if (!error) {
+        await supabase
+          .from("schedule_assignment_crew")
+          .delete()
+          .eq("assignment_id", existing.id);
+        if (links.length > 0) {
+          await supabase
+            .from("schedule_assignment_crew")
+            .insert(links.map((l) => ({ ...l, assignment_id: existing.id })));
+        }
+      }
     } else {
-      ({ error } = await supabase.from("schedule_assignments").insert(row));
+      // Insert the assignment, grab its id, then write the crew links.
+      const { data, error: insertError } = await supabase
+        .from("schedule_assignments")
+        .insert(row)
+        .select("id")
+        .single();
+      error = insertError;
+      if (!insertError && data) {
+        assignmentId = data.id;
+        if (links.length > 0) {
+          const { error: linkError } = await supabase
+            .from("schedule_assignment_crew")
+            .insert(links.map((l) => ({ ...l, assignment_id: assignmentId })));
+          error = linkError;
+        }
+      }
     }
+
     setIsSaving(false);
     if (error) {
       note(`Save failed: ${error.message}`, true);
@@ -285,19 +321,37 @@ export function ScheduleAssignmentForm({
         </Field>
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Crew member">
-            <select
-              value={crewId}
-              onChange={(e) => setCrewId(e.target.value)}
-              className="form-input"
-            >
-              <option value="">Select…</option>
-              {crew.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.name}
-                </option>
-              ))}
-            </select>
+          <Field label="Crew (tap to add one or more)">
+            <div className="flex flex-wrap gap-2">
+              {crew.map((member) => {
+                const selected = crewIds.includes(member.id);
+                return (
+                  <button
+                    key={member.id}
+                    type="button"
+                    onClick={() => toggleCrew(member.id)}
+                    aria-pressed={selected}
+                    className={
+                      selected
+                        ? "flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-black text-whitewarm"
+                        : "flex items-center gap-1.5 rounded-full border-2 border-pine/20 bg-whitewarm px-3 py-1.5 text-sm font-black text-charcoal/70 hover:bg-pine/10"
+                    }
+                    style={
+                      selected
+                        ? { backgroundColor: member.color, borderColor: member.color }
+                        : undefined
+                    }
+                  >
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: selected ? "#fff" : member.color }}
+                      aria-hidden
+                    />
+                    {member.name}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
           <Field label="Date">
             <input
@@ -350,10 +404,15 @@ export function ScheduleAssignmentForm({
 
         {conflicts.length > 0 ? (
           <div className="rounded-soft border border-clay/30 bg-clay/10 px-3 py-2 text-sm font-bold text-clay">
-            Heads up: {crew.find((c) => c.id === crewId)?.name ?? "This crew"} already
-            has {conflicts.length === 1 ? "an entry" : `${conflicts.length} entries`} that
-            day {conflicts.map((c) => `(${formatTimeRange(c)})`).join(" ")}. Overlapping
-            times are allowed — just making sure it&apos;s intentional.
+            Heads up — overlapping entries on this day for a crew you picked:
+            <ul className="mt-1 list-disc pl-5">
+              {conflictSummary.map((c, i) => (
+                <li key={i}>
+                  {c.shared} ({c.time})
+                </li>
+              ))}
+            </ul>
+            Overlapping times are allowed — just making sure it&apos;s intentional.
           </div>
         ) : null}
 

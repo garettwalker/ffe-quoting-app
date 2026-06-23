@@ -105,8 +105,17 @@ export function ScheduleBoard({
     }
     map.forEach((list, date) => {
       list.sort((a, b) => {
-        const ca = crewById.get(a.crewId)?.sortOrder ?? 999;
-        const cb = crewById.get(b.crewId)?.sortOrder ?? 999;
+        // Sort by the earliest crew (smallest sort_order) on each entry.
+        const ca = Math.min(
+          ...(a.crewIds.map((id) => crewById.get(id)?.sortOrder ?? 999).length
+            ? a.crewIds.map((id) => crewById.get(id)?.sortOrder ?? 999)
+            : [999])
+        );
+        const cb = Math.min(
+          ...(b.crewIds.map((id) => crewById.get(id)?.sortOrder ?? 999).length
+            ? b.crewIds.map((id) => crewById.get(id)?.sortOrder ?? 999)
+            : [999])
+        );
         if (ca !== cb) return ca - cb;
         const ta = a.startTime ?? "99:99"; // all-day sorts first
         const tb = b.startTime ?? "99:99";
@@ -138,7 +147,7 @@ export function ScheduleBoard({
       open: true,
       assignment,
       presetDate: assignment.workDate,
-      presetCrewId: assignment.crewId
+      presetCrewId: null
     });
   }
 
@@ -257,7 +266,9 @@ export function ScheduleBoard({
                     <AssignmentCard
                       key={a.id}
                       assignment={a}
-                      crew={crewById.get(a.crewId)}
+                      crew={a.crewIds
+                        .map((id) => crewById.get(id))
+                        .filter((c): c is Crew => Boolean(c))}
                       onEdit={() => openEdit(a)}
                     />
                   ))
@@ -313,7 +324,7 @@ function AssignmentCard({
   onEdit
 }: {
   assignment: ScheduleAssignment;
-  crew: Crew | undefined;
+  crew: Crew[];
   onEdit: () => void;
 }) {
   const phase = phaseLabel(assignment.phase);
@@ -326,13 +337,28 @@ function AssignmentCard({
       className="block w-full rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft hover:border-pine/30"
     >
       <div className="mb-1 flex items-center gap-1.5">
-        <span
-          className="h-2.5 w-2.5 shrink-0 rounded-full"
-          style={{ backgroundColor: crew?.color ?? "#344236" }}
-          aria-hidden
-        />
+        {crew.length > 0 ? (
+          <span className="flex shrink-0 items-center -space-x-1">
+            {crew.map((c) => (
+              <span
+                key={c.id}
+                className="h-2.5 w-2.5 rounded-full border border-whitewarm"
+                style={{ backgroundColor: c.color }}
+                aria-hidden
+              />
+            ))}
+          </span>
+        ) : (
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full"
+            style={{ backgroundColor: "#344236" }}
+            aria-hidden
+          />
+        )}
         <span className="text-xs font-black text-charcoal/70">
-          {crew?.name ?? "Unassigned"}
+          {crew.length > 0
+            ? crew.map((c) => c.name).join(", ")
+            : "Unassigned"}
         </span>
         <span className="ml-auto text-xs font-bold text-charcoal/55">
           {formatTimeRange(assignment)}
