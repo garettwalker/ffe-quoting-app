@@ -1,18 +1,20 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { ContingencyEditor } from "@/components/contingency-editor";
+import { CrewEditor } from "@/components/crew-editor";
 import { PricingItemEditor } from "@/components/pricing-item-editor";
 import { PricingLevelEditor } from "@/components/pricing-level-editor";
 import { ProjectTypeEditor } from "@/components/project-type-editor";
 import { SettingsEditor } from "@/components/settings-editor";
 import { getPricingCatalog } from "@/lib/pricing";
+import { getCrew } from "@/lib/schedule";
 
 // Always read the live catalog from Supabase (no caching), so edits made here
 // are reflected immediately on reload and after each editor's router.refresh().
 export const dynamic = "force-dynamic";
 
 export default async function PricingAdminPage() {
-  const catalog = await getPricingCatalog();
+  const [catalog, crew] = await Promise.all([getPricingCatalog(), getCrew()]);
 
   return (
     <AppShell>
@@ -56,6 +58,7 @@ export default async function PricingAdminPage() {
         <PricingLevelEditor levels={catalog.levels} />
         <ContingencyEditor contingencies={catalog.contingencies} />
         <ProjectTypeEditor projectTypes={catalog.projectTypes} />
+        <CrewEditor crew={crew} />
         <SettingsEditor settings={catalog.settings} />
       </div>
     </AppShell>

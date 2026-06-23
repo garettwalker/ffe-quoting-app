@@ -28,7 +28,8 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/[id]/invoices` | Invoicing page for an accepted quote. Set contract amount, rough-in/finish split, and permit fee; mark invoices paid; download invoice PDFs. |
 | `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). One-click Download PDF; on-screen layout is a preview. |
 | `/quotes/[id]/invoices/[kind]/pdf` | Server route: renders the invoice (`initial` or `finish`) to a PDF buffer and streams it back as a file download. |
-| `/pricing-admin` | Pricing admin. Edit line items, pricing levels, contingencies, project types, and business info/quote notes/invoice terms stored in Supabase. Deactivate-only (no hard delete). |
+| `/pricing-admin` | Pricing admin. Edit line items, pricing levels, contingencies, project types, crew, and business info/quote notes/invoice terms stored in Supabase. Deactivate-only (no hard delete). |
+| `/schedule` | Schedule. Owner-only week view of the crew's jobs: phone-first day list (7-column grid on desktop), Prev/Today/Next week nav, tap a day to add, tap a card to edit. Entries are either a quote job (rough-in/finish for an accepted quote, title/location auto-filled from the quote) or a free-form service call. Optional clock times, default all-day. Times + a soft overlap warning. Employee self-service access is deferred to the auth pass. |
 | `/receivables` | Accounts Receivable. Two stacked tables — Pending Payments (outstanding balances) and Historical Paid (paid in full) — one row per job with rough-in and finish invoice columns. Preset period filter + sort. Read-only, derived from `quotes.invoice_data`. |
 
 ## File structure
@@ -51,8 +52,9 @@ app
     [id]/invoices/page.tsx      // Invoicing setup + invoice list
     [id]/invoices/[kind]/print/page.tsx  // Printable invoice (initial/finish, preview + Download PDF)
     [id]/invoices/[kind]/pdf/route.tsx   // Server route: renders the invoice to a PDF buffer
-  pricing-admin/page.tsx       // Pricing admin (items, levels, contingencies, project types, settings)
+  pricing-admin/page.tsx       // Pricing admin (items, levels, contingencies, project types, crew, settings)
   receivables/page.tsx         // Accounts Receivable (pending vs paid, two tables)
+  schedule/page.tsx            // Schedule (owner-only week view; phone day list / desktop 7-col grid)
 
 components
   app-shell.tsx
@@ -68,6 +70,9 @@ components
   invoice-builder.tsx           // invoice setup form (contract, split, permit)
   invoice-paid-button.tsx       // toggles an invoice paid/unpaid
   receivables-table.tsx         // AR tables: period/sort + pending vs paid partition
+  schedule-board.tsx            // client week board: week nav, day list/grid, add/edit modal
+  schedule-assignment-form.tsx  // client add/edit form (Quote job vs Service call, times, overlap warning)
+  crew-editor.tsx               // admin editor for the crew list (add/rename/color/active)
   pricing-admin-ui.tsx          // shared Field/buttons/badges for the admin editors
   pricing-item-editor.tsx       // admin editor for pricing_items
   pricing-level-editor.tsx      // admin editor for pricing_levels
@@ -91,6 +96,7 @@ lib
   pdf-logo.ts                   // server-only: reads /public/ffe-logo.png into a base64 data URI for react-pdf
   pricing.ts                    // server-side reads of the live pricing catalog + settings
   quote-id.ts                   // resolveQuoteIdForSave: keep a custom id or ask the server for the next atomic daily number
+  schedule.ts                   // crew + schedule assignment types, server fetchers, time/phase/overlap helpers
   quote-storage.ts
   supabase.ts
   types.ts
@@ -368,6 +374,64 @@ create policy "Allow browser delete quotes during app build" on public.quotes fo
 ```
 The **update** policy is required for the status pipeline (`QuoteStatusButton`), saving drafts against an existing row, and editing saved quotes. If status changes fail in testing, verify the update policy exists.
 
+### Scheduling (crew + assignments)
+
+The owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form entries (service calls, warranty visits, supply runs) that have no quote. `crew` is a small editable list (managed under Pricing → Crew; deactivate instead of delete so past schedules keep their label). `schedule_assignments` is one row per crew member per day: `quote_id` and `phase` are both optional (null = a free-form/service-call entry with no phase), and `title`/`location` are always stored on the row as an editable snapshot, so editing them never touches the quote and deleting a quote (`on delete set null`) never wipes schedule history. Only `crew_id` and `work_date` are required. Run once in the Supabase SQL Editor:
+```sql
+create table if not exists public.crew (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  role text not null default 'full_time' check (role in ('full_time','intern')),
+  color text not null default '#344236',
+  active boolean not null default true,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.schedule_assignments (
+  id uuid primary key default gen_random_uuid(),
+  quote_id uuid references public.quotes(id) on delete set null,
+  crew_id uuid not null references public.crew(id) on delete cascade,
+  phase text check (phase in ('rough_in','finish')),
+  title text not null default '',
+  location text not null default '',
+  work_date date not null,
+  start_time time,
+  end_time time,
+  notes text not null default '',
+  status text not null default 'scheduled' check (status in ('scheduled','completed','cancelled')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (start_time is null or end_time is null or end_time > start_time)
+);
+
+create index if not exists schedule_assignments_work_date_idx on public.schedule_assignments(work_date);
+create index if not exists schedule_assignments_crew_date_idx on public.schedule_assignments(crew_id, work_date);
+create index if not exists schedule_assignments_quote_idx on public.schedule_assignments(quote_id);
+
+alter table public.crew enable row level security;
+alter table public.schedule_assignments enable row level security;
+
+create policy "Allow browser read crew"  on public.crew for select to anon using (true);
+create policy "Allow browser insert crew" on public.crew for insert to anon with check (true);
+create policy "Allow browser update crew" on public.crew for update to anon using (true) with check (true);
+create policy "Allow browser delete crew" on public.crew for delete to anon using (true);
+
+create policy "Allow browser read assignments"  on public.schedule_assignments for select to anon using (true);
+create policy "Allow browser insert assignments" on public.schedule_assignments for insert to anon with check (true);
+create policy "Allow browser update assignments" on public.schedule_assignments for update to anon using (true) with check (true);
+create policy "Allow browser delete assignments" on public.schedule_assignments for delete to anon using (true);
+```
+Seed the crew (or add them via Pricing → Crew):
+```sql
+insert into public.crew (name, role, color, active, sort_order) values
+  ('Adam', 'full_time', '#344236', true, 0),
+  ('Johnathan', 'full_time', '#a56543', true, 1),
+  ('Peyton', 'intern', '#6e7751', true, 2)
+on conflict do nothing;
+```
+These permissive anon policies mirror the rest of the dev posture and **must be tightened before production** (gate to owner/admin, scope employees to their own schedule) as part of the auth/RLS pass. Employee self-service access to the schedule is deferred until that pass; today the schedule is owner-only.
+
 ## Branding
 
 - Logo: `public/ffe-logo.png` (use this one, not older circular badge logos).
@@ -427,6 +491,7 @@ Pending (rough priority):
 
 ## Recent work (history)
 
+- 2026-06-22: Added a scheduling tool (Phase 1: phone-first week list). New `/schedule` route (owner-only; employee self-service is deferred to the auth pass) where the owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form service calls. Two new tables — `crew` (editable list managed under Pricing → Crew; deactivate-only) and `schedule_assignments` (one row per crew member per day; `quote_id` and `phase` both optional so a service call has no quote/phase; `title`/`location` stored as an editable snapshot; optional clock times default all-day; status scheduled/completed/cancelled) — with permissive dev RLS policies to be tightened alongside the auth pass. New `lib/schedule.ts` (types + server fetchers `getCrew`/`getScheduleRange`/`getSchedulableJobs` + time/phase/overlap helpers), `app/schedule/page.tsx` (server, `force-dynamic`, fetches the current week), `components/schedule-board.tsx` (client week board: Prev/Today/Next nav, 7-day list that becomes a 7-column grid on desktop, add/edit modal, refetches the week on nav and after every save), `components/schedule-assignment-form.tsx` (client form with a Quote-job vs Service-call toggle; picking a quote pre-fills title/location and reveals a Rough-In/Finish phase; soft overlap warning), and `components/crew-editor.tsx` (admin editor mirroring the pricing editors). Added a Schedule nav link. Phase 2 (desktop week grid with native HTML5 drag-to-reschedule) to follow. Owner must run the crew + schedule_assignments SQL (DDL + policies + seed) in the Supabase SQL Editor before testing.
 - 2026-06-22: Minor code-hygiene pass (internal, no user-facing change). (1) Hoisted the duplicated `normalizeStatus` helper (was copy-pasted in `app/page.tsx`, `app/quotes/page.tsx`, and `app/quotes/[id]/page.tsx`) into a single `normalizeStatus` export in `lib/types.ts` next to the `QuoteStatus` type; the three pages now import it. (2) Removed the dead `isFullyPaid` function from `lib/invoice-calculations.ts` and the unused `isFullyPaid` field from the `ReceivableJob` type + its assignment in `app/receivables/page.tsx`. `isFullyPaid` (per-invoice paid flags) was superseded by the balance-based `isPaidInFull` in the 2026-06-22 reconciliation work but kept only for this unused field; the AR table already partitions off `totalOutstandingCents === 0 && totalInvoicedCents > 0`, which is `isPaidInFull`, so `isPaidInFull` is now the single "paid in full" definition with no leftover. (3) Switched the settings editor (`components/settings-editor.tsx`) from `.update().eq("id", 1)` to `.upsert({ id: 1, ... }, { onConflict: "id" })` so saving business info self-heals if the `app_settings` id=1 seed row is ever missing (previously the update silently matched 0 rows and reported "Settings saved" while saving nothing). The upsert's insert path requires an `app_settings` insert anon policy, which was missing from the README policy block and has been added; run the one-line `create policy ... for insert` SQL below if it has not been run. (4) Added `export const dynamic = "force-dynamic"` to `app/quotes/[id]/page.tsx` and `app/quotes/[id]/invoices/page.tsx`, which were relying only on the shared client's `cache: "no-store"`; the README's "all live-data pages force-dynamic" claim is now literally true.
 - 2026-06-22: Multi-page PDFs now repeat the header and footer on every page. Previously a quote or invoice that spilled onto a second page rendered page 2+ bare (no logo/business name at the top, no contact line at the bottom) because the header and footer were ordinary in-flow content that only rendered once. The header and footer `<View>`s in `components/pdf/pdf-shared.tsx` (Summary Quote + Invoice) and `components/pdf/detailed-quote-document.tsx` (Detailed Quote) are now `fixed` and absolutely pinned (top:0 / bottom:0), and the page top/bottom padding was raised (48 -> 112 top, 48 -> 56 bottom) to reserve space so the flowing line-item content never slides under the repeated header/footer. The footer also appends "Page X of Y", but only when the document is actually more than one page (a 1-page quote still shows just the contact line, no "Page 1 of 1"). Owner to visually verify on Vercel with a 2-page Detailed Quote. Remaining known limitation (not addressed): on a 2-page Detailed Quote the line-items table itself splits at the page break, so the bordered box and the column-header row (Item / Qty / Unit / Unit Price / Line Total) do not repeat on page 2 — the rows continue but without column headers.
 - 2026-06-22: Cosmetic polish pass. (1) Removed em dashes from user-facing app copy (README says none allowed): invoice card titles ("Invoice 1: Rough-In (Initial)"), receivables placeholders ("N/A" instead of an em dash for missing issued date / missing invoice), pricing-admin helper text, and the pricing-level description fallback. (2) Invoice PDF filename now prefixes `invoice-` (e.g. `invoice-Q-20260619-001-R.pdf`) so it is recognizably an invoice in a downloads folder. (3) The initial invoice PDF no longer prints a "Permit Fee $0.00" line when there is no permit fee; the on-screen preview matches (both render from the shared `lib/invoice-pdf.ts` props). (4) Fixed preview-vs-PDF drift: the on-screen notes/terms boxes on the Detailed Quote, Summary Quote, and invoice previews are now hidden when empty (matching the PDFs, which already hid them); the Detailed Quote preview now shows a "No priced items on this quote." row when empty (matching the PDF); and the Detailed Quote preview no longer leaves a leading " · " when project type is blank (now uses the same `filter(Boolean).join(" · ")` the Summary and invoice previews use).
