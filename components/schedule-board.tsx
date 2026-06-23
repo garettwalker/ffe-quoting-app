@@ -414,11 +414,11 @@ function AssignmentCard({
       onDragEnd={onDragEnd}
       className={
         dragging
-          ? "block w-full rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft opacity-40"
-          : "block w-full cursor-grab rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft hover:border-pine/30 active:cursor-grabbing"
+          ? "block w-full overflow-hidden rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft opacity-40"
+          : "block w-full cursor-grab overflow-hidden rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft hover:border-pine/30 active:cursor-grabbing"
       }
     >
-      <div className="mb-1 flex items-center gap-1.5">
+      <div className="mb-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
         {crew.length > 0 ? (
           <span className="flex shrink-0 items-center -space-x-1">
             {crew.map((c) => (
@@ -437,12 +437,12 @@ function AssignmentCard({
             aria-hidden
           />
         )}
-        <span className="text-xs font-black text-charcoal/70">
+        <span className="min-w-0 truncate text-xs font-black text-charcoal/70">
           {crew.length > 0
             ? crew.map((c) => c.name).join(", ")
             : "Unassigned"}
         </span>
-        <span className="ml-auto text-xs font-bold text-charcoal/55">
+        <span className="ml-auto shrink-0 text-xs font-bold text-charcoal/55">
           {formatTimeRange(assignment)}
         </span>
       </div>
