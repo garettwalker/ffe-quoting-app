@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { supabase } from "@/lib/supabase";
 import {
   formatTimeRange,
   getScheduleRange,
@@ -83,6 +84,12 @@ export function ScheduleBoard({
     presetCrewId: null
   });
 
+  // Drag-to-reschedule (desktop). draggingId dims the source card; dragOverDate
+  // highlights the target day column; note surfaces a failed move.
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverDate, setDragOverDate] = useState<string | null>(null);
+  const [note, setNote] = useState("");
+
   const crewById = useMemo(() => {
     const map = new Map<string, Crew>();
     crew.forEach((c) => map.set(c.id, c));
@@ -136,6 +143,23 @@ export function ScheduleBoard({
     const result = await getScheduleRange(from, to);
     setAssignments(result);
     setLoading(false);
+  }
+
+  // Drag a card onto another day column: update its work_date and refetch the
+  // week. Crew links are untouched (only the parent work_date changes). Mirrors
+  // the app's direct-mutate-then-refresh pattern (same as the schedule form).
+  async function moveAssignment(id: string, newDate: string) {
+    setNote("");
+    const { error } = await supabase
+      .from("schedule_assignments")
+      .update({ work_date: newDate })
+      .eq("id", id);
+    if (error) {
+      setNote(`Could not move: ${error.message}`);
+      await loadWeek(weekStart); // snap the card back to its real day
+      return;
+    }
+    await loadWeek(weekStart);
   }
 
   function openAdd(presetDate: string, presetCrewId: string | null = null) {
@@ -216,19 +240,49 @@ export function ScheduleBoard({
         <p className="text-sm font-bold text-charcoal/60">Loading week…</p>
       ) : null}
 
+      {note ? (
+        <p className="rounded-soft border border-clay/30 bg-clay/10 px-3 py-2 text-sm font-bold text-clay">
+          {note}
+        </p>
+      ) : null}
+
+      <p className="hidden text-xs font-bold text-charcoal/45 md:block">
+        Drag a card to another day to reschedule, or tap to edit.
+      </p>
+
       {/* Week: stacked day cards on mobile, 7-column grid on desktop. */}
       <div className="grid gap-3 md:grid-cols-7">
         {days.map((date, i) => {
           const iso = toISODate(date);
           const dayAssignments = byDate.get(iso) ?? [];
           const today = isToday(date);
+          const isDropTarget = dragOverDate === iso;
           return (
             <div
               key={iso}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOverDate(iso);
+              }}
+              onDragLeave={() =>
+                setDragOverDate((d) => (d === iso ? null : d))
+              }
+              onDrop={(e) => {
+                e.preventDefault();
+                const id = e.dataTransfer.getData("text/plain");
+                setDragOverDate(null);
+                setDraggingId(null);
+                if (!id) return;
+                const current = assignments.find((a) => a.id === id);
+                if (!current || current.workDate === iso) return;
+                moveAssignment(id, iso);
+              }}
               className={
-                today
-                  ? "rounded-xl2 border border-pine/30 bg-cream p-3 shadow-soft"
-                  : "rounded-xl2 border border-pine/10 bg-whitewarm/75 p-3 shadow-soft"
+                isDropTarget
+                  ? "rounded-xl2 border-2 border-pine/50 bg-pine/5 p-3 shadow-soft"
+                  : today
+                    ? "rounded-xl2 border border-pine/30 bg-cream p-3 shadow-soft"
+                    : "rounded-xl2 border border-pine/10 bg-whitewarm/75 p-3 shadow-soft"
               }
             >
               <div className="mb-2 flex items-center justify-between gap-2">
@@ -269,7 +323,16 @@ export function ScheduleBoard({
                       crew={a.crewIds
                         .map((id) => crewById.get(id))
                         .filter((c): c is Crew => Boolean(c))}
+                      dragging={draggingId === a.id}
                       onEdit={() => openEdit(a)}
+                      onDragStart={() => {
+                        setDraggingId(a.id);
+                        setNote("");
+                      }}
+                      onDragEnd={() => {
+                        setDraggingId(null);
+                        setDragOverDate(null);
+                      }}
                     />
                   ))
                 )}
@@ -321,11 +384,17 @@ export function ScheduleBoard({
 function AssignmentCard({
   assignment,
   crew,
-  onEdit
+  dragging,
+  onEdit,
+  onDragStart,
+  onDragEnd
 }: {
   assignment: ScheduleAssignment;
   crew: Crew[];
+  dragging: boolean;
   onEdit: () => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
 }) {
   const phase = phaseLabel(assignment.phase);
   const cancelled = assignment.status === "cancelled";
@@ -334,7 +403,20 @@ function AssignmentCard({
     <button
       type="button"
       onClick={onEdit}
-      className="block w-full rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft hover:border-pine/30"
+      draggable
+      onDragStart={(e) => {
+        // Stash the id in the transfer so the drop handler reads it from the
+        // event (survives even if React state is stale mid-drag).
+        e.dataTransfer.setData("text/plain", assignment.id);
+        e.dataTransfer.effectAllowed = "move";
+        onDragStart();
+      }}
+      onDragEnd={onDragEnd}
+      className={
+        dragging
+          ? "block w-full rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft opacity-40"
+          : "block w-full cursor-grab rounded-xl1 border border-pine/10 bg-whitewarm p-3 text-left shadow-soft hover:border-pine/30 active:cursor-grabbing"
+      }
     >
       <div className="mb-1 flex items-center gap-1.5">
         {crew.length > 0 ? (
