@@ -6,6 +6,7 @@ import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
 import { invoiceReference, outstandingCents, isPaidInFull } from "@/lib/invoice-calculations";
+import { getServerUser } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   InvoiceData,
@@ -32,13 +33,16 @@ type PageProps = {
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const { data, error } = await supabase
-    .from("quotes")
-    .select(
-      "id, quote_id, status, quote_data, calculation_data, invoice_data"
-    )
-    .eq("id", params.id)
-    .single();
+  const [user, { data, error }] = await Promise.all([
+    getServerUser(),
+    supabase
+      .from("quotes")
+      .select(
+        "id, quote_id, status, quote_data, calculation_data, invoice_data"
+      )
+      .eq("id", params.id)
+      .single()
+  ]);
 
   if (error || !data || !data.quote_data || !data.calculation_data) {
     notFound();
@@ -116,6 +120,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     title="Invoice 1: Rough-In (Initial)"
                     amountCents={initialInvoice.amountCents}
                     status={initialInvoice.status}
+                    recordedBy={user?.email ?? ""}
                   />
                 ) : null}
 
@@ -128,6 +133,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     title="Invoice 2: Finish"
                     amountCents={finishInvoice.amountCents}
                     status={finishInvoice.status}
+                    recordedBy={user?.email ?? ""}
                   />
                 ) : null}
               </div>
@@ -167,7 +173,8 @@ function InvoiceCard({
   reference,
   title,
   amountCents,
-  status
+  status,
+  recordedBy
 }: {
   quoteId: string;
   invoiceData: InvoiceData;
@@ -176,6 +183,7 @@ function InvoiceCard({
   title: string;
   amountCents: number;
   status: "unpaid" | "paid";
+  recordedBy: string;
 }) {
   return (
     <div className="rounded-xl1 border border-pine/10 bg-cream p-4">
@@ -199,7 +207,7 @@ function InvoiceCard({
         >
           PDF
         </Link>
-        <InvoicePaidButton quoteId={quoteId} invoiceData={invoiceData} kind={kind} />
+        <InvoicePaidButton quoteId={quoteId} invoiceData={invoiceData} kind={kind} recordedBy={recordedBy} />
       </div>
     </div>
   );
