@@ -211,7 +211,7 @@ function InvoiceCard({
           href={`/quotes/${quoteId}/invoices/${kind}/print`}
           className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
         >
-          PDF
+          View invoice
         </Link>
         <InvoicePaidButton quoteId={quoteId} invoiceData={invoiceData} kind={kind} recordedBy={recordedBy} />
       </div>
