@@ -3,10 +3,18 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { getSupabaseEnv } from "@/lib/supabase-env";
 
-// Phase A: refresh the auth session on every request so the session cookies
-// stay valid. It does NOT redirect yet — the app stays fully open and usable.
-// Phase B adds the redirect to /login for unauthenticated users (except the
-// public routes: /login, /api/keepalive, and the future /pay/* + webhook).
+// Phase B: refresh the session on every request AND redirect unauthenticated
+// users to /login for protected pages. API routes are NOT redirected here —
+// each route enforces its own auth and returns a JSON 401/403 (a redirect would
+// be wrong for an API call). Public paths never require a login: the login
+// page itself, the customer pay link (+ success/canceled pages), and the
+// keepalive + Stripe webhook endpoints.
+const PUBLIC_PATHS = ["/login", "/pay", "/api/keepalive", "/api/stripe-webhook"];
+
+function isPublic(path: string) {
+  return PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+}
+
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
   const { url, anonKey } = getSupabaseEnv();
@@ -27,8 +35,22 @@ export async function middleware(request: NextRequest) {
     }
   });
 
-  // Refreshing the session also refreshes the cookies on `response`.
-  await supabase.auth.getUser();
+  // Refresh the session (also refreshes the cookies on `response`).
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const path = request.nextUrl.pathname;
+
+  // Logged-in users visiting /login are sent straight to the dashboard.
+  if (user && path === "/login") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
+  // Unauthenticated users hitting a protected page are sent to /login.
+  const isApi = path.startsWith("/api/");
+  if (!user && !isApi && !isPublic(path)) {
+    return NextResponse.redirect(new URL("/login", request.url));
+  }
 
   return response;
 }

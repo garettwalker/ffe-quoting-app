@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getServerUser } from "@/lib/auth";
 import { logEmailSend } from "@/lib/email-log";
 import { getSettings } from "@/lib/pricing";
 import {
@@ -16,10 +17,11 @@ import {
 // Renders the requested quote/invoice PDF to a buffer (same path the Download
 // PDF routes use) and sends it to `to` as an attachment via Resend.
 //
-// SECURITY: this endpoint is currently OPEN (no auth). Until owner/admin login
-// (Supabase Auth) lands, anyone with the URL can trigger a send as the business.
-// That tightening is the documented next step after this feature is verified.
-// See the README "Sending email from the app" section.
+// SECURITY: gated to an admin session (Phase B). getServerUser() reads the
+// Supabase session from cookies; only an authenticated admin may send. An
+// unauthenticated caller gets 401, a non-admin gets 403. Pair with the
+// middleware front-door redirect that already keeps anonymous users off the
+// pages that expose this button.
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +29,21 @@ const DOCS: EmailDocKind[] = ["detailed", "summary", "invoice"];
 const INVOICE_KINDS: InvoiceKind[] = ["initial", "finish"];
 
 export async function POST(request: Request) {
+  // Auth gate (Phase B): only an admin may send emails as the business.
+  const user = await getServerUser();
+  if (!user) {
+    return NextResponse.json(
+      { ok: false, error: "Sign in required." },
+      { status: 401 }
+    );
+  }
+  if (user.role !== "admin") {
+    return NextResponse.json(
+      { ok: false, error: "Admin access required." },
+      { status: 403 }
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
