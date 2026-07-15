@@ -128,6 +128,7 @@ export function buildEmailDefaults({
 }
 
 export type SendPdfEmailInput = {
+  from: string;
   to: string;
   subject: string;
   message: string;
@@ -138,23 +139,40 @@ export type SendPdfEmailResult =
   | { ok: true; id: string }
   | { ok: false; error: string };
 
-// Sends the PDF as an attachment via Resend. The "from" address must live on a
-// domain the owner has verified in Resend (set as EMAIL_FROM env). Returns a
-// plain ok/error result so the API route can map it to an HTTP status without
-// leaking provider internals.
+// Resolves the "from" address for a document. Quotes (detailed + summary) send
+// from EMAIL_FROM. Invoices (initial + finish) send from EMAIL_FROM_INVOICES
+// when it is set, otherwise fall back to EMAIL_FROM. Both must live on a domain
+// the owner has verified in Resend. Returns "" when nothing is configured.
+export function getEmailFrom(doc: EmailDocKind): string {
+  if (doc === "invoice") {
+    const invoiceFrom = process.env.EMAIL_FROM_INVOICES;
+    if (invoiceFrom) return invoiceFrom;
+  }
+  return process.env.EMAIL_FROM ?? "";
+}
+
+// Sends the PDF as an attachment via Resend. The caller resolves the "from"
+// address (see getEmailFrom). Returns a plain ok/error result so the API route
+// can map it to an HTTP status without leaking provider internals.
 export async function sendPdfEmail({
+  from,
   to,
   subject,
   message,
   attachment
 }: SendPdfEmailInput): Promise<SendPdfEmailResult> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.EMAIL_FROM;
-  if (!apiKey || !from) {
+  if (!apiKey) {
+    return {
+      ok: false,
+      error: "Email is not configured. Set RESEND_API_KEY in the environment."
+    };
+  }
+  if (!from) {
     return {
       ok: false,
       error:
-        "Email is not configured. Set RESEND_API_KEY and EMAIL_FROM in the environment."
+        "Email is not configured. Set EMAIL_FROM (and optionally EMAIL_FROM_INVOICES) in the environment."
     };
   }
 

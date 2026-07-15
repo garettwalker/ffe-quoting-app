@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   buildEmailDefaults,
+  getEmailFrom,
   isValidEmail,
   renderEmailAttachment,
   sendPdfEmail,
@@ -94,7 +95,12 @@ export async function POST(request: Request) {
   const finalSubject = subject?.trim() ? subject.trim() : defaults.subject;
   const finalMessage = message && message.trim() ? message : defaults.message;
 
+  // Quotes send from EMAIL_FROM; invoices from EMAIL_FROM_INVOICES (falls back
+  // to EMAIL_FROM when not set).
+  const from = getEmailFrom(doc as EmailDocKind);
+
   const result = await sendPdfEmail({
+    from,
     to: to.trim(),
     subject: finalSubject,
     message: finalMessage,
