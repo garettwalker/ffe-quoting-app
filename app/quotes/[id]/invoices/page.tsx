@@ -209,7 +209,7 @@ function InvoiceCard({
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href={`/quotes/${quoteId}/invoices/${kind}/print`}
-          className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
+          className="inline-flex items-center justify-center rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card transition hover:bg-deep-pine"
         >
           View invoice
         </Link>
