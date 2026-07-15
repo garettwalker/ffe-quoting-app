@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logEmailSend } from "@/lib/email-log";
 import { getSettings } from "@/lib/pricing";
 import {
   buildEmailDefaults,
@@ -115,6 +116,21 @@ export async function POST(request: Request) {
     subject: finalSubject,
     message: finalMessage,
     attachment
+  });
+
+  // Append an audit-log row (both sent and failed). Best-effort: a logging
+  // failure never changes the send response or breaks a successful send.
+  await logEmailSend({
+    quoteId: id,
+    doc: doc as EmailDocKind,
+    invoiceKind: doc === "invoice" ? (invoiceKind as InvoiceKind) : undefined,
+    reference: attachment.reference,
+    docTitle: attachment.docTitle,
+    recipient: to.trim(),
+    subject: finalSubject,
+    providerMessageId: result.ok ? result.id : null,
+    status: result.ok ? "sent" : "failed",
+    error: result.ok ? "" : result.error
   });
 
   if (!result.ok) {

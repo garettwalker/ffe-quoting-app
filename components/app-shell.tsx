@@ -55,6 +55,12 @@ export function AppShell({ children }: AppShellProps) {
               Schedule
             </Link>
             <Link
+              href="/email-log"
+              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
+            >
+              Email Log
+            </Link>
+            <Link
               href="/pricing-admin"
               className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
             >

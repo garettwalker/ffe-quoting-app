@@ -31,6 +31,7 @@ This README is the long-term context file for the project. It is meant for both 
 | `/api/email-pdf` | POST API route. Renders a quote/invoice PDF to a buffer (same path as the Download PDF routes) and sends it to a customer as an attachment via Resend. Body: `{ id, doc, invoiceKind?, to, subject?, message? }`. The recipient, subject, and message are pre-filled from the email on file + per-doc defaults and editable before sending. See **Sending email from the app** below. |
 | `/pricing-admin` | Pricing admin. Edit line items, pricing levels, contingencies, project types, crew, and business info/quote notes/invoice terms stored in Supabase. Deactivate-only (no hard delete). |
 | `/schedule` | Schedule. Owner-only week view of the crew's jobs: phone-first day list (7-column grid on desktop), Prev/Today/Next week nav, tap a day to add, tap a card to edit. On desktop, drag a card onto another day column to reschedule it (native HTML5; tap-to-edit is the fallback and the only path on mobile). Entries are either a quote job (rough-in/finish for an accepted quote, title/location auto-filled from the quote) or a free-form service call, and can carry one or more crew. Optional clock times, default all-day. Times + a soft overlap warning. Employee self-service access is deferred to the auth pass. |
+| `/email-log` | Email audit log. Read-only, recent-first list of every quote/invoice emailed from the app (date, document, recipient, status), including failed send attempts. One row per send. Pairs with the per-quote Email History section on `/quotes/[id]`. |
 | `/receivables` | Accounts Receivable. Two stacked tables — Pending Payments (outstanding balances) and Historical Paid (paid in full) — one row per job with rough-in and finish invoice columns. Preset period filter + sort. Read-only, derived from `quotes.invoice_data`. |
 
 ## File structure
@@ -55,6 +56,7 @@ app
     [id]/invoices/[kind]/pdf/route.tsx   // Server route: renders the invoice to a PDF buffer
   api
     email-pdf/route.tsx        // POST API route: renders a PDF to a buffer and emails it via Resend
+  email-log/page.tsx           // Read-only global email audit log (recent sends, newest first)
   pricing-admin/page.tsx       // Pricing admin (items, levels, contingencies, project types, crew, settings)
   receivables/page.tsx         // Accounts Receivable (pending vs paid, two tables)
   schedule/page.tsx            // Schedule (owner-only week view; phone day list / desktop 7-col grid)
@@ -102,6 +104,7 @@ lib
   quote-id.ts                   // resolveQuoteIdForSave: keep a custom id or ask the server for the next atomic daily number
   schedule.ts                   // crew + schedule assignment types, server fetchers, time/phase/overlap helpers
   send-pdf-email.tsx            // server-only: renders a quote/invoice PDF to a buffer (reuses the /pdf helpers) and sends it via Resend; buildEmailDefaults + isValidEmail live here
+  email-log.ts                  // server-only: append-only email audit log (logEmailSend + getEmailHistoryForQuote + getRecentEmailLog)
   quote-storage.ts
   supabase.ts
   types.ts
@@ -177,7 +180,38 @@ Sending goes through **Resend**. One-time setup (owner, before the feature can s
 2. In Resend, **verify a domain you own** (add the DNS records Resend shows you). Until a domain is verified, Resend only delivers to its own test address (`onboarding@resend.dev`), so the owner can self-test before going live but cannot reach a customer.
 3. Add `RESEND_API_KEY` and `EMAIL_FROM` (an address on the verified domain) to Vercel env and `.env.local`. Optionally add `EMAIL_FROM_INVOICES` so invoices send from a separate address; if unset, invoices use `EMAIL_FROM`. Both `EMAIL_FROM` and `EMAIL_FROM_INVOICES` must be on the verified domain (any localpart works once the domain is verified).
 
-**Security caveat (open endpoint until OAuth).** Per a deliberate decision, `/api/email-pdf` has **no auth gate** today: until owner/admin login (Supabase Auth) lands, anyone with the URL could trigger a send as the business. Tightening this endpoint to the owner/admin session is the documented next step after the feature is verified working, and pairs with the existing Pending "Owner/admin login" + RLS-tightening items. No audit trail is stored yet (no "already sent" marker); a sent-emails log or an invoice "sent" timestamp is a natural follow-up but is out of scope for this pass.
+**Security caveat (open endpoint until OAuth).** Per a deliberate decision, `/api/email-pdf` has **no auth gate** today: until owner/admin login (Supabase Auth) lands, anyone with the URL could trigger a send as the business. Tightening this endpoint to the owner/admin session is the documented next step after the feature is verified working, and pairs with the existing Pending "Owner/admin login" + RLS-tightening items.
+
+### Email audit trail
+Every send through `/api/email-pdf` appends one row to an append-only `email_log` table (in `lib/email-log.ts`, `logEmailSend` is best-effort so a logging failure never breaks a send). The row records the quote, doc type, invoice kind, reference + doc-title snapshots, recipient, subject, the Resend message id, status (`sent`/`failed`), any error, and the timestamp. Both successful and failed sends are logged so the owner can see attempts, not just successes. The `reference`/`doc_title` snapshots + `on delete set null` keep history readable even if the quote row is later deleted.
+
+It surfaces in two places: an **Email History** section on the saved-quote page (`/quotes/[id]`, per-quote, newest first) and a global **Email Log** page (`/email-log`, nav link, 50 most recent sends across all quotes, newest first). Both are read-only; the table is append-only (no update/delete).
+
+**One-time SQL (run in the Supabase SQL Editor before deploying the audit trail):**
+```sql
+create table if not exists public.email_log (
+  id uuid primary key default gen_random_uuid(),
+  quote_id uuid references public.quotes(id) on delete set null,
+  doc text not null check (doc in ('detailed','summary','invoice')),
+  invoice_kind text check (invoice_kind is null or invoice_kind in ('initial','finish')),
+  reference text not null default '',
+  doc_title text not null default '',
+  recipient text not null,
+  subject text not null,
+  provider_message_id text,
+  status text not null default 'sent' check (status in ('sent','failed')),
+  error text not null default '',
+  sent_at timestamptz not null default now()
+);
+
+create index if not exists email_log_quote_idx on public.email_log(quote_id);
+create index if not exists email_log_sent_at_idx on public.email_log(sent_at desc);
+
+alter table public.email_log enable row level security;
+create policy "Allow browser read email log"  on public.email_log for select to anon using (true);
+create policy "Allow browser insert email log" on public.email_log for insert to anon with check (true);
+```
+No update/delete policies (append-only). These permissive anon policies mirror the rest of the dev posture and **must be tightened** (reads to owner/admin, writes server-side only) alongside the auth/RLS pass.
 
 ## Pricing and calculation logic
 
@@ -553,6 +587,7 @@ Pending (rough priority):
 
 ## Recent work (history)
 
+- 2026-07-14: Email audit trail. Every send through `/api/email-pdf` now appends one row to a new append-only `email_log` table (both sent and failed attempts). The row records the quote, doc type, invoice kind, reference + doc-title snapshots, recipient, subject, Resend message id, status, error, and timestamp. New `lib/email-log.ts` (`logEmailSend` best-effort insert, `getEmailHistoryForQuote`, `getRecentEmailLog`). The `/api/email-pdf` route calls `logEmailSend` after each send; a logging failure never changes the send response. Two read-only views: an **Email History** section on the saved-quote page (`app/quotes/[id]/page.tsx`, per-quote, newest first) and a new global `/email-log` page (`app/email-log/page.tsx`, nav link in `components/app-shell.tsx`, 50 most recent sends across all quotes). `reference`/`doc_title` snapshots + `on delete set null` keep history readable even if the quote is deleted. Owner one-time SQL: create `email_log` + indexes + permissive anon read/insert policies (tighten with the auth pass); see the **Email audit trail** section. Appends only, no update/delete.
 - 2026-07-14: Email quotes and invoices directly from the app. Each of the four customer-facing printables (Detailed Quote, Summary Quote, Initial Invoice, Finish Invoice) now has an **Email PDF** button next to the existing Download PDF. It opens a small To / Subject / Message panel pre-filled from the customer's email on file (`quote_data.clientEmail`) plus per-doc defaults (no em dashes in the copy), editable before sending; Send posts to `POST /api/email-pdf`, which renders the requested PDF to a buffer using the **same** `load*PdfInput` + `renderToBuffer` path the Download routes use and attaches it to an email sent via Resend. Quotes (Detailed + Summary) send from `EMAIL_FROM`; invoices (Initial + Finish) send from `EMAIL_FROM_INVOICES` when set, else `EMAIL_FROM` (resolved by `getEmailFrom`). The emailed PDF is byte-identical to the downloaded one and matches the on-screen preview; internal notes stay excluded. New server-only `lib/send-pdf-email.tsx` (a render dispatcher reusing the existing `lib/detailed-quote-pdf.ts` / `lib/summary-quote-pdf.ts` / `lib/invoice-pdf.ts` helpers, plus `sendPdfEmail`, `getEmailFrom`, `buildEmailDefaults`, and `isValidEmail`), new `app/api/email-pdf/route.ts` (POST, `force-dynamic`; validates `id` / `doc` / `invoiceKind` / `to`, resolves the from address by doc type, renders, sends, returns ok/error JSON), new client `components/pdf/email-pdf-button.tsx` (inline panel, sending/sent/error states, styled to match the download button), and new server `components/pdf/pdf-action-bar.tsx` (the printable toolbar: Back link + Download PDF anchor + Email PDF button, replacing the deleted `components/pdf/download-pdf-button.tsx`). The three print pages (`app/quotes/[id]/print/page.tsx`, `app/quotes/[id]/summary/page.tsx`, `app/quotes/[id]/invoices/[kind]/print/page.tsx`) now compute email defaults server-side from the data they already load and pass them to `PdfActionBar`. `resend` added to `package.json`; README env section, Routes table, file tree, and a new "Sending email from the app" section all updated. Owner one-time setup: run `npm install`, verify a sending domain in Resend (add its DNS records), set `RESEND_API_KEY` and `EMAIL_FROM` (an address on the verified domain) in Vercel + `.env.local`, and optionally `EMAIL_FROM_INVOICES` for a separate invoice from address. The email's Reply-To is the business email on file (`app_settings.business_email`), so customer replies land in the owner's inbox. **Security caveat:** `/api/email-pdf` is intentionally open (no auth) for now; it is gated to the owner/admin session in the pending OAuth pass. No audit trail is stored this pass. Marked the "email the generated PDF" Pending item complete.
 - 2026-06-22: Added a scheduling tool (Phase 1: phone-first week list). New `/schedule` route (owner-only; employee self-service is deferred to the auth pass) where the owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form service calls. Two new tables — `crew` (editable list managed under Pricing → Crew; deactivate-only) and `schedule_assignments` (one row per day; `quote_id` and `phase` both optional so a service call has no quote/phase; `title`/`location` stored as an editable snapshot; optional clock times default all-day; status scheduled/completed/cancelled) — plus a `schedule_assignment_crew` join table so an entry can have **one or more** crew members, with permissive dev RLS policies to be tightened alongside the auth pass. New `lib/schedule.ts` (types + server fetchers `getCrew`/`getScheduleRange`/`getSchedulableJobs` + time/phase/overlap helpers), `app/schedule/page.tsx` (server, `force-dynamic`, fetches the current week), `components/schedule-board.tsx` (client week board: Prev/Today/Next nav, 7-day list that becomes a 7-column grid on desktop, add/edit modal, refetches the week on nav and after every save), `components/schedule-assignment-form.tsx` (client form with a Quote-job vs Service-call toggle; multi-select crew pills; picking a quote pre-fills title/location and reveals a Rough-In/Finish phase; soft overlap warning), and `components/crew-editor.tsx` (admin editor mirroring the pricing editors). Added a Schedule nav link. Phase 2 (desktop week grid with native HTML5 drag-to-reschedule) to follow. Owner must run the crew + schedule_assignments + schedule_assignment_crew SQL (DDL + policies + seed) in the Supabase SQL Editor before testing.
 - 2026-06-22: Scheduling Phase 2 — desktop drag-to-reschedule. On the desktop 7-day grid, assignment cards are now native HTML5 draggable; drop a card onto another day column to move its `work_date` (no edit form needed). The source card dims while dragging and the target day column highlights. Tap-to-edit remains the always-available fallback and is the only path on mobile (HTML5 drag is mouse-centric). Drag changes day only (crew/phase/times are still edited via the form) — a deliberate simplification once multi-crew made the old "crew as rows" grid model no longer fit (one entry can span several crew). No schema change and no SQL to run; `work_date` is a plain column and the move is an `update({ work_date })` plus a week refetch. Single-file change (`components/schedule-board.tsx`).

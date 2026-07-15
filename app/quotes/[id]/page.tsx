@@ -3,7 +3,8 @@ import { AppShell } from "@/components/app-shell";
 import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { QuoteStatusButton } from "@/components/quote-status-button";
 import { StatusBadge } from "@/components/status-badge";
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, formatDate } from "@/lib/currency";
+import { getEmailHistoryForQuote } from "@/lib/email-log";
 import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import { supabase } from "@/lib/supabase";
 import { normalizeStatus } from "@/lib/types";
@@ -83,6 +84,8 @@ export default async function SavedQuotePage({ params }: PageProps) {
     day: "numeric",
     year: "numeric"
   });
+
+  const emailHistory = await getEmailHistoryForQuote(params.id);
 
   return (
     <AppShell>
@@ -305,6 +308,58 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </div>
         </aside>
       </div>
+
+      {emailHistory.length > 0 ? (
+        <section className="mt-8 rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
+          <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
+            Email History
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead className="bg-sand text-deep-pine">
+                <tr>
+                  <th className="p-3 font-black">Date</th>
+                  <th className="p-3 font-black">Document</th>
+                  <th className="p-3 font-black">Recipient</th>
+                  <th className="p-3 font-black">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-pine/10 bg-cream">
+                {emailHistory.map((entry) => (
+                  <tr key={entry.id}>
+                    <td className="whitespace-nowrap p-3 text-charcoal/80">
+                      {formatDate(entry.sent_at)}
+                    </td>
+                    <td className="p-3">
+                      <p className="font-bold text-charcoal">{entry.doc_title}</p>
+                      {entry.subject ? (
+                        <p className="text-xs text-charcoal/60">
+                          {entry.subject}
+                        </p>
+                      ) : null}
+                    </td>
+                    <td className="p-3 text-charcoal/80">{entry.recipient}</td>
+                    <td className="p-3">
+                      {entry.status === "sent" ? (
+                        <span className="rounded-full bg-pine/15 px-3 py-1 text-xs font-black text-deep-pine">
+                          Sent
+                        </span>
+                      ) : (
+                        <span
+                          className="rounded-full bg-clay/20 px-3 py-1 text-xs font-black text-clay"
+                          title={entry.error || "Send failed"}
+                        >
+                          Failed
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       {quote.internalNotes.trim() ? (
         <section className="mt-8 rounded-xl2 border border-clay/25 bg-cream/60 p-6 shadow-soft">
