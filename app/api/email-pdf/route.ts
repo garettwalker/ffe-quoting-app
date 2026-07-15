@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSettings } from "@/lib/pricing";
 import {
   buildEmailDefaults,
   getEmailFrom,
@@ -69,11 +70,16 @@ export async function POST(request: Request) {
     );
   }
 
-  const attachment = await renderEmailAttachment(
-    id,
-    doc as EmailDocKind,
-    doc === "invoice" ? (invoiceKind as InvoiceKind) : undefined
-  );
+  // Render the PDF attachment and load the live business settings (for the
+  // reply-to address and the defaults-fallback business name) in parallel.
+  const [attachment, settings] = await Promise.all([
+    renderEmailAttachment(
+      id,
+      doc as EmailDocKind,
+      doc === "invoice" ? (invoiceKind as InvoiceKind) : undefined
+    ),
+    getSettings()
+  ]);
   if (!attachment) {
     return NextResponse.json(
       { ok: false, error: "Quote or invoice not found." },
@@ -83,13 +89,12 @@ export async function POST(request: Request) {
 
   // Fall back to defaults for any empty field. The client always sends its
   // own pre-filled subject/message (built from the live business name), so
-  // this fallback only runs if the endpoint is called directly with blanks;
-  // a static business name is correct for that rare path.
+  // this fallback only runs if the endpoint is called directly with blanks.
   const defaults = buildEmailDefaults({
     doc: doc as EmailDocKind,
     quoteId: attachment.quoteId,
     reference: attachment.reference,
-    businessName: "Freedom Family Electric"
+    businessName: settings.businessName || "Freedom Family Electric"
   });
 
   const finalSubject = subject?.trim() ? subject.trim() : defaults.subject;
@@ -99,8 +104,13 @@ export async function POST(request: Request) {
   // to EMAIL_FROM when not set).
   const from = getEmailFrom(doc as EmailDocKind);
 
+  // Replies go to the business email on file (e.g. freedomfamilyelectric@gmail.com),
+  // not the sending address, so the owner actually receives customer replies.
+  const replyTo = settings.businessEmail || undefined;
+
   const result = await sendPdfEmail({
     from,
+    replyTo,
     to: to.trim(),
     subject: finalSubject,
     message: finalMessage,

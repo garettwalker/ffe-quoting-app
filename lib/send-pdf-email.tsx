@@ -129,6 +129,7 @@ export function buildEmailDefaults({
 
 export type SendPdfEmailInput = {
   from: string;
+  replyTo?: string;
   to: string;
   subject: string;
   message: string;
@@ -156,6 +157,7 @@ export function getEmailFrom(doc: EmailDocKind): string {
 // can map it to an HTTP status without leaking provider internals.
 export async function sendPdfEmail({
   from,
+  replyTo,
   to,
   subject,
   message,
@@ -186,6 +188,7 @@ export async function sendPdfEmail({
     const resend = new Resend(apiKey);
     const { data, error } = await resend.emails.send({
       from,
+      ...(replyTo ? { replyTo } : {}),
       to,
       subject,
       html,
