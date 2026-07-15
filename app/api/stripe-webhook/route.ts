@@ -27,6 +27,12 @@ import type { InvoiceKind } from "@/lib/types";
 //                                        days later, so this is the ACH success)
 //   payment_intent.processing          -> mark processing (informational)
 //   payment_intent.payment_failed      -> mark failed (invoice stays unpaid)
+//   payment_intent.canceled             -> mark failed (owner cancelled an
+//                                        incomplete/processing attempt in the
+//                                        Stripe dashboard; invoice flag is not
+//                                        touched, since a cancel is not a refund
+//                                        and the invoice may be paid by another
+//                                        successful attempt)
 //   charge.refunded                    -> mark refunded + reverse the flag
 
 export const dynamic = "force-dynamic";
@@ -117,19 +123,23 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
 
     case "payment_intent.succeeded":
     case "payment_intent.processing":
-    case "payment_intent.payment_failed": {
+    case "payment_intent.payment_failed":
+    case "payment_intent.canceled": {
       const intent = event.data.object as Stripe.PaymentIntent;
       const status: PaymentStatus =
         event.type === "payment_intent.succeeded"
           ? "succeeded"
-          : event.type === "payment_intent.payment_failed"
+          : event.type === "payment_intent.payment_failed" ||
+              event.type === "payment_intent.canceled"
             ? "failed"
             : "processing";
       const ctx = await updatePaymentStatus(intent.id, status);
       // Only "succeeded" flips the invoice to paid (the ACH success path; for
       // cards the flag was already flipped at checkout.session.completed, and
-      // setInvoicePaid is idempotent). failed/processing never mark an invoice
-      // paid.
+      // setInvoicePaid is idempotent). failed/processing/canceled never mark an
+      // invoice paid. A canceled attempt does NOT un-flip the flag either: the
+      // invoice may have been paid by a different, successful payment, and
+      // reversing a real success is a refund (charge.refunded), not a cancel.
       if (status === "succeeded" && ctx) {
         await setInvoicePaid(ctx.quoteUuid, ctx.kind, true);
       }

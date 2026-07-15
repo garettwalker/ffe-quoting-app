@@ -85,7 +85,7 @@ export function InvoicePaidButton({
     } else {
       // Reversing a manual mark: remove the manual payment row(s) for this
       // invoice so the ledger matches the flag. Stripe card/ACH rows are never
-      // touched here (method != 'manual').
+      // deleted here (method != 'manual').
       const { error: deleteError } = await supabase
         .from("payments")
         .delete()
@@ -94,6 +94,23 @@ export function InvoicePaidButton({
         .eq("method", "manual")
         .eq("status", "succeeded");
       if (deleteError) ledgerError = deleteError.message;
+      else {
+        // Admin override: also mark any stuck non-terminal Stripe rows for this
+        // invoice (an incomplete/processing ACH the owner cancelled in the
+        // Stripe dashboard, which our webhook may not have heard about) as
+        // failed, so the ledger matches the now-unpaid flag and a fresh payment
+        // can be taken. A succeeded/refunded Stripe row is NEVER touched here:
+        // that is real money, and reversing it is a refund handled in Stripe
+        // (charge.refunded via the webhook), not a manual toggle.
+        const { error: staleError } = await supabase
+          .from("payments")
+          .update({ status: "failed" })
+          .eq("quote_id", quoteId)
+          .eq("invoice_kind", kind)
+          .neq("method", "manual")
+          .in("status", ["processing", "pending"]);
+        if (staleError) ledgerError = staleError.message;
+      }
     }
 
     setIsWorking(false);
