@@ -112,7 +112,9 @@ export async function POST(request: Request) {
     doc: doc as EmailDocKind,
     quoteId: attachment.quoteId,
     reference: attachment.reference,
-    businessName: settings.businessName || "Freedom Family Electric"
+    businessName: settings.businessName || "Freedom Family Electric",
+    quoteUuid: id,
+    invoiceKind: doc === "invoice" ? (invoiceKind as InvoiceKind) : undefined
   });
 
   const finalSubject = subject?.trim() ? subject.trim() : defaults.subject;

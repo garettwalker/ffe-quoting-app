@@ -32,7 +32,9 @@ export default async function PrintInvoicePage({ params }: PageProps) {
   const emailDefaults = buildEmailDefaults({
     doc: "invoice",
     reference: pdfProps.reference,
-    businessName: pdfProps.businessName
+    businessName: pdfProps.businessName,
+    quoteUuid: params.id,
+    invoiceKind: params.kind as InvoiceKind
   });
 
   return (

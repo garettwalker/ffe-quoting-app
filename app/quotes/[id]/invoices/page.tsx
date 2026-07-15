@@ -6,7 +6,9 @@ import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
 import { invoiceReference, outstandingCents, isPaidInFull } from "@/lib/invoice-calculations";
+import { buildPayUrl } from "@/lib/pay-token";
 import { getServerUser } from "@/lib/auth";
+import { CopyPayLinkButton } from "@/components/pay/copy-pay-link-button";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   InvoiceData,
@@ -121,6 +123,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     amountCents={initialInvoice.amountCents}
                     status={initialInvoice.status}
                     recordedBy={user?.email ?? ""}
+                    payUrl={buildPayUrl(row.id, "initial")}
                   />
                 ) : null}
 
@@ -134,6 +137,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     amountCents={finishInvoice.amountCents}
                     status={finishInvoice.status}
                     recordedBy={user?.email ?? ""}
+                    payUrl={buildPayUrl(row.id, "finish")}
                   />
                 ) : null}
               </div>
@@ -174,7 +178,8 @@ function InvoiceCard({
   title,
   amountCents,
   status,
-  recordedBy
+  recordedBy,
+  payUrl
 }: {
   quoteId: string;
   invoiceData: InvoiceData;
@@ -184,6 +189,7 @@ function InvoiceCard({
   amountCents: number;
   status: "unpaid" | "paid";
   recordedBy: string;
+  payUrl: string | null;
 }) {
   return (
     <div className="rounded-xl1 border border-pine/10 bg-cream p-4">
@@ -209,6 +215,15 @@ function InvoiceCard({
         </Link>
         <InvoicePaidButton quoteId={quoteId} invoiceData={invoiceData} kind={kind} recordedBy={recordedBy} />
       </div>
+
+      {payUrl ? (
+        <div className="mt-3 border-t border-pine/10 pt-3">
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-clay">
+            Online payment link
+          </p>
+          <CopyPayLinkButton payUrl={payUrl} />
+        </div>
+      ) : null}
     </div>
   );
 }

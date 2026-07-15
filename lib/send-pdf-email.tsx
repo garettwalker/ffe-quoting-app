@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { DetailedQuotePdfDocument } from "@/components/pdf/detailed-quote-document";
 import { InvoicePdfDocument } from "@/components/pdf/invoice-document";
 import { SummaryQuotePdfDocument } from "@/components/pdf/summary-quote-document";
+import { buildPayUrl, paymentsConfigured } from "@/lib/pay-token";
 import { loadDetailedQuotePdfInput } from "@/lib/detailed-quote-pdf";
 import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
 import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
@@ -92,6 +93,8 @@ export type EmailDefaultsInput = {
   quoteId?: string;
   reference?: string;
   businessName: string;
+  quoteUuid?: string; // the quotes.id uuid; needed to mint a pay link for invoices
+  invoiceKind?: InvoiceKind;
 };
 
 // Default subject + body per document type. No em dashes (house style).
@@ -99,15 +102,28 @@ export function buildEmailDefaults({
   doc,
   quoteId,
   reference,
-  businessName
+  businessName,
+  quoteUuid,
+  invoiceKind
 }: EmailDefaultsInput): { subject: string; message: string } {
   const name = businessName || "Freedom Family Electric";
 
   if (doc === "invoice") {
     const ref = reference || "";
+    // Append a signed "Pay online" link to the invoice email body, but only when
+    // the full payment chain is live (Stripe wired + PAY_LINK_SECRET + APP_URL).
+    // Until then, customers get the standard "payment details are on the
+    // invoice" body so they're never sent to a dead "being set up" page.
+    const payUrl =
+      quoteUuid && invoiceKind && paymentsConfigured()
+        ? buildPayUrl(quoteUuid, invoiceKind)
+        : null;
+    const message = payUrl
+      ? `Hi,\n\nPlease find your invoice attached. You can pay online here:\n${payUrl}\n\nOr pay by the method shown on the invoice. Let me know if you have any questions.\n\nThank you,\n${name}`
+      : `Hi,\n\nPlease find your invoice attached. Payment details are on the invoice. Let me know if you have any questions.\n\nThank you,\n${name}`;
     return {
       subject: `Invoice ${ref} from ${name}`,
-      message: `Hi,\n\nPlease find your invoice attached. Payment details are on the invoice. Let me know if you have any questions.\n\nThank you,\n${name}`
+      message
     };
   }
 
