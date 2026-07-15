@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { LogoutButton } from "@/components/logout-button";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -72,6 +73,7 @@ export function AppShell({ children }: AppShellProps) {
             >
               Start New Quote
             </Link>
+            <LogoutButton />
           </nav>
         </div>
       </header>

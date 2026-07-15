@@ -29,6 +29,8 @@ This README is the long-term context file for the project. It is meant for both 
 | `/quotes/[id]/invoices/[kind]/print` | Printable invoice (`kind` = `initial` or `finish`). One-click Download PDF; on-screen layout is a preview. |
 | `/quotes/[id]/invoices/[kind]/pdf` | Server route: renders the invoice (`initial` or `finish`) to a PDF buffer and streams it back as a file download. |
 | `/api/email-pdf` | POST API route. Renders a quote/invoice PDF to a buffer (same path as the Download PDF routes) and sends it to a customer as an attachment via Resend. Body: `{ id, doc, invoiceKind?, to, subject?, message? }`. The recipient, subject, and message are pre-filled from the email on file + per-doc defaults and editable before sending. See **Sending email from the app** below. |
+| `/api/keepalive` | GET health-check. Runs one trivial Supabase query (head-count on `quotes`) and returns 200, or 503 on query failure. Hit daily by the `.github/workflows/keepalive.yml` cron so the Supabase free-tier project is not paused after 7 days of inactivity. Public and unauthenticated (counts rows only; reads/writes nothing sensitive). |
+| `/login` | Email + password sign-in (Supabase Auth). Public. Phase A (current): the app is still open and this is reachable but nothing requires it; Phase B will redirect unauthenticated users here. |
 | `/pricing-admin` | Pricing admin. Edit line items, pricing levels, contingencies, project types, crew, and business info/quote notes/invoice terms stored in Supabase. Deactivate-only (no hard delete). |
 | `/schedule` | Schedule. Owner-only week view of the crew's jobs: phone-first day list (7-column grid on desktop), Prev/Today/Next week nav, tap a day to add, tap a card to edit. On desktop, drag a card onto another day column to reschedule it (native HTML5; tap-to-edit is the fallback and the only path on mobile). Entries are either a quote job (rough-in/finish for an accepted quote, title/location auto-filled from the quote) or a free-form service call, and can carry one or more crew. Optional clock times, default all-day. Times + a soft overlap warning. Employee self-service access is deferred to the auth pass. |
 | `/email-log` | Email audit log. Read-only, recent-first list of every quote/invoice emailed from the app (date, document, recipient, status), including failed send attempts. One row per send. Pairs with the per-quote Email History section on `/quotes/[id]`. |
@@ -37,6 +39,7 @@ This README is the long-term context file for the project. It is meant for both 
 ## File structure
 
 ```
+middleware.ts                   // refreshes the Supabase Auth session on every request (Phase A: no redirect yet)
 app
   globals.css
   layout.tsx
@@ -56,6 +59,8 @@ app
     [id]/invoices/[kind]/pdf/route.tsx   // Server route: renders the invoice to a PDF buffer
   api
     email-pdf/route.tsx        // POST API route: renders a PDF to a buffer and emails it via Resend
+    keepalive/route.ts         // GET health-check: trivial Supabase query, hit daily by the keepalive cron
+  login/page.tsx               // Email + password sign-in (Supabase Auth)
   email-log/page.tsx           // Read-only global email audit log (recent sends, newest first)
   pricing-admin/page.tsx       // Pricing admin (items, levels, contingencies, project types, crew, settings)
   receivables/page.tsx         // Accounts Receivable (pending vs paid, two tables)
@@ -63,6 +68,8 @@ app
 
 components
   app-shell.tsx
+  login-form.tsx                 // client: email + password sign-in via Supabase Auth
+  logout-button.tsx             // client: sign out + return to /login
   dashboard-active-quote.tsx     // slim resume card for unsaved working copies
   dashboard-quote-section.tsx   // one pipeline stage (Draft / Prepared / Client Accepted)
   status-badge.tsx              // draft/prepared/accepted + invoice paid/unpaid badges
@@ -105,6 +112,10 @@ lib
   schedule.ts                   // crew + schedule assignment types, server fetchers, time/phase/overlap helpers
   send-pdf-email.tsx            // server-only: renders a quote/invoice PDF to a buffer (reuses the /pdf helpers) and sends it via Resend; buildEmailDefaults + isValidEmail live here
   email-log.ts                  // server-only: append-only email audit log (logEmailSend + getEmailHistoryForQuote + getRecentEmailLog)
+  supabase-env.ts               // shared lazy env reader for the auth clients (throws at call time, not build time)
+  supabase-browser.ts           // client-only singleton Supabase client (carries the logged-in session)
+  supabase-server.ts            // server Supabase client (reads session from cookies; setAll is a no-op in RSC)
+  auth.ts                       // server role helpers: getServerUser / isLoggedIn / isAdmin (role from app_metadata)
   quote-storage.ts
   supabase.ts
   types.ts
@@ -331,6 +342,39 @@ EMAIL_FROM_INVOICES                // (optional) RFC "From" for invoices, e.g.
                                    //   If unset, invoices fall back to EMAIL_FROM.
 ```
 The Supabase URL is the base project URL, **not** the REST endpoint. The `RESEND_API_KEY` / `EMAIL_FROM` / `EMAIL_FROM_INVOICES` vars are server-only (no `NEXT_PUBLIC_` prefix) and are only needed once the email feature is enabled. Quotes (Detailed + Summary) send from `EMAIL_FROM`; invoices (Initial + Finish) send from `EMAIL_FROM_INVOICES` when set, otherwise `EMAIL_FROM`. See **Sending email from the app** below.
+
+### Supabase keepalive (prevent free-tier pause)
+
+Supabase pauses a free-tier project after 7 days of no inbound activity. A daily GitHub Actions cron pings `GET /api/keepalive`, which runs one trivial Supabase query so the project counts as active and is not paused. Scheduled workflows run only on the default branch, so this is effective only when committed to `main`.
+
+- The route is `app/api/keepalive/route.ts` (public, unauthenticated, counts rows only). The cron is `.github/workflows/keepalive.yml` (runs ~08:17 UTC daily; also runnable on demand from the Actions tab).
+- **One-time setup (no code):** in the GitHub repo go to Settings → Secrets and variables → Actions → **Variables** → New variable, name `APP_URL`, value = the production app URL with no trailing slash (e.g. `https://your-app.vercel.app`). The workflow appends `/api/keepalive` itself.
+- You can see every run (and any failures) under the repo's **Actions** tab → "Supabase keepalive". A failed ping shows a red X; a paused/healthy Supabase project is the first thing to check if it goes red.
+
+### Supabase Auth (owner/admin login) — in progress
+
+Login is being added in four low-risk phases so the live app keeps working between each. The app today (Phase A) is **still open** — login exists but nothing requires it yet.
+
+**Roles:** `admin` (the owner + business owner — full access) and `team_member` (crew; schedule-only, wired in a later phase). Role is stored in each user's `app_metadata` (set in the Supabase dashboard, signed into the JWT) so it can't be self-edited; `lib/auth.ts` reads it via `getServerUser()`. New files (Phase A): `middleware.ts` (refreshes the session on every request; does not redirect yet), `lib/supabase-env.ts` / `lib/supabase-browser.ts` / `lib/supabase-server.ts` (the auth-aware clients), `lib/auth.ts`, `app/login/page.tsx`, `components/login-form.tsx`, `components/logout-button.tsx` (added to the app header). Existing data access (`lib/supabase.ts`, the anon client) is untouched in Phase A — no breakage.
+
+- **Phase A (current):** auth infrastructure + login + logout. App stays fully open; login works but is optional.
+- **Phase B:** middleware redirects unauthenticated users to `/login` (except public routes: `/login`, `/api/keepalive`, and the future `/pay/*` + `/api/stripe-webhook`); gate `POST /api/email-pdf` to a session. **You must have logged in on the live app before this ships, or it locks you out.**
+- **Phase C:** tighten RLS role-aware. For each table: add `authenticated`/`admin` policies alongside the existing `anon` ones, verify logged-in reads/writes work, then drop the `anon` policies. Switch server + browser clients to the authenticated session. Critical gotcha: an authenticated user is *not* `anon`, so the new policies must exist before the clients switch (or every read 401s). Rollback: re-add `anon` policies via the SQL Editor.
+- **Phase D:** confirm role gates (employees excluded from quotes/pricing/receivables/email-log automatically; admin full access incl delete + reopen).
+
+**One-time Supabase setup (Phase A):**
+1. Supabase dashboard → **Authentication → Providers → Email**: enable Email, ensure "Confirm email" is off for now (or confirm the users manually), and allow `freedomfamilyelectric@gmail.com` + `glwalke17@gmail.com`.
+2. **Authentication → Users → Add user**: create the two admin users (email + a password you choose). Send the password to the business owner out-of-band.
+3. Set each user's role: for each user, **Authentication → Users → (user) → ... → set `app_metadata`** to `{ "role": "admin" }` (via the dashboard user panel or a one-time SQL update — see below). Without this, `getServerUser()` defaults to `team_member`.
+4. Test: visit `/login`, sign in, land on `/`; a Logout button is in the header.
+
+```sql
+-- Set the admin role on the two admin users (run once in the Supabase SQL Editor).
+-- Replace the emails if needed.
+update auth.users
+set raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb) || '{"role":"admin"}'::jsonb
+where email in ('freedomfamilyelectric@gmail.com', 'glwalke17@gmail.com');
+```
 
 `quotes` table:
 ```sql
@@ -587,6 +631,8 @@ Pending (rough priority):
 
 ## Recent work (history)
 
+- 2026-07-15: Supabase Auth — Phase A (login infrastructure, app still open). Added `@supabase/ssr` and the auth-aware clients: `lib/supabase-env.ts` (lazy shared env reader, fails at call time not build time), `lib/supabase-browser.ts` (singleton browser client carrying the session), `lib/supabase-server.ts` (server client reading cookies; `setAll` is a no-op in the read-only server-component context since middleware refreshes the session), and `lib/auth.ts` (`getServerUser` / `isLoggedIn` / `isAdmin`; role read from `app_metadata.role`, defaulting to `team_member`). New `middleware.ts` calls `getUser()` on every non-static route to refresh the session but does **not** redirect yet — the app stays fully open. New `app/login/page.tsx` + `components/login-form.tsx` (email/password via `signInWithPassword`, redirect to `/` on success) and `components/logout-button.tsx` (added to the app header). Roles: `admin` (owner + business owner, full) and `team_member` (crew, schedule-only — wired in a later phase); framework is role-aware from day one so adding employees later needs no rewrite. Phase A is verified: `tsc` clean and production build green (`/login` + edge middleware compile). Existing data access via `lib/supabase.ts` (anon client) is untouched — no breakage. **One-time Supabase setup** (in dashboard): enable Email provider, add the two admin users, set `app_metadata.role = "admin"` (SQL provided). Remaining phases: B (front-door redirect + gate `/api/email-pdf`), C (role-aware RLS tightening), D (role-gate confirm). No new env vars (uses existing `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`).
+- 2026-07-15: Supabase keepalive ping. Added `GET /api/keepalive` (`app/api/keepalive/route.ts`, public + unauthenticated) that runs one trivial Supabase query (a head-count on `quotes`) and returns 200, or 503 if the query errors; and `.github/workflows/keepalive.yml`, a daily GitHub Actions cron (~08:17 UTC, also runnable on demand) that `curl -f`s that route so the Supabase free-tier project is not paused after 7 days of inactivity. The route reads/writes nothing sensitive (counts rows only). Scheduled workflows run only on the default branch, so this is effective on `main`. **One-time owner setup (no code):** GitHub repo → Settings → Secrets and variables → Actions → **Variables** → add `APP_URL` = the production app URL (no trailing slash); the workflow appends `/api/keepalive`. Runs/failures are visible in the Actions tab → "Supabase keepalive". No SQL, no env vars, no new dependencies.
 - 2026-07-14: Email audit trail. Every send through `/api/email-pdf` now appends one row to a new append-only `email_log` table (both sent and failed attempts). The row records the quote, doc type, invoice kind, reference + doc-title snapshots, recipient, subject, Resend message id, status, error, and timestamp. New `lib/email-log.ts` (`logEmailSend` best-effort insert, `getEmailHistoryForQuote`, `getRecentEmailLog`). The `/api/email-pdf` route calls `logEmailSend` after each send; a logging failure never changes the send response. Two read-only views: an **Email History** section on the saved-quote page (`app/quotes/[id]/page.tsx`, per-quote, newest first) and a new global `/email-log` page (`app/email-log/page.tsx`, nav link in `components/app-shell.tsx`, 50 most recent sends across all quotes). `reference`/`doc_title` snapshots + `on delete set null` keep history readable even if the quote is deleted. Owner one-time SQL: create `email_log` + indexes + permissive anon read/insert policies (tighten with the auth pass); see the **Email audit trail** section. Appends only, no update/delete.
 - 2026-07-14: Email quotes and invoices directly from the app. Each of the four customer-facing printables (Detailed Quote, Summary Quote, Initial Invoice, Finish Invoice) now has an **Email PDF** button next to the existing Download PDF. It opens a small To / Subject / Message panel pre-filled from the customer's email on file (`quote_data.clientEmail`) plus per-doc defaults (no em dashes in the copy), editable before sending; Send posts to `POST /api/email-pdf`, which renders the requested PDF to a buffer using the **same** `load*PdfInput` + `renderToBuffer` path the Download routes use and attaches it to an email sent via Resend. Quotes (Detailed + Summary) send from `EMAIL_FROM`; invoices (Initial + Finish) send from `EMAIL_FROM_INVOICES` when set, else `EMAIL_FROM` (resolved by `getEmailFrom`). The emailed PDF is byte-identical to the downloaded one and matches the on-screen preview; internal notes stay excluded. New server-only `lib/send-pdf-email.tsx` (a render dispatcher reusing the existing `lib/detailed-quote-pdf.ts` / `lib/summary-quote-pdf.ts` / `lib/invoice-pdf.ts` helpers, plus `sendPdfEmail`, `getEmailFrom`, `buildEmailDefaults`, and `isValidEmail`), new `app/api/email-pdf/route.ts` (POST, `force-dynamic`; validates `id` / `doc` / `invoiceKind` / `to`, resolves the from address by doc type, renders, sends, returns ok/error JSON), new client `components/pdf/email-pdf-button.tsx` (inline panel, sending/sent/error states, styled to match the download button), and new server `components/pdf/pdf-action-bar.tsx` (the printable toolbar: Back link + Download PDF anchor + Email PDF button, replacing the deleted `components/pdf/download-pdf-button.tsx`). The three print pages (`app/quotes/[id]/print/page.tsx`, `app/quotes/[id]/summary/page.tsx`, `app/quotes/[id]/invoices/[kind]/print/page.tsx`) now compute email defaults server-side from the data they already load and pass them to `PdfActionBar`. `resend` added to `package.json`; README env section, Routes table, file tree, and a new "Sending email from the app" section all updated. Owner one-time setup: run `npm install`, verify a sending domain in Resend (add its DNS records), set `RESEND_API_KEY` and `EMAIL_FROM` (an address on the verified domain) in Vercel + `.env.local`, and optionally `EMAIL_FROM_INVOICES` for a separate invoice from address. The email's Reply-To is the business email on file (`app_settings.business_email`), so customer replies land in the owner's inbox. **Security caveat:** `/api/email-pdf` is intentionally open (no auth) for now; it is gated to the owner/admin session in the pending OAuth pass. No audit trail is stored this pass. Marked the "email the generated PDF" Pending item complete.
 - 2026-06-22: Added a scheduling tool (Phase 1: phone-first week list). New `/schedule` route (owner-only; employee self-service is deferred to the auth pass) where the owner schedules his crew (Adam, Johnathan full-time; Peyton intern) onto rough-in and finish jobs for accepted quotes, plus free-form service calls. Two new tables — `crew` (editable list managed under Pricing → Crew; deactivate-only) and `schedule_assignments` (one row per day; `quote_id` and `phase` both optional so a service call has no quote/phase; `title`/`location` stored as an editable snapshot; optional clock times default all-day; status scheduled/completed/cancelled) — plus a `schedule_assignment_crew` join table so an entry can have **one or more** crew members, with permissive dev RLS policies to be tightened alongside the auth pass. New `lib/schedule.ts` (types + server fetchers `getCrew`/`getScheduleRange`/`getSchedulableJobs` + time/phase/overlap helpers), `app/schedule/page.tsx` (server, `force-dynamic`, fetches the current week), `components/schedule-board.tsx` (client week board: Prev/Today/Next nav, 7-day list that becomes a 7-column grid on desktop, add/edit modal, refetches the week on nav and after every save), `components/schedule-assignment-form.tsx` (client form with a Quote-job vs Service-call toggle; multi-select crew pills; picking a quote pre-fills title/location and reveals a Rough-In/Finish phase; soft overlap warning), and `components/crew-editor.tsx` (admin editor mirroring the pricing editors). Added a Schedule nav link. Phase 2 (desktop week grid with native HTML5 drag-to-reschedule) to follow. Owner must run the crew + schedule_assignments + schedule_assignment_crew SQL (DDL + policies + seed) in the Supabase SQL Editor before testing.
