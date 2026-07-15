@@ -2,16 +2,20 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { getScheduleRange } from "@/lib/schedule-client";
 import {
   formatTimeRange,
-  getScheduleRange,
   phaseLabel,
   type Crew,
   type ScheduleAssignment,
   type SchedulableJob
 } from "@/lib/schedule";
 import { ScheduleAssignmentForm } from "@/components/schedule-assignment-form";
+
+// Authenticated browser client (singleton). Carries the logged-in owner's
+// session so RLS enforces admin-only writes (e.g. moveAssignment's date change).
+const supabase = getSupabaseBrowser();
 
 type ScheduleBoardProps = {
   crew: Crew[]; // active crew only (server filters)

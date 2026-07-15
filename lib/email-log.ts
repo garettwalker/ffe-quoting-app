@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type { EmailDocKind, InvoiceKind } from "@/lib/send-pdf-email";
 
 // Append-only email audit log. Every send through /api/email-pdf writes one
@@ -39,6 +39,7 @@ export type LogEmailSendPayload = {
 export async function logEmailSend(
   payload: LogEmailSendPayload
 ): Promise<void> {
+  const supabase = getSupabaseServer();
   try {
     await supabase.from("email_log").insert({
       quote_id: payload.quoteId,
@@ -61,6 +62,7 @@ export async function logEmailSend(
 export async function getEmailHistoryForQuote(
   quoteId: string
 ): Promise<EmailLogRow[]> {
+  const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("email_log")
     .select(
@@ -77,6 +79,7 @@ export async function getEmailHistoryForQuote(
 export async function getRecentEmailLog(
   limit = 50
 ): Promise<EmailLogRow[]> {
+  const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("email_log")
     .select(

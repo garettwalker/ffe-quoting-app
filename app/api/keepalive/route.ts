@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseAdmin } from "@/lib/supabase-admin";
 
 // GET /api/keepalive
 // Public health-check used by the daily GitHub Actions cron
@@ -13,11 +13,16 @@ import { supabase } from "@/lib/supabase";
 //
 // Intentionally public and unauthenticated (it only counts rows; it reads and
 // writes nothing sensitive). It is excluded from any future auth gate.
+//
+// Uses the service-role client (no user session): after the Phase C RLS pass,
+// anonymous access to `quotes` is denied, so the anon key can no longer run
+// this count. The service-role key bypasses RLS and is server-only (never sent
+// to the browser).
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const { error } = await supabase
+  const { error } = await getSupabaseAdmin()
     .from("quotes")
     .select("id", { count: "exact", head: true });
 

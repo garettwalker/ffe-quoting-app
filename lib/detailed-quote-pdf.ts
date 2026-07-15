@@ -1,7 +1,7 @@
 import { formatCurrency } from "@/lib/currency";
 import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
 import type { DetailedQuotePdfProps } from "@/components/pdf/detailed-quote-document";
 
@@ -34,6 +34,7 @@ export type DetailedQuotePdfInput = {
 export async function loadDetailedQuotePdfInput(
   id: string
 ): Promise<DetailedQuotePdfInput | null> {
+  const supabase = getSupabaseServer();
   const [quoteResult, settings] = await Promise.all([
     supabase
       .from("quotes")

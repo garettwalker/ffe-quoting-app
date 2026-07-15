@@ -8,7 +8,7 @@ import {
   invoiceReference,
   outstandingCents
 } from "@/lib/invoice-calculations";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   InvoiceData,
   InvoiceKind,
@@ -85,6 +85,7 @@ function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
 }
 
 export default async function ReceivablesPage() {
+  const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("quotes")
     .select(

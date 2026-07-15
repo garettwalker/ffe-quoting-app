@@ -6,7 +6,7 @@ import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
 import { invoiceReference, outstandingCents, isPaidInFull } from "@/lib/invoice-calculations";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   InvoiceData,
   InvoiceKind,
@@ -31,6 +31,7 @@ type PageProps = {
 };
 
 export default async function InvoicingPage({ params }: PageProps) {
+  const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("quotes")
     .select(

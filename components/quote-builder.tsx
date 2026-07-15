@@ -11,7 +11,11 @@ import {
   saveActiveQuote
 } from "@/lib/quote-storage";
 import { resolveQuoteIdForSave } from "@/lib/quote-id";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+
+// Authenticated browser client (singleton). Carries the logged-in user's
+// session so RLS enforces admin-only writes after the Phase C pass.
+const supabase = getSupabaseBrowser();
 import type { BasePricingMode, PricingCatalog, QuoteFormState } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";

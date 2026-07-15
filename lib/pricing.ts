@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   AppSettings,
   ContingencyOption,
@@ -20,6 +20,7 @@ import type {
 // row is missing (e.g. the migration has not been run yet) so print pages degrade
 // gracefully instead of crashing.
 export async function getSettings(): Promise<AppSettings> {
+  const supabase = getSupabaseServer();
   const { data } = await supabase
     .from("app_settings")
     .select(
@@ -48,6 +49,7 @@ export async function getSettings(): Promise<AppSettings> {
 // Read the full live-pricing catalog (all rows including inactive, ordered by
 // sort_order) plus the app settings. Used by the builder entry points.
 export async function getPricingCatalog(): Promise<PricingCatalog> {
+  const supabase = getSupabaseServer();
   const [itemsRes, levelsRes, contingenciesRes, projectTypesRes, settings] =
     await Promise.all([
       supabase

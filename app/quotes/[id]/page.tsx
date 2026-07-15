@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatDate } from "@/lib/currency";
 import { getEmailHistoryForQuote } from "@/lib/email-log";
 import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
 import type {
   InvoiceData,
@@ -32,6 +32,7 @@ type PageProps = {
 };
 
 export default async function SavedQuotePage({ params }: PageProps) {
+  const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("quotes")
     .select(

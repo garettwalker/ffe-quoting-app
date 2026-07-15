@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
 import { getPricingCatalog } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type { QuoteFormState } from "@/lib/types";
 
 type SavedQuoteRow = {
@@ -19,6 +19,7 @@ type PageProps = {
 export const dynamic = "force-dynamic";
 
 export default async function EditSavedQuotePage({ params }: PageProps) {
+  const supabase = getSupabaseServer();
   const [quoteResult, catalog] = await Promise.all([
     supabase.from("quotes").select("id, quote_data").eq("id", params.id).single(),
     getPricingCatalog()

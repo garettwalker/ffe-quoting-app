@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import { computeInvoiceAmounts } from "@/lib/invoice-calculations";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+
+// Authenticated browser client (singleton). Carries the logged-in user's
+// session so RLS enforces admin-only writes after the Phase C pass.
+const supabase = getSupabaseBrowser();
 import type { InvoiceData, InvoiceKind, InvoiceRecord } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 

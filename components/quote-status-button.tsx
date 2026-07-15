@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+
+// Authenticated browser client (singleton). Carries the logged-in user's
+// session so RLS enforces admin-only writes after the Phase C pass.
+const supabase = getSupabaseBrowser();
 import type { QuoteStatus } from "@/lib/types";
 
 type Variant = "primary" | "secondary" | "ghost";

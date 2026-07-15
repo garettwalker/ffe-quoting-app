@@ -7,7 +7,7 @@ import { PricingLevelEditor } from "@/components/pricing-level-editor";
 import { ProjectTypeEditor } from "@/components/project-type-editor";
 import { SettingsEditor } from "@/components/settings-editor";
 import { getPricingCatalog } from "@/lib/pricing";
-import { getCrew } from "@/lib/schedule";
+import { getCrew } from "@/lib/schedule-server";
 
 // Always read the live catalog from Supabase (no caching), so edits made here
 // are reflected immediately on reload and after each editor's router.refresh().

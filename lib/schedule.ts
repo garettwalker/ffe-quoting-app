@@ -1,9 +1,17 @@
-import { supabase } from "@/lib/supabase";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Scheduling: the owner schedules his crew (Adam, Johnathan, Peyton) onto rough-in
 // and finish work for accepted quotes, plus free-form entries (service calls,
 // warranty visits, supply runs) that have no quote. See the README scheduling
 // section and components/schedule-* for the UI.
+//
+// This module is shared by server and client code, so it holds ONLY types and
+// pure helpers + fetcher functions that take a Supabase client as an argument.
+// It must NOT import a client directly: the server client (lib/supabase-server)
+// reads cookies() via next/headers, which is server-only and cannot be pulled
+// into a client bundle. The thin context-specific wrappers live in
+// lib/schedule-server.ts (server reads) and lib/schedule-client.ts (browser
+// week-navigation reads).
 
 export type CrewRole = "full_time" | "intern";
 export type SchedulePhase = "rough_in" | "finish";
@@ -89,8 +97,8 @@ function normalizeTime(value: string | null): string | null {
 
 // All crew, active first then by sort_order. The schedule board shows only active
 // crew, but the crew editor shows all so deactivated members are still manageable.
-export async function getCrew(): Promise<Crew[]> {
-  const { data, error } = await supabase
+export async function fetchCrew(client: SupabaseClient): Promise<Crew[]> {
+  const { data, error } = await client
     .from("crew")
     .select("id, name, role, color, active, sort_order")
     .order("active", { ascending: false })
@@ -111,8 +119,12 @@ export async function getCrew(): Promise<Crew[]> {
 // set. Crew is fetched from the schedule_assignment_crew linking table in a second
 // query (one assignment can have several crew). Unsorted beyond work_date; the
 // board groups by day and sorts within (all-day first, then start time).
-export async function getScheduleRange(from: string, to: string): Promise<ScheduleAssignment[]> {
-  const { data, error } = await supabase
+export async function fetchScheduleRange(
+  client: SupabaseClient,
+  from: string,
+  to: string
+): Promise<ScheduleAssignment[]> {
+  const { data, error } = await client
     .from("schedule_assignments")
     .select(
       "id, quote_id, phase, title, location, work_date, start_time, end_time, notes, status"
@@ -126,7 +138,7 @@ export async function getScheduleRange(from: string, to: string): Promise<Schedu
   if (rows.length === 0) return [];
 
   // Pull the crew links for just these assignments and group by assignment_id.
-  const { data: links, error: linkError } = await supabase
+  const { data: links, error: linkError } = await client
     .from("schedule_assignment_crew")
     .select("assignment_id, crew_id")
     .in(
@@ -159,8 +171,10 @@ export async function getScheduleRange(from: string, to: string): Promise<Schedu
 
 // Accepted quotes that can be scheduled as jobs. Excludes draft/prepared (nothing
 // to schedule yet) and is capped for the picker dropdown.
-export async function getSchedulableJobs(): Promise<SchedulableJob[]> {
-  const { data, error } = await supabase
+export async function fetchSchedulableJobs(
+  client: SupabaseClient
+): Promise<SchedulableJob[]> {
+  const { data, error } = await client
     .from("quotes")
     .select(
       "id, quote_id, client_name, project_street, project_city, project_state, project_zip, project_type"

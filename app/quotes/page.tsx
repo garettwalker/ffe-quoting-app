@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { DashboardQuoteSection } from "@/components/dashboard-quote-section";
 import { lifecycleStage } from "@/lib/invoice-calculations";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
 import type { DashboardQuoteRow } from "@/lib/types";
 
@@ -13,6 +13,7 @@ import type { DashboardQuoteRow } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 export default async function QuotesPage() {
+  const supabase = getSupabaseServer();
   const { data, error } = await supabase
     .from("quotes")
     .select(

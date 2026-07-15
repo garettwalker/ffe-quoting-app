@@ -2,7 +2,7 @@ import { categoryDisplayName, summarizeByCategory } from "@/lib/calculations";
 import { formatCurrency } from "@/lib/currency";
 import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
 import type { SummaryQuotePdfProps } from "@/components/pdf/summary-quote-document";
 
@@ -35,6 +35,7 @@ export type SummaryQuotePdfInput = {
 export async function loadSummaryQuotePdfInput(
   id: string
 ): Promise<SummaryQuotePdfInput | null> {
+  const supabase = getSupabaseServer();
   const [quoteResult, settings] = await Promise.all([
     supabase
       .from("quotes")

@@ -1,4 +1,12 @@
-import { supabase } from "@/lib/supabase";
+"use client";
+
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+
+// Authenticated browser client (singleton). Carries the logged-in user's
+// session so the next_quote_id RPC and the existing-id lookup enforce RLS
+// (admin-only after the Phase C pass). This module is used only by client
+// components (the quote builder + review page), so it is a client module.
+const supabase = getSupabaseBrowser();
 
 // The quote id is left blank in the builder until the quote is actually saved.
 // The owner can type a custom id into the builder; a non-blank value is used

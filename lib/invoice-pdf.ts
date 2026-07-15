@@ -6,7 +6,7 @@ import {
 } from "@/lib/invoice-calculations";
 import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   InvoiceData,
   InvoiceKind,
@@ -44,6 +44,7 @@ export async function loadInvoicePdfInput(
 ): Promise<InvoicePdfInput | null> {
   if (kind !== "initial" && kind !== "finish") return null;
 
+  const supabase = getSupabaseServer();
   const [quoteResult, settings] = await Promise.all([
     supabase
       .from("quotes")

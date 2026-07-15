@@ -11,7 +11,11 @@ import {
   type StoredQuote
 } from "@/lib/quote-storage";
 import { resolveQuoteIdForSave } from "@/lib/quote-id";
-import { supabase } from "@/lib/supabase";
+import { getSupabaseBrowser } from "@/lib/supabase-browser";
+
+// Authenticated browser client (singleton). Carries the logged-in user's
+// session so RLS enforces admin-only writes after the Phase C pass.
+const supabase = getSupabaseBrowser();
 
 export default function QuoteReviewPage() {
   const router = useRouter();

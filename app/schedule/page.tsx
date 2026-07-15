@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { ScheduleBoard } from "@/components/schedule-board";
-import { getCrew, getScheduleRange, getSchedulableJobs } from "@/lib/schedule";
+import { getCrew, getScheduleRange, getSchedulableJobs } from "@/lib/schedule-server";
 
 // Always read the live crew + assignments + schedulable jobs from Supabase.
 export const dynamic = "force-dynamic";
