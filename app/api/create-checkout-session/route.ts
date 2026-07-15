@@ -1,23 +1,27 @@
 import { NextResponse } from "next/server";
+import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { findInvoice } from "@/lib/invoice-calculations";
-import { verifyPayToken } from "@/lib/pay-token";
-import type { InvoiceData } from "@/lib/types";
+import { findInvoice, invoiceReference } from "@/lib/invoice-calculations";
+import { verifyPayToken, getAppUrl } from "@/lib/pay-token";
+import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
 
 // POST /api/create-checkout-session
 // Body: { token }  -- the HMAC-signed pay-link token (lib/pay-token.ts)
 //
 // Public (the /pay page has no session): the signed token authorizes the
 // request; the invoice + amount are ALWAYS re-read from the database via the
-// service-role client, never from the token or the browser. Returns a Stripe
-// Checkout URL to redirect to once Stripe is wired (step 3). Until then, it
-// returns { ok: false, configured: false } so the customer-facing button shows
-// an honest "being set up" message instead of a dead end.
+// service-role client, never from the token or the browser. Creates a Stripe
+// Checkout Session (card + US bank account / ACH) and returns its URL. The
+// session carries metadata (quote_uuid + invoice_kind) so the webhook can find
+// the invoice when Stripe confirms payment. Until STRIPE_SECRET_KEY is set,
+// returns { ok: false, configured: false } so the customer-facing button shows an
+// honest "being set up" message.
 
 export const dynamic = "force-dynamic";
 
 type QuoteRow = {
   quote_id: string;
+  quote_data: QuoteFormState;
   invoice_data: InvoiceData | null;
 };
 
@@ -44,14 +48,14 @@ export async function POST(request: Request) {
   const supabase = getSupabaseAdmin();
   const result = await supabase
     .from("quotes")
-    .select("quote_id, invoice_data")
+    .select("quote_id, quote_data, invoice_data")
     .eq("id", verified.quoteUuid)
     .single();
   const data = result.data as QuoteRow | null;
   if (result.error || !data || !data.invoice_data) {
     return NextResponse.json({ ok: false, error: "Invoice not found." }, { status: 404 });
   }
-  const invoiceData = data.invoice_data as InvoiceData;
+  const invoiceData = data.invoice_data;
   const invoice = findInvoice(invoiceData, verified.kind);
   if (!invoice) {
     return NextResponse.json({ ok: false, error: "Invoice not found." }, { status: 404 });
@@ -64,20 +68,60 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "No balance is due on this invoice." });
   }
 
-  // Until Stripe is configured (step 3), tell the button to show the "being set
-  // up" message. No Stripe keys are required to build/deploy this route.
+  // Until Stripe is configured, tell the button to show the "being set up"
+  // message (step 2 behavior).
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {
     return NextResponse.json({ ok: false, configured: false });
   }
 
-  // --- Step 3 (Stripe wired): create a Checkout Session with `amountCents` as
-  // the line-item amount (card + ACH/us_bank_account), with success/cancel URLs
-  // back to /pay/success and /pay/canceled, and return { ok: true, url }. The
-  // signed webhook (app/api/stripe-webhook/route.ts) is the source of truth for
-  // confirming payment + flipping the invoice flag + writing the ledger row. ---
-  return NextResponse.json(
-    { ok: false, error: "Online payment is not available yet." },
-    { status: 503 }
-  );
+  const appUrl = getAppUrl();
+  if (!appUrl) {
+    return NextResponse.json(
+      { ok: false, error: "APP_URL is not configured." },
+      { status: 500 }
+    );
+  }
+
+  const reference = invoiceReference(data.quote_id, verified.kind);
+  const clientEmail = data.quote_data?.clientEmail || undefined;
+
+  const stripe = new Stripe(stripeKey);
+  try {
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      // Card + US bank account (ACH). ACH must also be enabled in the Stripe
+      // dashboard (test mode) for the bank option to appear to customers.
+      payment_method_types: ["card", "us_bank_account"],
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: amountCents,
+            product_data: { name: `Invoice ${reference}` }
+          }
+        }
+      ],
+      success_url: `${appUrl}/pay/success`,
+      cancel_url: `${appUrl}/pay/canceled`,
+      // The webhook uses these to find the invoice when Stripe confirms payment.
+      metadata: {
+        quote_uuid: verified.quoteUuid,
+        invoice_kind: verified.kind
+      },
+      ...(clientEmail ? { customer_email: clientEmail } : {})
+    });
+
+    if (!session.url) {
+      return NextResponse.json(
+        { ok: false, error: "Stripe did not return a checkout URL." },
+        { status: 502 }
+      );
+    }
+    return NextResponse.json({ ok: true, url: session.url });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Failed to create checkout session.";
+    return NextResponse.json({ ok: false, error: message }, { status: 502 });
+  }
 }
