@@ -93,6 +93,21 @@ export async function POST(request: Request) {
       // Card + US bank account (ACH). ACH must also be enabled in the Stripe
       // dashboard (test mode) for the bank option to appear to customers.
       payment_method_types: ["card", "us_bank_account"],
+      // Force instant ACH verification via Stripe Financial Connections (Plaid)
+      // so the customer logs into their bank once and the charge settles
+      // normally. Setting verification_method to "instant" REMOVES the "enter
+      // bank manually" option from Checkout — that manual path falls back to
+      // microdeposit verification, which can't complete inside a one-shot
+      // Checkout and leaves the payment "incomplete" indefinitely (the owner
+      // hit exactly this by choosing manual entry during testing).
+      payment_method_options: {
+        us_bank_account: {
+          verification_method: "instant",
+          financial_connections: {
+            permissions: ["payment_method"]
+          }
+        }
+      },
       line_items: [
         {
           quantity: 1,

@@ -119,7 +119,7 @@ export function buildEmailDefaults({
         ? buildPayUrl(quoteUuid, invoiceKind)
         : null;
     const message = payUrl
-      ? `Hi,\n\nPlease find your invoice attached. You can pay online here:\n${payUrl}\n\nOr pay by the method shown on the invoice. Let me know if you have any questions.\n\nThank you,\n${name}`
+      ? `Hi,\n\nPlease find your invoice attached. You can pay online with a credit or debit card, or by ACH bank transfer, using this link:\n${payUrl}\n\nPrefer to mail a paper check? The mailing address is on the invoice. Let me know if you have any questions.\n\nThank you,\n${name}`
       : `Hi,\n\nPlease find your invoice attached. Payment details are on the invoice. Let me know if you have any questions.\n\nThank you,\n${name}`;
     return {
       subject: `Invoice ${ref} from ${name}`,
