@@ -1,7 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
+import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
 import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
+import { buildEmailDefaults, type InvoiceKind } from "@/lib/send-pdf-email";
 
 type PageProps = {
   params: { id: string; kind: string };
@@ -28,13 +29,28 @@ export default async function PrintInvoicePage({ params }: PageProps) {
     .filter(Boolean)
     .join(" · ");
 
+  const emailDefaults = buildEmailDefaults({
+    doc: "invoice",
+    reference: pdfProps.reference,
+    businessName: pdfProps.businessName
+  });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <DownloadPdfButton
-        href={`/quotes/${params.id}/invoices/${params.kind}/pdf`}
+      <PdfActionBar
         backHref={`/quotes/${params.id}/invoices`}
+        downloadHref={`/quotes/${params.id}/invoices/${params.kind}/pdf`}
         backLabel="Back to invoices"
-        buttonLabel="Download PDF"
+        downloadLabel="Download PDF"
+        email={{
+          doc: "invoice",
+          id: params.id,
+          invoiceKind: params.kind as InvoiceKind,
+          defaultTo: pdfProps.clientEmail ?? "",
+          defaultSubject: emailDefaults.subject,
+          defaultMessage: emailDefaults.message,
+          docTitle: pdfProps.title
+        }}
       />
 
       <section className="rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">

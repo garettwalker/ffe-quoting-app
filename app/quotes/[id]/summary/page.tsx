@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
+import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
+import { buildEmailDefaults } from "@/lib/send-pdf-email";
 import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
 
 type PageProps = {
@@ -43,13 +44,27 @@ export default async function SummaryQuotePage({ params }: PageProps) {
     .filter(Boolean)
     .join(" · ");
 
+  const emailDefaults = buildEmailDefaults({
+    doc: "summary",
+    quoteId: quote.quoteId,
+    businessName: settings.businessName
+  });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <DownloadPdfButton
-        href={`/quotes/${params.id}/summary/pdf`}
+      <PdfActionBar
         backHref={`/quotes/${params.id}`}
+        downloadHref={`/quotes/${params.id}/summary/pdf`}
         backLabel="Back to quote"
-        buttonLabel="Download PDF"
+        downloadLabel="Download PDF"
+        email={{
+          doc: "summary",
+          id: params.id,
+          defaultTo: quote.clientEmail ?? "",
+          defaultSubject: emailDefaults.subject,
+          defaultMessage: emailDefaults.message,
+          docTitle: "Summary Quote"
+        }}
       />
 
       <section className="rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">

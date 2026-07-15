@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
-import { DownloadPdfButton } from "@/components/pdf/download-pdf-button";
+import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
 import { formatCurrency } from "@/lib/currency";
 import { loadDetailedQuotePdfInput } from "@/lib/detailed-quote-pdf";
+import { buildEmailDefaults } from "@/lib/send-pdf-email";
 
 type PageProps = {
   params: { id: string };
@@ -35,13 +36,27 @@ export default async function PrintQuotePage({ params }: PageProps) {
     .filter(Boolean)
     .join(" · ");
 
+  const emailDefaults = buildEmailDefaults({
+    doc: "detailed",
+    quoteId: quote.quoteId,
+    businessName: settings.businessName
+  });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <DownloadPdfButton
-        href={`/quotes/${params.id}/print/pdf`}
+      <PdfActionBar
         backHref={`/quotes/${params.id}`}
+        downloadHref={`/quotes/${params.id}/print/pdf`}
         backLabel="Back to quote"
-        buttonLabel="Download PDF"
+        downloadLabel="Download PDF"
+        email={{
+          doc: "detailed",
+          id: params.id,
+          defaultTo: quote.clientEmail ?? "",
+          defaultSubject: emailDefaults.subject,
+          defaultMessage: emailDefaults.message,
+          docTitle: "Detailed Quote"
+        }}
       />
 
       <section className="rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
