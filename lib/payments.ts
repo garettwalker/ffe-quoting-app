@@ -100,6 +100,43 @@ export async function updatePaymentStatus(
   return { quoteUuid: row.quote_id, kind: row.invoice_kind };
 }
 
+// Double-payment guard. Returns true when there is an active (non-terminal)
+// payment for this invoice in the ledger: one that is still processing, pending,
+// or already succeeded. /api/create-checkout-session calls this BEFORE creating
+// a new Stripe session and refuses if it returns true, so a customer can't be
+// charged twice on one invoice. This matters most in live mode: an ACH payment
+// sits "processing" for 1-3 business days while the invoice flag is still unpaid
+// (the flag only flips on payment_intent.succeeded, which arrives days later),
+// so without this guard a customer who reopens the link could pay again. A
+// failed/refunded/cancelled payment does NOT count: those are terminal and the
+// customer is allowed to retry. Fail-open on a read error (the primary guard is
+// the invoice paid flag, which is checked separately and reliably; a transient
+// ledger read failure in this narrow window is near-impossible and failing open
+// avoids blocking a legitimate customer).
+export async function hasActivePayment(
+  quoteUuid: string,
+  kind: InvoiceKind
+): Promise<boolean> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("quote_id", quoteUuid)
+    .eq("invoice_kind", kind)
+    .in("status", ["processing", "pending", "succeeded"])
+    .limit(1);
+  if (error) {
+    console.error(
+      "[payments] hasActivePayment read failed, failing open",
+      quoteUuid,
+      kind,
+      error.message
+    );
+    return false;
+  }
+  return Array.isArray(data) && data.length > 0;
+}
+
 // Flip one invoice's paid flag in quotes.invoice_data (the UI source of truth).
 // Idempotent: setting "paid" twice is harmless. `paid=false` reverses it (used
 // on refund). Reads the live invoice_data, updates just the matching invoice's

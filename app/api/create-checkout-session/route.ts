@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
+import { hasActivePayment } from "@/lib/payments";
 import { findInvoice, invoiceReference } from "@/lib/invoice-calculations";
 import { verifyPayToken, getAppUrl } from "@/lib/pay-token";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
@@ -63,6 +64,24 @@ export async function POST(request: Request) {
   if (invoice.status === "paid") {
     return NextResponse.json({ ok: false, error: "This invoice is already paid." });
   }
+
+  // Double-payment guard: refuse to start a new charge if there is already an
+  // active Stripe payment for this invoice (processing/pending/succeeded). In
+  // live mode an ACH can sit "processing" for 1-3 business days while the invoice
+  // flag is still unpaid (it only flips on payment_intent.succeeded), so without
+  // this a customer who reopens the link could be charged twice. A
+  // failed/refunded/cancelled payment does not block; those are retries.
+  if (await hasActivePayment(verified.quoteUuid, verified.kind)) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "A payment for this invoice is already in progress. Please wait for it to finish, or contact us if you need help."
+      },
+      { status: 409 }
+    );
+  }
+
   const amountCents = Math.round(invoice.amountCents) || 0;
   if (amountCents <= 0) {
     return NextResponse.json({ ok: false, error: "No balance is due on this invoice." });
