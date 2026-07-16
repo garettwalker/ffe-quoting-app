@@ -3,6 +3,7 @@ import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getSettings } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/currency";
 import { findInvoice, invoiceReference } from "@/lib/invoice-calculations";
+import { ACH_LIMIT_CENTS } from "@/lib/payments";
 import { verifyPayToken } from "@/lib/pay-token";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
 import { PayButton } from "@/components/pay/pay-button";
@@ -133,6 +134,14 @@ export default async function PayPage({ params }: PageProps) {
           </p>
         </div>
       </div>
+
+      {amountCents > ACH_LIMIT_CENTS ? (
+        <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
+          This invoice is above the {formatCurrency(ACH_LIMIT_CENTS).replace(/\.00$/, "")} ACH
+          bank-transfer limit, so online payment is by card only. You can also
+          mail a check (the mailing address is on the invoice).
+        </div>
+      ) : null}
 
       <div className="mt-6">
         <PayButton token={decoded} amountCents={amountCents} />

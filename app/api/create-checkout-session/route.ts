@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { hasActivePayment } from "@/lib/payments";
+import { hasActivePayment, achAvailableForAmount } from "@/lib/payments";
 import { findInvoice, invoiceReference } from "@/lib/invoice-calculations";
 import { verifyPayToken, getAppUrl } from "@/lib/pay-token";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
@@ -105,28 +105,19 @@ export async function POST(request: Request) {
   const reference = invoiceReference(data.quote_id, verified.kind);
   const clientEmail = data.quote_data?.clientEmail || undefined;
 
+  // Offer ACH (US bank account) only when the invoice is at or under the account's
+  // ACH per-payment cap (lib/payments.ts ACH_LIMIT_CENTS). Over the cap Stripe
+  // would reject the ACH charge mid-Checkout, so we don't offer the bank option
+  // at all — the customer sees card only, and the /pay page notes why. Under the
+  // cap, both card and ACH show as normal.
+  const offerAch = achAvailableForAmount(amountCents);
+
   const stripe = new Stripe(stripeKey);
   try {
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "payment",
-      // Card + US bank account (ACH). ACH must also be enabled in the Stripe
-      // dashboard (test mode) for the bank option to appear to customers.
-      payment_method_types: ["card", "us_bank_account"],
-      // Force instant ACH verification via Stripe Financial Connections (Plaid)
-      // so the customer logs into their bank once and the charge settles
-      // normally. Setting verification_method to "instant" REMOVES the "enter
-      // bank manually" option from Checkout — that manual path falls back to
-      // microdeposit verification, which can't complete inside a one-shot
-      // Checkout and leaves the payment "incomplete" indefinitely (the owner
-      // hit exactly this by choosing manual entry during testing).
-      payment_method_options: {
-        us_bank_account: {
-          verification_method: "instant",
-          financial_connections: {
-            permissions: ["payment_method"]
-          }
-        }
-      },
+      // Card always; ACH only when the amount is within the ACH cap.
+      payment_method_types: offerAch ? ["card", "us_bank_account"] : ["card"],
       line_items: [
         {
           quantity: 1,
@@ -145,7 +136,27 @@ export async function POST(request: Request) {
         invoice_kind: verified.kind
       },
       ...(clientEmail ? { customer_email: clientEmail } : {})
-    });
+    };
+
+    if (offerAch) {
+      // Force instant ACH verification via Stripe Financial Connections (Plaid)
+      // so the customer logs into their bank once and the charge settles
+      // normally. Setting verification_method to "instant" REMOVES the "enter
+      // bank manually" option from Checkout — that manual path falls back to
+      // microdeposit verification, which can't complete inside a one-shot
+      // Checkout and leaves the payment "incomplete" indefinitely (the owner
+      // hit exactly this by choosing manual entry during testing).
+      sessionParams.payment_method_options = {
+        us_bank_account: {
+          verification_method: "instant",
+          financial_connections: {
+            permissions: ["payment_method"]
+          }
+        }
+      };
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     if (!session.url) {
       return NextResponse.json(

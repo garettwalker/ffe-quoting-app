@@ -16,6 +16,20 @@ export type PaymentStatus =
   | "failed"
   | "refunded";
 
+// Stripe ACH (US bank account) per-payment cap on this account. Stripe shows
+// this limit when you enable US bank account; it is account-specific and Stripe
+// can raise it with more verification. We avoid offering ACH above this amount
+// (see /api/create-checkout-session, which drops us_bank_account from the
+// payment methods over the cap) so a customer never hits a mid-Checkout
+// rejection, and the /pay page tells them why. Bump here if Stripe raises it.
+export const ACH_LIMIT_CENTS = 20_000 * 100;
+
+// ACH is offered only for positive amounts at or under the cap. Over the cap,
+// only card is offered (plus the customer can always mail a check).
+export function achAvailableForAmount(amountCents: number): boolean {
+  return amountCents > 0 && amountCents <= ACH_LIMIT_CENTS;
+}
+
 type QuoteRow = { quote_id: string; invoice_data: InvoiceData | null };
 
 // Read the live invoice amount for a quote + kind from the DB. The amount shown
