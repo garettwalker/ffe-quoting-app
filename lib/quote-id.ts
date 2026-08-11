@@ -9,8 +9,12 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 const supabase = getSupabaseBrowser();
 
 // The quote id is left blank in the builder until the quote is actually saved.
-// The owner can type a custom id into the builder; a non-blank value is used
-// as-is and the server is not asked for one.
+// The Quote ID field is read-only in the builder (the owner asked to remove
+// manual entry on 2026-08-11), so a brand-new quote always has a blank id and
+// the server always assigns the daily-sequence number. The non-blank path
+// below is still used when EDITING a saved quote: the builder is prefilled
+// with that quote's existing id, which is passed back through and kept as-is
+// so a saved quote's client-facing reference never changes.
 //
 // For a brand-new quote with a blank id, the daily-sequence number
 // (Q-YYYYMMDD-NNN) comes from a Postgres function `next_quote_id(p_day)` (see
@@ -44,12 +48,12 @@ function toDayKey(quoteDate: string): string {
 }
 
 // Returns the quote id to persist for this save:
-//  - If the owner typed a custom id (currentId non-blank), use it as-is.
-//  - Else if `existingRowId` is set (we are updating an already-saved quote and
-//    the id field was cleared), keep that row's existing quote_id instead of
-//    minting a new number. Clearing the field on an edit is not "give me a new
-//    id" — a saved quote already has a client-facing reference that should not
-//    change unless the owner types a new custom one explicitly.
+//  - If currentId is non-blank, use it as-is. This is the edit path: the
+//    builder was prefilled with the saved quote's existing id and the read-only
+//    field passes it straight back, so the client-facing reference is kept.
+//  - Else if `existingRowId` is set (we are updating an already-saved quote
+//    but the id was blank for some reason), keep that row's existing quote_id
+//    instead of minting a new number.
 //  - Else (a brand-new quote with a blank id), ask the server for the next
 //    atomic daily number for the quote's own date.
 // Throws on failure so the caller can surface a save error instead of

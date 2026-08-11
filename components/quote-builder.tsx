@@ -383,10 +383,13 @@ export function QuoteBuilder({
             <Field label="Quote ID">
               <input
                 value={quote.quoteId}
-                onChange={(event) => updateQuote("quoteId", event.target.value)}
+                readOnly
                 placeholder="Assigned on save"
-                className="form-input"
+                className="form-input cursor-not-allowed bg-sand/60 text-charcoal/70"
               />
+              <span className="text-xs font-bold text-charcoal/50">
+                Assigned automatically when you save. It cannot be edited.
+              </span>
             </Field>
 
             <Field label="Quote Date">
