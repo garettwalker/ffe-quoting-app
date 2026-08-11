@@ -119,25 +119,44 @@ export async function loadInvoicePdfInput(
         }
       : null;
 
-  // Scope-of-work detail shown on the invoice: each line item with its
-  // customer-facing comment underneath when present. No per-line prices here —
-  // the invoice bills by percentage of the contract, so line prices would
-  // clash with the charge amounts. The invoice's scope is INDEPENDENT of the
-  // quote: once invoicing is set up the scope lines live on the invoice
-  // (invoice_data.scopeLines) and are edited there, so the quote stays a
-  // point-in-time estimate. For invoices set up before this field existed
-  // (no scopeLines on the row yet), fall back to the quote's
-  // calculation_data.clientFacingLines so nothing breaks — and the first time
-  // the owner re-saves the invoice setup, the builder persists scopeLines.
+  // Scope-of-work line items shown on the invoice. Each line carries its
+  // name, a customer-facing comment, a "qty x unit price" detail string, and
+  // the line total — all money formatting pre-done here so the PDF component
+  // stays data-in. The contract is the sum of these line totals; the charge
+  // lines above bill the rough-in/finish split of that contract.
+  //
+  // The invoice's scope is INDEPENDENT of the quote: once invoicing is set up
+  // the line items live on the invoice (invoice_data.scopeLines) and are
+  // edited there, so the quote stays a point-in-time estimate. For invoices
+  // set up before line items existed (no scopeLines on the row yet), fall back
+  // to the quote's calculation_data.clientFacingLines so nothing breaks — and
+  // the first time the owner re-saves the setup, the builder persists the
+  // line items. The backfill is display-only (it does not change the stored
+  // contractAmountCents, which legacy invoices keep as the hand-entered value).
   const scopeLines = Array.isArray(invoiceData.scopeLines)
-    ? invoiceData.scopeLines.map((line) => ({
-        name: line.name,
-        comment: line.comment
-      }))
-    : row.calculation_data.clientFacingLines.map((line) => ({
-        name: line.name,
-        comment: line.comment
-      }));
+    ? invoiceData.scopeLines.map((line) => {
+        const totalCents = line.quantity * line.unitPriceCents;
+        return {
+          name: line.name,
+          comment: line.comment,
+          detail: `${line.quantity} × ${formatCurrency(line.unitPriceCents)}`,
+          total: formatCurrency(totalCents)
+        };
+      })
+    : row.calculation_data.clientFacingLines.map((line) => {
+        const qty = line.category === "Base" ? 1 : line.quantity;
+        const unitCents =
+          line.category === "Base"
+            ? line.clientLineTotalCents
+            : line.clientUnitPriceCents;
+        const totalCents = qty * unitCents;
+        return {
+          name: line.name,
+          comment: line.comment,
+          detail: `${qty} × ${formatCurrency(unitCents)}`,
+          total: formatCurrency(totalCents)
+        };
+      });
 
   const pdfProps: InvoicePdfProps = {
     businessName: settings.businessName,

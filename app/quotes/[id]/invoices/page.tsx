@@ -10,9 +10,11 @@ import { buildPayUrl } from "@/lib/pay-token";
 import { getServerUser } from "@/lib/auth";
 import { CopyPayLinkButton } from "@/components/pay/copy-pay-link-button";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { getPricingCatalog } from "@/lib/pricing";
 import type {
   InvoiceData,
   InvoiceKind,
+  PricingItem,
   QuoteCalculationResult,
   QuoteFormState
 } from "@/lib/types";
@@ -35,7 +37,7 @@ type PageProps = {
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [user, { data, error }] = await Promise.all([
+  const [user, { data, error }, catalog] = await Promise.all([
     getServerUser(),
     supabase
       .from("quotes")
@@ -43,7 +45,8 @@ export default async function InvoicingPage({ params }: PageProps) {
         "id, quote_id, status, quote_data, calculation_data, invoice_data"
       )
       .eq("id", params.id)
-      .single()
+      .single(),
+    getPricingCatalog()
   ]);
 
   if (error || !data || !data.quote_data || !data.calculation_data) {
@@ -104,8 +107,19 @@ export default async function InvoicingPage({ params }: PageProps) {
             quoteId={row.id}
             initialInvoiceData={invoiceData}
             quoteTotalCents={result.clientQuoteTotalCents}
+            pricingItems={catalog.items}
+            // Default unit price for a line added on the invoice = catalog base
+            // price x the quote's pricing-level/contingency multiplier, so an
+            // added line matches the job's pricing level (still editable).
+            clientMultiplier={result.combinedClientMultiplier}
             seedScopeLines={result.clientFacingLines.map((line) => ({
+              pricingItemId: line.pricingItemId,
               name: line.name,
+              quantity: line.category === "Base" ? 1 : line.quantity,
+              unitPriceCents:
+                line.category === "Base"
+                  ? line.clientLineTotalCents
+                  : line.clientUnitPriceCents,
               comment: line.comment
             }))}
           />

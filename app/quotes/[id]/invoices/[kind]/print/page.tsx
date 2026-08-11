@@ -127,7 +127,13 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             <div className="overflow-hidden rounded-xl1 border border-pine/10">
               <div className="divide-y divide-pine/10 bg-cream">
                 {pdfProps.scopeLines.map((line, index) => (
-                  <InvoiceScopeLine key={index} name={line.name} comment={line.comment} />
+                  <InvoiceScopeLine
+                    key={index}
+                    name={line.name}
+                    comment={line.comment}
+                    detail={line.detail}
+                    total={line.total}
+                  />
                 ))}
               </div>
             </div>
@@ -184,15 +190,31 @@ function InvoiceLine({ label, amount }: { label: string; amount: string }) {
   );
 }
 
-function InvoiceScopeLine({ name, comment }: { name: string; comment: string }) {
+function InvoiceScopeLine({
+  name,
+  comment,
+  detail,
+  total
+}: {
+  name: string;
+  comment: string;
+  detail: string;
+  total: string;
+}) {
   return (
-    <div className="p-3">
-      <p className="font-bold text-charcoal">{name}</p>
-      {comment ? (
-        <p className="mt-1 break-words text-xs italic leading-5 text-charcoal/60">
-          {comment}
-        </p>
-      ) : null}
+    <div className="flex items-start justify-between gap-4 p-3">
+      <div className="min-w-0">
+        <p className="font-bold text-charcoal">{name}</p>
+        {comment ? (
+          <p className="mt-1 break-words text-xs italic leading-5 text-charcoal/60">
+            {comment}
+          </p>
+        ) : null}
+      </div>
+      <div className="shrink-0 text-right">
+        <p className="font-black text-charcoal">{total}</p>
+        <p className="text-xs text-charcoal/55">{detail}</p>
+      </div>
     </div>
   );
 }

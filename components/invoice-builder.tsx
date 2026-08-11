@@ -9,20 +9,48 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 // Authenticated browser client (singleton). Carries the logged-in user's
 // session so RLS enforces admin-only writes after the Phase C pass.
 const supabase = getSupabaseBrowser();
-import type { InvoiceData, InvoiceKind, InvoiceRecord } from "@/lib/types";
+import type {
+  InvoiceData,
+  InvoiceKind,
+  InvoiceRecord,
+  PricingItem
+} from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
+
+// One editable scope line on the invoice. The name is resolved from the
+// catalog by pricingItemId (read-only in the UI); quantity + unit price +
+// comment are editable. The contract amount is the sum of (qty * unit price)
+// across all lines, so editing a line updates the contract and the two
+// invoice amounts flow from the % split as before.
+type ScopeLine = {
+  pricingItemId: string;
+  name: string;
+  quantity: number;
+  unitPriceCents: number;
+  comment: string;
+};
 
 type InvoiceBuilderProps = {
   quoteId: string;
   // The saved invoice setup, if any. Null means invoices have not been set up.
   initialInvoiceData: InvoiceData | null;
-  // The accepted quote total, used to default the contract amount on first setup.
+  // The accepted quote total, used to default the contract amount on first
+  // setup (and as the manual contract value when there are no line items).
   quoteTotalCents: number;
-  // The quote's line items + comments, used to seed the invoice's scope-of-work
-  // section the first time invoicing is set up. Once saved, the invoice's scope
-  // lives on the invoice (invoice_data.scopeLines) and is edited independently
-  // of the quote, so this seed is only used when there is no existing scope.
-  seedScopeLines: Array<{ name: string; comment: string }>;
+  // The full pricing-items catalog (active + inactive), used for the
+  // "add a line" dropdown. Available-to-add filters to active non-Base items
+  // not already on the invoice.
+  pricingItems: PricingItem[];
+  // The quote's combined pricing-level + contingency multiplier. Used as the
+  // default unit price for a line added on the invoice (catalog base price x
+  // multiplier) so an added line matches the job's pricing level. The unit
+  // price is still editable.
+  clientMultiplier: number;
+  // The quote's line items, used to seed the invoice's scope the first time
+  // invoicing is set up (names + quantities + client prices + comments). Once
+  // saved, the scope lives on the invoice (invoice_data.scopeLines) and is
+  // edited independently of the quote.
+  seedScopeLines: ScopeLine[];
 };
 
 const KIND_LABEL: Record<InvoiceKind, string> = {
@@ -34,14 +62,13 @@ export function InvoiceBuilder({
   quoteId,
   initialInvoiceData,
   quoteTotalCents,
+  pricingItems,
+  clientMultiplier,
   seedScopeLines
 }: InvoiceBuilderProps) {
   const router = useRouter();
   const existing = initialInvoiceData;
 
-  const [contractDollars, setContractDollars] = useState<number>(() =>
-    existing ? centsToDollars(existing.contractAmountCents) : centsToDollars(quoteTotalCents)
-  );
   const [roughInPercent, setRoughInPercent] = useState<number>(
     existing ? existing.roughInPercent : 50
   );
@@ -52,24 +79,49 @@ export function InvoiceBuilder({
     existing ? centsToDollars(existing.permitFeeCents) : 0
   );
 
-  // Scope-of-work lines for the invoice. Seeded from the existing invoice's
-  // scope if it has one (independent of the quote), otherwise from the quote's
-  // line items + comments (first setup). The owner edits names + comments here;
-  // they are saved on the invoice and shown on both invoice PDFs. No per-line
-  // amounts (the invoice bills by percentage of the contract).
-  const [scopeLines, setScopeLines] = useState<Array<{ name: string; comment: string }>>(
-    () =>
-      Array.isArray(existing?.scopeLines)
-        ? (existing!.scopeLines as Array<{ name: string; comment: string }>).map((l) => ({
-            name: l.name,
-            comment: l.comment
-          }))
-        : seedScopeLines.map((l) => ({ name: l.name, comment: l.comment }))
+  // Manual contract amount, used ONLY when there are no scope lines (legacy
+  // invoices set up before line items, or an invoice whose lines have all been
+  // removed). When scope lines exist the contract is derived from their sum.
+  const [contractDollars, setContractDollars] = useState<number>(() =>
+    existing ? centsToDollars(existing.contractAmountCents) : centsToDollars(quoteTotalCents)
   );
+
+  // Scope-of-work line items for the invoice. Seeded from the existing
+  // invoice's scope if it has one (independent of the quote), otherwise from
+  // the quote's line items (first setup). Legacy invoices with no scopeLines
+  // start with an empty list (manual contract mode); the owner can add lines
+  // to switch to line-item billing.
+  const [scopeLines, setScopeLines] = useState<ScopeLine[]>(() => {
+    if (Array.isArray(existing?.scopeLines)) {
+      return (existing!.scopeLines as ScopeLine[]).map((line) => ({
+        pricingItemId: line.pricingItemId ?? "",
+        name: line.name,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+        comment: line.comment
+      }));
+    }
+    // Legacy invoice (existing contract but no scopeLines): keep it on the
+    // manual contract — do NOT seed from the quote, since that could change a
+    // (possibly paid) invoice's contract. Brand-new invoice: seed from quote.
+    return existing ? [] : seedScopeLines.map((line) => ({ ...line }));
+  });
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState(false);
+
+  // The contract is the sum of line totals when there are lines, otherwise the
+  // manual contract amount.
+  const contractCents = useMemo(() => {
+    if (scopeLines.length > 0) {
+      return scopeLines.reduce(
+        (sum, line) => sum + line.quantity * line.unitPriceCents,
+        0
+      );
+    }
+    return dollarsToCents(contractDollars);
+  }, [scopeLines, contractDollars]);
 
   // Clear any stale save message as soon as the owner edits an input.
   useEffect(() => {
@@ -79,7 +131,7 @@ export function InvoiceBuilder({
 
   // Build a preview InvoiceData from the current inputs so amounts update live.
   const previewData: InvoiceData = {
-    contractAmountCents: dollarsToCents(contractDollars),
+    contractAmountCents: contractCents,
     roughInPercent,
     finishPercent,
     permitFeeCents: dollarsToCents(permitDollars),
@@ -91,7 +143,7 @@ export function InvoiceBuilder({
   const amounts = useMemo(
     () => computeInvoiceAmounts(previewData),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [contractDollars, roughInPercent, finishPercent, permitDollars, existing]
+    [contractCents, roughInPercent, finishPercent, permitDollars, existing]
   );
 
   // A paid invoice records money that was actually collected. If the owner's
@@ -146,15 +198,32 @@ export function InvoiceBuilder({
     };
   }
 
-  // --- Scope-of-work line editing -------------------------------------
-  // The invoice's scope lines are editable here independently of the quote.
-  // Names + comments only — no per-line amounts (the invoice bills by
-  // percentage of the contract). Editing comments on a paid invoice is safe:
-  // it does not change any money, so the paid-amount reset below never fires.
+  // --- Scope line editing -----------------------------------------------
+  // Lines are catalog items (name resolved from pricingItemId, read-only).
+  // Quantity + unit price + comment are editable. Adding a line picks from the
+  // catalog dropdown; the unit price defaults to catalog base x the job's
+  // pricing-level multiplier. Editing a line's qty/price updates the contract
+  // (sum of line totals) and therefore the invoice amounts; on a paid invoice
+  // that changes an amount, the paidAmountChanges warning + reset applies.
+  // Editing only a comment is money-free and never resets anything.
 
-  function updateScopeName(index: number, name: string) {
+  function resolveName(pricingItemId: string, fallback: string): string {
+    if (!pricingItemId) return fallback;
+    const item = pricingItems.find((p) => p.id === pricingItemId);
+    return item?.name ?? fallback;
+  }
+
+  function updateScopeQuantity(index: number, quantity: number) {
     setScopeLines((prev) =>
-      prev.map((line, i) => (i === index ? { ...line, name } : line))
+      prev.map((line, i) => (i === index ? { ...line, quantity } : line))
+    );
+  }
+
+  function updateScopeUnitPrice(index: number, dollars: number) {
+    setScopeLines((prev) =>
+      prev.map((line, i) =>
+        i === index ? { ...line, unitPriceCents: dollarsToCents(dollars) } : line
+      )
     );
   }
 
@@ -165,12 +234,43 @@ export function InvoiceBuilder({
   }
 
   function removeScopeLine(index: number) {
-    setScopeLines((prev) => prev.filter((_, i) => i !== index));
+    setScopeLines((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      // If removing the last line, drop back to manual contract mode seeded
+      // with the contract the lines were summing to, so the manual field does
+      // not jump to zero.
+      if (next.length === 0 && prev.length > 0) {
+        const sum = prev.reduce((s, l) => s + l.quantity * l.unitPriceCents, 0);
+        setContractDollars(centsToDollars(sum));
+      }
+      return next;
+    });
   }
 
-  function addScopeLine() {
-    setScopeLines((prev) => [...prev, { name: "", comment: "" }]);
+  function addScopeLine(pricingItemId: string) {
+    const item = pricingItems.find((p) => p.id === pricingItemId);
+    if (!item) return;
+    setScopeLines((prev) => [
+      ...prev,
+      {
+        pricingItemId: item.id,
+        name: item.name,
+        quantity: 1,
+        unitPriceCents: Math.round(item.basePriceCents * clientMultiplier),
+        comment: ""
+      }
+    ]);
   }
+
+  // Active catalog adders not already on the invoice (by pricingItemId). The
+  // base package is a seeded pseudo-item, not in the catalog, so it never
+  // appears here.
+  const availableItems = pricingItems.filter(
+    (item) =>
+      item.active &&
+      item.category !== "Base" &&
+      !scopeLines.some((line) => line.pricingItemId === item.id)
+  );
 
   async function saveInvoices() {
     if (isSaving) return;
@@ -190,19 +290,31 @@ export function InvoiceBuilder({
 
     const now = new Date().toISOString();
     const data: InvoiceData = {
-      contractAmountCents: dollarsToCents(contractDollars),
+      contractAmountCents: contractCents,
       roughInPercent,
       finishPercent,
       permitFeeCents: dollarsToCents(permitDollars),
       generatedAt: now,
       invoices: [buildInvoiceRecord("initial", now), buildInvoiceRecord("finish", now)],
-      // Persist the invoice's own scope lines so the invoice is independent of
-      // the quote from this save onward (PDFs/print read this field first, only
-      // falling back to the quote when an old invoice lacks it).
-      scopeLines: scopeLines.map((line) => ({
-        name: line.name.trim(),
-        comment: line.comment.trim()
-      }))
+      // Persist the invoice's own scope lines when there are any, so the
+      // invoice is independent of the quote from this save onward. When there
+      // are no lines, keep the prior scope state: a legacy invoice that never
+      // had lines stays without scopeLines (PDF backfills from the quote),
+      // while an invoice whose lines were cleared saves an empty array (the
+      // owner's clear is respected, no quote backfill).
+      ...(scopeLines.length > 0
+        ? {
+            scopeLines: scopeLines.map((line) => ({
+              pricingItemId: line.pricingItemId,
+              name: line.name.trim(),
+              quantity: line.quantity,
+              unitPriceCents: line.unitPriceCents,
+              comment: line.comment.trim()
+            }))
+          }
+        : Array.isArray(existing?.scopeLines)
+          ? { scopeLines: [] }
+          : {})
     };
 
     const { error } = await supabase
@@ -244,25 +356,35 @@ export function InvoiceBuilder({
           Invoice Setup
         </p>
         <h2 className="font-display text-2xl font-bold tracking-[-0.03em] text-moss">
-          Contract amount, split, and permit fee
+          Line items, split, and permit fee
         </h2>
         <p className="mt-2 text-sm font-bold text-charcoal/65">
-          The initial invoice is the rough-in amount plus the permit fee. The
-          finish invoice is the remainder. Defaults to a 50/50 split.
+          The contract is the sum of the line items below. The initial invoice
+          is the rough-in percent of that contract plus the permit fee; the
+          finish invoice is the remainder. Add line items from your pricing
+          catalog, set quantity and price, and adjust the split.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <Field label="Contract Amount ($)">
-          <FormattedNumberInput
-            value={contractDollars}
-            onChange={setContractDollars}
-            allowDecimal
-            min={0}
-            placeholder="Enter contract amount"
-            className="form-input"
-          />
-        </Field>
+        {scopeLines.length > 0 ? (
+          <Field label="Contract (sum of line items)">
+            <div className="form-input flex items-center bg-sand/60 font-display text-lg font-bold text-deep-pine">
+              {formatCurrency(contractCents)}
+            </div>
+          </Field>
+        ) : (
+          <Field label="Contract Amount ($)">
+            <FormattedNumberInput
+              value={contractDollars}
+              onChange={setContractDollars}
+              allowDecimal
+              min={0}
+              placeholder="Enter contract amount"
+              className="form-input"
+            />
+          </Field>
+        )}
 
         <Field label="Permit Fee ($)">
           <FormattedNumberInput
@@ -310,6 +432,123 @@ export function InvoiceBuilder({
         </Field>
       </div>
 
+      {/* Line items */}
+      <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
+            Line Items
+          </p>
+          <p className="text-xs font-bold text-charcoal/55">
+            Pulled from your pricing catalog. Quantities and prices are editable.
+          </p>
+        </div>
+
+        <div className="space-y-3">
+          {scopeLines.length === 0 ? (
+            <p className="rounded-soft border border-dashed border-stone bg-whitewarm/60 px-3 py-4 text-sm font-bold text-charcoal/55">
+              No line items yet. Add one from the catalog below, or enter a
+              contract amount above to bill a lump sum.
+            </p>
+          ) : null}
+
+          {scopeLines.map((line, index) => {
+            const name = resolveName(line.pricingItemId, line.name);
+            const lineTotalCents = line.quantity * line.unitPriceCents;
+            return (
+              <div
+                key={index}
+                className="rounded-soft border border-pine/10 bg-whitewarm p-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="break-words font-black text-deep-pine">{name}</p>
+                    <p className="text-sm font-bold text-charcoal/60">
+                      {formatCurrency(lineTotalCents)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeScopeLine(index)}
+                    title="Remove this line item"
+                    className="shrink-0 rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
+                  >
+                    Remove
+                  </button>
+                </div>
+
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Field label="Quantity">
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={line.quantity === 0 ? "" : line.quantity}
+                      onChange={(event) =>
+                        updateScopeQuantity(
+                          index,
+                          event.target.value === "" ? 0 : Number(event.target.value)
+                        )
+                      }
+                      placeholder="1"
+                      className="form-input"
+                    />
+                  </Field>
+                  <Field label="Unit Price ($)">
+                    <FormattedNumberInput
+                      value={centsToDollars(line.unitPriceCents)}
+                      onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
+                      allowDecimal
+                      min={0}
+                      placeholder="0"
+                      className="form-input"
+                    />
+                  </Field>
+                </div>
+
+                <label className="mb-1 mt-3 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
+                  Comment (shown on invoice)
+                </label>
+                <textarea
+                  value={line.comment}
+                  onChange={(event) => updateScopeComment(index, event.target.value)}
+                  placeholder="Customer-facing note for this line (optional)"
+                  rows={2}
+                  className="form-input w-full max-w-full resize-y"
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        {availableItems.length > 0 ? (
+          <div className="mt-3">
+            <label className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
+              Add a line item
+            </label>
+            <select
+              className="form-input min-h-12"
+              defaultValue=""
+              onChange={(event) => {
+                if (!event.target.value) return;
+                addScopeLine(event.target.value);
+                event.target.value = "";
+              }}
+            >
+              <option value="">Choose an item from the catalog...</option>
+              {availableItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.category} - {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm font-bold text-charcoal/55">
+            All catalog adders are already on this invoice.
+          </p>
+        )}
+      </div>
+
       <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">
         <p className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-clay">
           Live Preview
@@ -354,77 +593,6 @@ export function InvoiceBuilder({
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">
-        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
-            Scope of Work
-          </p>
-          <p className="text-xs font-bold text-charcoal/55">
-            Seeded from the quote. Edit here to make the invoice independent.
-          </p>
-        </div>
-        <p className="mb-3 text-sm font-bold text-charcoal/65">
-          These lines + comments print on both invoices. Names and comments only
-          — amounts stay on the contract / split above.
-        </p>
-
-        <div className="space-y-3">
-          {scopeLines.length === 0 ? (
-            <p className="rounded-soft border border-dashed border-stone bg-whitewarm/60 px-3 py-4 text-sm font-bold text-charcoal/55">
-              No scope lines yet. Add one below.
-            </p>
-          ) : null}
-
-          {scopeLines.map((line, index) => (
-            <div
-              key={index}
-              className="rounded-soft border border-pine/10 bg-whitewarm p-3"
-            >
-              <div className="flex items-start gap-3">
-                <div className="min-w-0 flex-1">
-                  <label className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
-                    Line item
-                  </label>
-                  <input
-                    type="text"
-                    value={line.name}
-                    onChange={(event) => updateScopeName(index, event.target.value)}
-                    placeholder="e.g. Recessed LED lighting"
-                    className="form-input"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeScopeLine(index)}
-                  title="Remove this scope line"
-                  className="mt-6 shrink-0 rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
-                >
-                  Remove
-                </button>
-              </div>
-              <label className="mb-1 mt-3 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
-                Comment (shown on invoice)
-              </label>
-              <textarea
-                value={line.comment}
-                onChange={(event) => updateScopeComment(index, event.target.value)}
-                placeholder="Customer-facing note for this line (optional)"
-                rows={2}
-                className="form-input w-full max-w-full resize-y"
-              />
-            </div>
-          ))}
-        </div>
-
-        <button
-          type="button"
-          onClick={addScopeLine}
-          className="mt-3 rounded-full border border-pine/30 px-4 py-2 text-sm font-black text-deep-pine hover:bg-sage/20"
-        >
-          + Add scope line
-        </button>
-      </div>
-
       {paidAmountChanges.length > 0 ? (
         <div className="mt-5 rounded-soft border border-clay/30 bg-clay/10 p-4 text-sm font-bold leading-6 text-clay">
           <p className="mb-2">
@@ -447,7 +615,7 @@ export function InvoiceBuilder({
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-bold text-charcoal/65">
           {existing
-            ? "Saving updates the invoice amounts and keeps any paid statuses."
+            ? "Saving updates the line items, contract, and invoice amounts, and keeps any paid statuses."
             : "This creates the two invoices for this accepted quote."}
         </p>
         <button

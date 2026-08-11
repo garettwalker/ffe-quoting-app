@@ -33,10 +33,12 @@ export type InvoicePdfProps = {
   squareFootageLabel: string;
   // The charge lines for this invoice: rough-in + permit (initial), or finish.
   lines: Array<{ label: string; amount: string }>;
-  // Scope-of-work detail: each quote line (base + adders) with its customer-
-  // facing comment underneath when present. No per-line prices (the invoice
-  // bills by percentage; line prices would clash with the charge amounts).
-  scopeLines: Array<{ name: string; comment: string }>;
+  // Scope-of-work line items: each line with its name, a customer-facing
+  // comment underneath when present, a "qty x unit price" detail string, and
+  // the line total. All money formatting is pre-done by lib/invoice-pdf.ts so
+  // this component stays pure data-in. The contract is the sum of these line
+  // totals; the charge lines above bill the rough-in/finish split of it.
+  scopeLines: Array<{ name: string; comment: string; detail: string; total: string }>;
   // Shown only on the finish invoice: what was already invoiced on the initial.
   previouslyInvoiced: {
     previouslyInvoicedAmount: string;
@@ -85,11 +87,18 @@ const scopeStyles = StyleSheet.create({
     borderRadius: 6
   },
   row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
     paddingVertical: 8,
     paddingHorizontal: 14,
     backgroundColor: PDF_COLORS.cream,
     borderBottomWidth: 1,
     borderBottomColor: PDF_INK.borderPineFaint
+  },
+  left: {
+    flex: 1,
+    paddingRight: 12
   },
   name: {
     fontSize: 9.5,
@@ -101,6 +110,20 @@ const scopeStyles = StyleSheet.create({
     fontSize: 8.5,
     lineHeight: 1.35,
     fontFamily: "Helvetica-Oblique",
+    color: PDF_INK.textMuted
+  },
+  right: {
+    alignItems: "flex-end"
+  },
+  total: {
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.charcoal
+  },
+  detail: {
+    marginTop: 1,
+    fontSize: 8,
+    fontFamily: "Helvetica",
     color: PDF_INK.textMuted
   }
 });
@@ -169,10 +192,16 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
                         : scopeStyles.row.borderBottomWidth
                   }}
                 >
-                  <Text style={scopeStyles.name}>{line.name}</Text>
-                  {line.comment ? (
-                    <Text style={scopeStyles.comment}>{line.comment}</Text>
-                  ) : null}
+                  <View style={scopeStyles.left}>
+                    <Text style={scopeStyles.name}>{line.name}</Text>
+                    {line.comment ? (
+                      <Text style={scopeStyles.comment}>{line.comment}</Text>
+                    ) : null}
+                  </View>
+                  <View style={scopeStyles.right}>
+                    <Text style={scopeStyles.total}>{line.total}</Text>
+                    <Text style={scopeStyles.detail}>{line.detail}</Text>
+                  </View>
                 </View>
               ))}
             </View>

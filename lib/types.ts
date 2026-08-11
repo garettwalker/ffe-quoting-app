@@ -74,13 +74,29 @@ export type InvoiceData = {
   generatedAt: string;
   // Exactly two records: initial then finish.
   invoices: InvoiceRecord[];
-  // Scope-of-work detail shown on both invoices. Seeded from the quote's
-  // line items + comments when invoicing is first set up, then lives on the
-  // invoice and is edited independently of the quote (so the quote stays a
-  // point-in-time estimate and final adjustments happen here). Optional so
-  // invoices set up before this field existed still load; the PDF/print path
-  // backfills from the quote's calculation_data.clientFacingLines when absent.
-  scopeLines?: Array<{ name: string; comment: string }>;
+  // Scope-of-work line items shown on both invoices. Each line is a real
+  // priced item: a catalog pricing item (or the base-package pseudo-item),
+  // a quantity, an editable unit price, and a customer-facing comment. The
+  // contract amount is the SUM of (quantity * unitPriceCents) across these
+  // lines; the rough-in/finish percentages then split that contract into the
+  // two invoices (same % model as before — the lines just become the source
+  // of the contract instead of a hand-entered dollar amount). Seeded from the
+  // quote's line items (names + quantities + client prices + comments) when
+  // invoicing is first set up, then lives on the invoice and is edited
+  // independently of the quote. Optional so invoices set up before this field
+  // existed still load: those keep their hand-entered contractAmountCents
+  // (no lines) and the PDF/print path backfills a display-only scope from the
+  // quote's calculation_data.clientFacingLines when absent.
+  scopeLines?: Array<{
+    // Catalog PricingItem id, or the base-package pseudo-id
+    // "base-electrical-package". Empty string for a legacy/manual line.
+    pricingItemId: string;
+    // Name snapshot for display (PDF/print do not have the catalog).
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+    comment: string;
+  }>;
 };
 
 // One invoice flattened for the Accounts Receivable view. `outstandingCents`
