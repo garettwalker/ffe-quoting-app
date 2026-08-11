@@ -58,7 +58,7 @@
 
   /* ---------- stage strip ---------- */
   .strip-wrap{margin-top:22px;overflow-x:auto;padding-bottom:6px}
-  .strip{display:flex;align-items:flex-start;min-width:760px;position:relative;padding-top:6px}
+  .strip{display:flex;align-items:flex-start;min-width:860px;position:relative;padding-top:6px}
   /* connector line */
   .strip::before{
     content:"";position:absolute;top:23px;left:24px;right:24px;height:3px;
@@ -112,8 +112,10 @@
   <main>
     <div class="note">
       <b>Mockup — not real data.</b> The proposed Projects view: each accepted job is tracked end-to-end
-      through field stages plus billing, pizza-delivery style. The completed stage is filled, the current
-      stage pulses, and upcoming stages stay muted. This is a v1 read on the idea before we build it.
+      through field stages plus billing, pizza-delivery style. Billing is split into the rough-in invoice
+      (sent after rough-in inspection) and the final invoice (sent after final inspection) so you can see
+      each one get billed and paid separately. The completed stage is filled, the current stage pulses,
+      and upcoming stages stay muted. This is a v1 read on the idea before we build it.
     </div>
 
     <div class="head">
@@ -125,8 +127,8 @@
 
     <div class="filters">
       <button class="chip on">All <span class="c">4</span></button>
-      <button class="chip">In the field <span class="c">2</span></button>
-      <button class="chip">Billing <span class="c">1</span></button>
+      <button class="chip">In the field <span class="c">3</span></button>
+      <button class="chip">Awaiting payment <span class="c">1</span></button>
       <button class="chip">Completed <span class="c">1</span></button>
     </div>
 
@@ -145,15 +147,17 @@
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Aug 4</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in</div><div class="dt">Aug 7</div></div>
           <div class="step active"><div class="node">&#9650;</div><div class="nm">Rough-in Insp.</div><div class="dt">Today</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Rough-in Billed</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Finish</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Final Insp.</div><div class="dt">&mdash;</div></div>
-          <div class="step upcoming"><div class="node">$</div><div class="nm">Billed</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Final Billed</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Paid</div><div class="dt">&mdash;</div></div>
         </div>
       </div>
       <div class="job-foot">
         <button class="btn primary">Mark inspection passed</button>
         <button class="btn">View quote</button>
+        <button class="btn">Send rough-in invoice</button>
         <button class="btn">Edit stages</button>
         <span class="crew"><span class="dot"></span>Crew A · James, Devon</span>
       </div>
@@ -174,9 +178,10 @@
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Jul 22</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in</div><div class="dt">Jul 28</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in Insp.</div><div class="dt">Jul 30</div></div>
+          <div class="step done"><div class="node">$</div><div class="nm">Rough-in Billed</div><div class="dt tnum">$26,450</div></div>
           <div class="step active"><div class="node">&#9650;</div><div class="nm">Finish</div><div class="dt">In progress</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Final Insp.</div><div class="dt">&mdash;</div></div>
-          <div class="step upcoming"><div class="node">$</div><div class="nm">Billed</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Final Billed</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Paid</div><div class="dt">&mdash;</div></div>
         </div>
       </div>
@@ -203,9 +208,10 @@
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Aug 9</div></div>
           <div class="step active"><div class="node">&#9650;</div><div class="nm">Rough-in</div><div class="dt">Scheduled Aug 14</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Rough-in Insp.</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Rough-in Billed</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Finish</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Final Insp.</div><div class="dt">&mdash;</div></div>
-          <div class="step upcoming"><div class="node">$</div><div class="nm">Billed</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Final Billed</div><div class="dt">&mdash;</div></div>
           <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Paid</div><div class="dt">&mdash;</div></div>
         </div>
       </div>
@@ -232,9 +238,10 @@
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Jun 18</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in</div><div class="dt">Jun 24</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in Insp.</div><div class="dt">Jun 27</div></div>
+          <div class="step done"><div class="node">$</div><div class="nm">Rough-in Billed</div><div class="dt tnum">$9,875</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Finish</div><div class="dt">Jul 8</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Final Insp.</div><div class="dt">Jul 11</div></div>
-          <div class="step done"><div class="node">&#10003;</div><div class="nm">Billed</div><div class="dt">Jul 12</div></div>
+          <div class="step done"><div class="node">$</div><div class="nm">Final Billed</div><div class="dt tnum">$9,875</div></div>
           <div class="step done"><div class="node">&#10003;</div><div class="nm">Paid</div><div class="dt">Jul 19</div></div>
         </div>
       </div>
