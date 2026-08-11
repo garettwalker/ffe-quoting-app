@@ -1,0 +1,253 @@
+<title>FFE Quote App — Project Status Tracker (mockup)</title>
+<meta name="color-scheme" content="light">
+<style>
+  :root{
+    --pine:#344236; --deep-pine:#243027; --moss:#6e7751; --sage:#a8ae91;
+    --clay:#a56543; --sand:#e8ddca; --cream:#f7f1e7; --stone:#c9c0ae;
+    --charcoal:#1d211d; --whitewarm:#fffdf8;
+    --line:rgba(52,66,54,.12); --line-2:rgba(52,66,54,.08);
+    --shadow:0 18px 50px rgba(29,33,29,.08);
+    --shadow-soft:0 24px 70px rgba(29,33,29,.16);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--cream);color:var(--charcoal);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:Georgia,"Times New Roman",serif}
+  .tnum{font-variant-numeric:tabular-nums}
+  .label{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--clay)}
+
+  .top{
+    position:sticky;top:0;z-index:30;background:rgba(247,241,231,.92);
+    backdrop-filter:blur(14px);border-bottom:1px solid var(--line);
+  }
+  .top-in{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px}
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{width:44px;height:44px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--moss),var(--pine));display:grid;place-items:center;color:var(--cream);font-family:Georgia,serif;font-weight:700;font-size:17px}
+  .brand .n{font-family:Georgia,serif;font-size:15px;font-weight:800;color:var(--deep-pine);line-height:1.1}
+  .brand .k{font-size:10px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--clay);line-height:1}
+  .menu-btn{display:inline-flex;align-items:center;gap:9px;background:var(--whitewarm);color:var(--deep-pine);font-weight:800;font-size:13px;padding:10px 14px;border-radius:999px;border:1px solid var(--line);cursor:pointer}
+  .menu-btn .bars{display:flex;flex-direction:column;gap:3px}
+  .menu-btn .bars i{display:block;width:15px;height:2px;border-radius:2px;background:var(--deep-pine)}
+
+  main{max-width:1080px;margin:0 auto;padding:36px 24px 90px}
+  .note{background:var(--sand);border-radius:12px;padding:15px 18px;font-size:13.5px;font-weight:700;color:var(--charcoal);line-height:1.55;margin-bottom:28px;max-width:780px}
+  .note b{color:var(--clay)}
+
+  .head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;flex-wrap:wrap}
+  .h1{font-family:Georgia,serif;font-size:clamp(30px,5vw,44px);font-weight:800;letter-spacing:-.035em;color:var(--moss);line-height:1.05;text-wrap:balance;margin:0}
+  .lede{margin-top:12px;max-width:60ch;font-size:15.5px;line-height:1.6;color:var(--charcoal);opacity:.78}
+
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-top:24px}
+  .chip{font-size:12.5px;font-weight:800;padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--whitewarm);color:var(--charcoal);cursor:pointer;transition:background .14s}
+  .chip:hover{background:var(--cream)}
+  .chip.on{background:var(--pine);color:var(--whitewarm);border-color:var(--pine)}
+  .chip .c{font-variant-numeric:tabular-nums;opacity:.6;margin-left:6px}
+  .chip.on .c{opacity:.7}
+
+  /* ---------- job card ---------- */
+  .job{background:var(--whitewarm);border:1px solid var(--line);border-radius:18px;padding:24px;box-shadow:var(--shadow);margin-top:18px}
+  .job-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
+  .job-head .who{font-family:Georgia,serif;font-size:23px;font-weight:800;color:var(--deep-pine);line-height:1.15}
+  .job-head .meta{font-size:13px;color:var(--charcoal);opacity:.62;font-weight:700;margin-top:4px}
+  .job-head .money{font-variant-numeric:tabular-nums;font-weight:800;color:var(--moss);font-size:15px;margin-top:8px}
+  .stage-now{font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--clay);background:rgba(165,101,67,.12);padding:6px 12px;border-radius:999px;white-space:nowrap}
+
+  /* ---------- stage strip ---------- */
+  .strip-wrap{margin-top:22px;overflow-x:auto;padding-bottom:6px}
+  .strip{display:flex;align-items:flex-start;min-width:760px;position:relative;padding-top:6px}
+  /* connector line */
+  .strip::before{
+    content:"";position:absolute;top:23px;left:24px;right:24px;height:3px;
+    background:var(--stone);border-radius:3px;z-index:0;
+  }
+  .step{flex:1;position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;text-align:center;min-width:96px}
+  .node{
+    width:46px;height:46px;border-radius:50%;display:grid;place-items:center;
+    font-size:18px;font-weight:800;background:var(--whitewarm);border:3px solid var(--stone);color:var(--stone);
+    transition:transform .15s;
+  }
+  .step.done .node{background:var(--sage);border-color:var(--sage);color:var(--deep-pine)}
+  .step.active .node{background:var(--cream);border-color:var(--clay);color:var(--clay);box-shadow:0 0 0 5px rgba(165,101,67,.14)}
+  .step.active .node::after{content:"";position:absolute;inset:-3px;border-radius:50%;border:2px solid var(--clay);animation:pulse 1.8s ease-out infinite}
+  .step .nm{margin-top:11px;font-size:12px;font-weight:800;color:var(--charcoal);line-height:1.25}
+  .step .dt{margin-top:3px;font-size:11px;font-variant-numeric:tabular-nums;color:var(--charcoal);opacity:.55;font-weight:700}
+  .step.done .nm{color:var(--deep-pine)}
+  .step.active .nm{color:var(--clay)}
+  .step.upcoming .nm,.step.upcoming .dt{opacity:.5}
+  @keyframes pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(1.7);opacity:0}}
+  @media (prefers-reduced-motion:reduce){.step.active .node::after{animation:none}}
+
+  .job-foot{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;border-top:1px solid var(--line-2);padding-top:16px}
+  .btn{font-size:13px;font-weight:800;padding:10px 16px;border-radius:999px;border:1px solid var(--line);background:var(--cream);color:var(--deep-pine);cursor:pointer;transition:background .14s}
+  .btn:hover{background:var(--sand)}
+  .btn.primary{background:var(--pine);color:var(--whitewarm);border-color:var(--pine)}
+  .btn.primary:hover{background:var(--deep-pine)}
+  .crew{font-size:12px;color:var(--charcoal);opacity:.7;font-weight:700;display:inline-flex;align-items:center;gap:7px;margin-left:auto}
+  .crew .dot{width:9px;height:9px;border-radius:50%;background:var(--moss)}
+
+  /* legend */
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:12px;font-weight:700;color:var(--charcoal);opacity:.75}
+  .legend span{display:inline-flex;align-items:center;gap:7px}
+  .lg{width:13px;height:13px;border-radius:50%;border:2px solid var(--stone)}
+  .lg.done{background:var(--sage);border-color:var(--sage)}
+  .lg.active{background:var(--cream);border-color:var(--clay)}
+  .lg.up{background:var(--whitewarm);border-color:var(--stone)}
+</style>
+</head>
+<body>
+  <div class="top">
+    <div class="top-in">
+      <div class="brand">
+        <div class="logo display">F</div>
+        <div><div class="k">Quote App</div><div class="n">Freedom Family Electric</div></div>
+      </div>
+      <button class="menu-btn"><span class="bars"><i></i><i></i><i></i></span><span>Menu</span></button>
+    </div>
+  </div>
+
+  <main>
+    <div class="note">
+      <b>Mockup — not real data.</b> The proposed Projects view: each accepted job is tracked end-to-end
+      through field stages plus billing, pizza-delivery style. The completed stage is filled, the current
+      stage pulses, and upcoming stages stay muted. This is a v1 read on the idea before we build it.
+    </div>
+
+    <div class="head">
+      <div>
+        <h1 class="h1">Projects</h1>
+        <p class="lede">Every job from quote to final payment, in one strip. Click a stage to update it.</p>
+      </div>
+    </div>
+
+    <div class="filters">
+      <button class="chip on">All <span class="c">4</span></button>
+      <button class="chip">In the field <span class="c">2</span></button>
+      <button class="chip">Billing <span class="c">1</span></button>
+      <button class="chip">Completed <span class="c">1</span></button>
+    </div>
+
+    <!-- Job 1: at rough-in inspection -->
+    <div class="job">
+      <div class="job-head">
+        <div>
+          <div class="who">Henderson Residence</div>
+          <div class="meta">412 Oak Ridge Ln · Reidsville, NC · Custom Home · 3,200 sq ft</div>
+          <div class="money tnum">Contract $61,400 · Q-20260804-002</div>
+        </div>
+        <span class="stage-now">Rough-in inspection</span>
+      </div>
+      <div class="strip-wrap">
+        <div class="strip">
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Aug 4</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in</div><div class="dt">Aug 7</div></div>
+          <div class="step active"><div class="node">&#9650;</div><div class="nm">Rough-in Insp.</div><div class="dt">Today</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Finish</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Final Insp.</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Billed</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Paid</div><div class="dt">&mdash;</div></div>
+        </div>
+      </div>
+      <div class="job-foot">
+        <button class="btn primary">Mark inspection passed</button>
+        <button class="btn">View quote</button>
+        <button class="btn">Edit stages</button>
+        <span class="crew"><span class="dot"></span>Crew A · James, Devon</span>
+      </div>
+    </div>
+
+    <!-- Job 2: at finish -->
+    <div class="job">
+      <div class="job-head">
+        <div>
+          <div class="who">Marlowe Build</div>
+          <div class="meta">88 Cypress Ct · Greensboro, NC · Spec Home · 2,650 sq ft</div>
+          <div class="money tnum">Contract $52,900 · Q-20260722-011</div>
+        </div>
+        <span class="stage-now">Finish</span>
+      </div>
+      <div class="strip-wrap">
+        <div class="strip">
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Jul 22</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in</div><div class="dt">Jul 28</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in Insp.</div><div class="dt">Jul 30</div></div>
+          <div class="step active"><div class="node">&#9650;</div><div class="nm">Finish</div><div class="dt">In progress</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Final Insp.</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Billed</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Paid</div><div class="dt">&mdash;</div></div>
+        </div>
+      </div>
+      <div class="job-foot">
+        <button class="btn primary">Mark finish complete</button>
+        <button class="btn">View quote</button>
+        <button class="btn">Open invoices</button>
+        <span class="crew"><span class="dot"></span>Crew B · Marcus, Trey</span>
+      </div>
+    </div>
+
+    <!-- Job 3: just accepted, field not started -->
+    <div class="job">
+      <div class="job-head">
+        <div>
+          <div class="who">Whitfield Cottage</div>
+          <div class="meta">15 Willow Bend · Summerfield, NC · Custom Home · 1,840 sq ft</div>
+          <div class="money tnum">Contract $38,200 · Q-20260809-001</div>
+        </div>
+        <span class="stage-now">Awaiting rough-in</span>
+      </div>
+      <div class="strip-wrap">
+        <div class="strip">
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Aug 9</div></div>
+          <div class="step active"><div class="node">&#9650;</div><div class="nm">Rough-in</div><div class="dt">Scheduled Aug 14</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Rough-in Insp.</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Finish</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Final Insp.</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">$</div><div class="nm">Billed</div><div class="dt">&mdash;</div></div>
+          <div class="step upcoming"><div class="node">&#9675;</div><div class="nm">Paid</div><div class="dt">&mdash;</div></div>
+        </div>
+      </div>
+      <div class="job-foot">
+        <button class="btn primary">Start rough-in</button>
+        <button class="btn">View quote</button>
+        <button class="btn">Assign crew</button>
+        <span class="crew"><span class="dot"></span>Unassigned</span>
+      </div>
+    </div>
+
+    <!-- Job 4: fully done -->
+    <div class="job">
+      <div class="job-head">
+        <div>
+          <div class="who">Delgado Remodel</div>
+          <div class="meta">27 Hartwell Dr · Winston-Salem, NC · Service / Remodel</div>
+          <div class="money tnum">Contract $19,750 · Q-20260618-004</div>
+        </div>
+        <span class="stage-now" style="background:rgba(110,119,81,.16);color:var(--moss)">Completed</span>
+      </div>
+      <div class="strip-wrap">
+        <div class="strip">
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Quote</div><div class="dt">Jun 18</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in</div><div class="dt">Jun 24</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Rough-in Insp.</div><div class="dt">Jun 27</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Finish</div><div class="dt">Jul 8</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Final Insp.</div><div class="dt">Jul 11</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Billed</div><div class="dt">Jul 12</div></div>
+          <div class="step done"><div class="node">&#10003;</div><div class="nm">Paid</div><div class="dt">Jul 19</div></div>
+        </div>
+      </div>
+      <div class="job-foot">
+        <button class="btn">View quote</button>
+        <button class="btn">Invoice history</button>
+        <span class="crew"><span class="dot"></span>Crew A · James, Devon</span>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i class="lg done"></i>Completed</span>
+      <span><i class="lg active"></i>Current stage</span>
+      <span><i class="lg up"></i>Upcoming</span>
+    </div>
+  </main>

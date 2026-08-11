@@ -1,0 +1,318 @@
+<title>FFE Quote App — Collapsible Right Nav (mockup)</title>
+<meta name="color-scheme" content="light">
+<style>
+  :root{
+    --pine:#344236; --deep-pine:#243027; --moss:#6e7751; --sage:#a8ae91;
+    --clay:#a56543; --sand:#e8ddca; --cream:#f7f1e7; --stone:#c9c0ae;
+    --charcoal:#1d211d; --whitewarm:#fffdf8;
+    --line:rgba(52,66,54,.12); --line-2:rgba(52,66,54,.08);
+    --shadow:0 18px 50px rgba(29,33,29,.08);
+    --shadow-soft:0 24px 70px rgba(29,33,29,.16);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--cream); color:var(--charcoal);
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .display{font-family:Georgia,"Times New Roman",serif}
+  .tnum{font-variant-numeric:tabular-nums}
+  .label{font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--clay)}
+  .focusable:focus-visible{outline:2px solid var(--moss);outline-offset:2px;border-radius:8px}
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky;top:0;z-index:40;
+    background:rgba(247,241,231,.92);backdrop-filter:blur(14px);
+    border-bottom:1px solid var(--line);
+  }
+  .hdr-inner{
+    max-width:1180px;margin:0 auto;min-height:76px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    padding:14px 24px;
+  }
+  .brand{display:flex;align-items:center;gap:12px}
+  .logo{
+    width:52px;height:52px;border-radius:50%;
+    background:radial-gradient(circle at 35% 30%,var(--moss),var(--pine));
+    display:grid;place-items:center;color:var(--cream);
+    font-family:Georgia,serif;font-weight:700;font-size:20px;
+    box-shadow:inset 0 0 0 2px rgba(255,253,248,.25);
+  }
+  .brand .k{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--clay);line-height:1}
+  .brand .n{font-family:Georgia,serif;font-size:17px;font-weight:800;color:var(--deep-pine);line-height:1.15;margin-top:3px}
+
+  .hdr-right{display:flex;align-items:center;gap:10px}
+  .new-quote{
+    display:inline-flex;align-items:center;gap:8px;
+    background:var(--pine);color:var(--whitewarm);font-weight:800;font-size:13px;
+    padding:11px 16px;border-radius:999px;border:none;cursor:pointer;
+    box-shadow:var(--shadow);transition:background .15s;
+  }
+  .new-quote:hover{background:var(--deep-pine)}
+  .menu-btn{
+    display:inline-flex;align-items:center;gap:9px;
+    background:var(--whitewarm);color:var(--deep-pine);font-weight:800;font-size:13px;
+    padding:11px 15px;border-radius:999px;border:1px solid var(--line);cursor:pointer;
+    transition:border-color .15s,background .15s;
+  }
+  .menu-btn:hover{border-color:var(--moss);background:var(--cream)}
+  .menu-btn .bars{display:flex;flex-direction:column;gap:3px}
+  .menu-btn .bars i{display:block;width:16px;height:2px;border-radius:2px;background:var(--deep-pine)}
+  .menu-btn .chev{transition:transform .2s;font-size:11px;color:var(--clay)}
+  body.nav-open .menu-btn .chev{transform:rotate(180deg)}
+
+  /* ---------- collapsible nav panel ---------- */
+  .nav-panel{
+    position:fixed;top:0;right:0;height:100vh;width:320px;z-index:60;
+    background:var(--whitewarm);border-left:1px solid var(--line);
+    box-shadow:var(--shadow-soft);
+    transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+    display:flex;flex-direction:column;
+  }
+  body.nav-open .nav-panel{transform:translateX(0)}
+  .nav-backdrop{
+    position:fixed;inset:0;z-index:55;background:rgba(29,33,29,.34);
+    opacity:0;pointer-events:none;transition:opacity .28s;
+  }
+  body.nav-open .nav-backdrop{opacity:1;pointer-events:auto}
+  .nav-head{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:20px 22px;border-bottom:1px solid var(--line-2);
+  }
+  .nav-head .t{font-family:Georgia,serif;font-size:20px;font-weight:800;color:var(--deep-pine)}
+  .nav-close{
+    width:34px;height:34px;border-radius:999px;border:1px solid var(--line);
+    background:var(--cream);color:var(--deep-pine);cursor:pointer;font-size:15px;
+    display:grid;place-items:center;transition:background .15s;
+  }
+  .nav-close:hover{background:var(--sand)}
+  .nav-list{padding:12px;overflow-y:auto;flex:1}
+  .nav-group{margin:14px 4px 6px}
+  .nav-group .label{font-size:10px}
+  .nav-item{
+    display:flex;align-items:center;gap:13px;width:100%;
+    padding:12px 12px;border-radius:12px;border:none;background:transparent;
+    cursor:pointer;text-align:left;color:var(--charcoal);
+    transition:background .14s;
+  }
+  .nav-item:hover{background:var(--cream)}
+  .nav-item.active{background:var(--pine);color:var(--whitewarm)}
+  .nav-item.active .sub{color:rgba(255,253,248,.7)}
+  .nav-ico{
+    width:34px;height:34px;border-radius:9px;flex:0 0 auto;
+    display:grid;place-items:center;font-size:16px;
+    background:var(--cream);color:var(--deep-pine);
+  }
+  .nav-item.active .nav-ico{background:rgba(255,253,248,.16);color:var(--whitewarm)}
+  .nav-item .txt{display:flex;flex-direction:column;min-width:0}
+  .nav-item .main{font-weight:800;font-size:14.5px;line-height:1.2}
+  .nav-item .sub{font-size:11.5px;color:var(--charcoal);opacity:.6;line-height:1.3;margin-top:2px}
+  .nav-foot{padding:16px 22px;border-top:1px solid var(--line-2)}
+  .logout{
+    width:100%;padding:11px;border-radius:10px;border:1px solid var(--line);
+    background:var(--cream);color:var(--clay);font-weight:800;font-size:13px;cursor:pointer;
+    transition:background .15s;
+  }
+  .logout:hover{background:var(--sand)}
+
+  /* ---------- collapsed icon rail (alt state, shown as a static sample) ---------- */
+  .rail-sample{
+    position:fixed;top:0;right:0;height:100vh;width:64px;z-index:30;
+    background:var(--whitewarm);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:6px;padding:18px 0;
+  }
+  .rail-sample .r-ico{
+    width:42px;height:42px;border-radius:10px;display:grid;place-items:center;
+    font-size:17px;color:var(--deep-pine);cursor:pointer;transition:background .14s;
+  }
+  .rail-sample .r-ico:hover{background:var(--cream)}
+  .rail-sample .r-ico.active{background:var(--pine);color:var(--whitewarm)}
+  .rail-sample .r-spacer{flex:1}
+
+  /* ---------- page body ---------- */
+  main{max-width:1180px;margin:0 auto;padding:40px 24px 80px}
+  .note{
+    background:var(--sand);border-radius:12px;padding:16px 18px;
+    font-size:13.5px;font-weight:700;color:var(--charcoal);line-height:1.55;
+    max-width:760px;margin-bottom:34px;
+  }
+  .note b{color:var(--clay)}
+  .h1{font-family:Georgia,serif;font-size:clamp(30px,5vw,44px);font-weight:800;
+      letter-spacing:-.035em;color:var(--moss);line-height:1.05;text-wrap:balance}
+  .lede{margin-top:14px;max-width:60ch;font-size:16px;line-height:1.6;color:var(--charcoal);opacity:.78}
+
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px;margin-top:32px}
+  .tile{
+    background:var(--whitewarm);border:1px solid var(--line);border-radius:18px;
+    padding:20px;box-shadow:var(--shadow);
+  }
+  .tile .label{margin-bottom:10px}
+  .tile .v{font-family:Georgia,serif;font-size:30px;font-weight:800;color:var(--deep-pine);line-height:1}
+  .tile .d{font-size:12px;color:var(--charcoal);opacity:.6;margin-top:8px;font-weight:700}
+  .tile.warn .v{color:var(--clay)}
+
+  .card{
+    background:var(--whitewarm);border:1px solid var(--line);border-radius:18px;
+    padding:24px;box-shadow:var(--shadow);margin-top:22px;
+  }
+  .card h2{font-family:Georgia,serif;font-size:22px;font-weight:800;color:var(--deep-pine);margin:0}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:13px 0;border-bottom:1px solid var(--line-2)}
+  .row:last-child{border-bottom:none}
+  .row .who{font-weight:800;color:var(--charcoal)}
+  .row .meta{font-size:12px;color:var(--charcoal);opacity:.6;font-weight:700;margin-top:2px}
+  .pill{font-size:11px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.04em}
+  .pill.field{background:rgba(168,174,145,.3);color:var(--deep-pine)}
+  .pill.bill{background:rgba(165,101,67,.16);color:var(--clay)}
+  .pill.done{background:rgba(110,119,81,.18);color:var(--moss)}
+
+  .states{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px}
+  .state-card{
+    flex:1;min-width:240px;background:var(--whitewarm);border:1px solid var(--line);
+    border-radius:18px;padding:18px;box-shadow:var(--shadow);
+  }
+  .state-card .label{margin-bottom:8px}
+  .state-card .desc{font-size:13px;line-height:1.5;color:var(--charcoal);opacity:.75;font-weight:600}
+  .mini-rail{display:flex;gap:6px;margin-top:12px;justify-content:center}
+  .mini-rail i{width:30px;height:30px;border-radius:8px;background:var(--cream);display:grid;place-items:center;font-size:14px}
+  .mini-rail i.a{background:var(--pine);color:var(--whitewarm)}
+
+  @media (max-width:560px){
+    .new-quote span:not(.bars){display:none}
+    .nav-panel{width:86vw}
+  }
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+  <div class="nav-backdrop" onclick="document.body.classList.remove('nav-open')"></div>
+
+  <!-- collapsed rail: shown only as a labeled sample, not in the live toggle -->
+  <!-- (kept off-screen here; the live pattern uses the slide-out panel below) -->
+
+  <header>
+    <div class="hdr-inner">
+      <div class="brand">
+        <div class="logo display">F</div>
+        <div>
+          <div class="k">Quote App</div>
+          <div class="n">Freedom Family Electric</div>
+        </div>
+      </div>
+      <div class="hdr-right">
+        <button class="new-quote focusable">+ New Quote</button>
+        <button class="menu-btn focusable" onclick="document.body.classList.toggle('nav-open')">
+          <span class="bars"><i></i><i></i><i></i></span>
+          <span>Menu</span>
+          <span class="chev">&#9662;</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- slide-out panel (expanded state) -->
+  <aside class="nav-panel" aria-label="Main menu">
+    <div class="nav-head">
+      <div class="t display">Menu</div>
+      <button class="nav-close focusable" onclick="document.body.classList.remove('nav-open')">&#10005;</button>
+    </div>
+
+    <nav class="nav-list">
+      <div class="nav-group"><div class="label">Work</div></div>
+      <button class="nav-item active focusable">
+        <span class="nav-ico">&#9632;</span>
+        <span class="txt"><span class="main">Dashboard</span><span class="sub">Summary of everything in motion</span></span>
+      </button>
+      <button class="nav-item focusable">
+        <span class="nav-ico">&#9998;</span>
+        <span class="txt"><span class="main">Quotes</span><span class="sub">Drafts, prepared, accepted pipeline</span></span>
+      </button>
+      <button class="nav-item focusable">
+        <span class="nav-ico">&#9881;</span>
+        <span class="txt"><span class="main">Projects</span><span class="sub">Field stage tracker — new</span></span>
+      </button>
+      <button class="nav-item focusable">
+        <span class="nav-ico">&#128197;</span>
+        <span class="txt"><span class="main">Schedule</span><span class="sub">Crews and assignments</span></span>
+      </button>
+
+      <div class="nav-group"><div class="label">Money</div></div>
+      <button class="nav-item focusable">
+        <span class="nav-ico">$</span>
+        <span class="txt"><span class="main">Receivables</span><span class="sub">Outstanding and paid invoices</span></span>
+      </button>
+      <button class="nav-item focusable">
+        <span class="nav-ico">&#9993;</span>
+        <span class="txt"><span class="main">Email Log</span><span class="sub">Quotes and invoices sent</span></span>
+      </button>
+
+      <div class="nav-group"><div class="label">Setup</div></div>
+      <button class="nav-item focusable">
+        <span class="nav-ico">&#9881;</span>
+        <span class="txt"><span class="main">Pricing Admin</span><span class="sub">Line items, levels, contingencies</span></span>
+      </button>
+    </nav>
+
+    <div class="nav-foot">
+      <button class="logout focusable">Sign out</button>
+    </div>
+  </aside>
+
+  <main>
+    <div class="note">
+      <b>Mockup — not real data.</b> This shows the proposed re-layout: the top menu is replaced by a
+      single <b>Menu</b> button on the right that slides out a full nav panel. Click <b>Menu</b> in the
+      header to open it. The nav now lists every tool (including the new <b>Projects</b> tracker) with a
+      short description, so the header stays clean as tools are added.
+    </div>
+
+    <h1 class="h1">Dashboard</h1>
+    <p class="lede">A quick read on what is in motion today — quotes, field work, and money.</p>
+
+    <div class="tiles">
+      <div class="tile"><div class="label">Active quotes</div><div class="v tnum">7</div><div class="d">2 prepared, 5 drafts</div></div>
+      <div class="tile warn"><div class="label">Awaiting payment</div><div class="v tnum">$48,250</div><div class="d">4 jobs, outstanding</div></div>
+      <div class="tile"><div class="label">In the field</div><div class="v tnum">3</div><div class="d">Rough-in or finish stage</div></div>
+      <div class="tile"><div class="label">Paid in full</div><div class="v tnum">12</div><div class="d">This year</div></div>
+    </div>
+
+    <div class="card">
+      <h2>Recent jobs</h2>
+      <div class="row">
+        <div><div class="who">Henderson Residence</div><div class="meta">412 Oak Ridge Ln · Custom Home</div></div>
+        <span class="pill field">Rough-in</span>
+      </div>
+      <div class="row">
+        <div><div class="who">Marlowe Build</div><div class="meta">88 Cypress Ct · Spec</div></div>
+        <span class="pill bill">Billing</span>
+      </div>
+      <div class="row">
+        <div><div class="who">Delgado Remodel</div><div class="meta">27 Hartwell Dr · Service</div></div>
+        <span class="pill done">Paid</span>
+      </div>
+    </div>
+
+    <div class="states">
+      <div class="state-card">
+        <div class="label">Collapsed (default)</div>
+        <div class="desc">Header shows only the logo, a New Quote button, and a Menu button. The page breathes.</div>
+        <div class="mini-rail"><i>+</i><i>&#9776;</i></div>
+      </div>
+      <div class="state-card">
+        <div class="label">Expanded (on click)</div>
+        <div class="desc">A 320px panel slides in from the right with every tool, grouped and described.</div>
+        <div class="mini-rail"><i class="a">&#9632;</i><i class="a">&#9998;</i><i class="a">&#9881;</i><i class="a">&#128197;</i><i class="a">$</i><i class="a">&#9993;</i></div>
+      </div>
+      <div class="state-card">
+        <div class="label">Alt: icon rail</div>
+        <div class="desc">If you prefer it always visible, a slim 64px icon rail can pin to the right edge instead.</div>
+        <div class="mini-rail"><i class="a">&#9632;</i><i>&#9998;</i><i>&#9881;</i><i>&#128197;</i><i>$</i></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // close on Escape
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('nav-open')});
+  </script>
