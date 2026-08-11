@@ -33,6 +33,10 @@ export type InvoicePdfProps = {
   squareFootageLabel: string;
   // The charge lines for this invoice: rough-in + permit (initial), or finish.
   lines: Array<{ label: string; amount: string }>;
+  // Scope-of-work detail: each quote line (base + adders) with its customer-
+  // facing comment underneath when present. No per-line prices (the invoice
+  // bills by percentage; line prices would clash with the charge amounts).
+  scopeLines: Array<{ name: string; comment: string }>;
   // Shown only on the finish invoice: what was already invoiced on the initial.
   previouslyInvoiced: {
     previouslyInvoicedAmount: string;
@@ -73,6 +77,34 @@ const priorStyles = StyleSheet.create({
   }
 });
 
+const scopeStyles = StyleSheet.create({
+  list: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: PDF_INK.borderPine,
+    borderRadius: 6
+  },
+  row: {
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: PDF_COLORS.cream,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_INK.borderPineFaint
+  },
+  name: {
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.charcoal
+  },
+  comment: {
+    marginTop: 2,
+    fontSize: 8.5,
+    lineHeight: 1.35,
+    fontFamily: "Helvetica-Oblique",
+    color: PDF_INK.textMuted
+  }
+});
+
 export function InvoicePdfDocument(props: InvoicePdfProps) {
   const {
     businessName,
@@ -86,6 +118,7 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
     projectType,
     squareFootageLabel,
     lines,
+    scopeLines,
     previouslyInvoiced,
     amountDue,
     paymentTerms,
@@ -120,6 +153,31 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
 
         <PdfSectionLabel>{title}</PdfSectionLabel>
         <PdfList items={lines} emptyLabel="No charges on this invoice." />
+
+        {scopeLines.length > 0 ? (
+          <>
+            <PdfSectionLabel>SCOPE OF WORK</PdfSectionLabel>
+            <View style={scopeStyles.list}>
+              {scopeLines.map((line, index) => (
+                <View
+                  key={`${line.name}-${index}`}
+                  style={{
+                    ...scopeStyles.row,
+                    borderBottomWidth:
+                      index === scopeLines.length - 1
+                        ? 0
+                        : scopeStyles.row.borderBottomWidth
+                  }}
+                >
+                  <Text style={scopeStyles.name}>{line.name}</Text>
+                  {line.comment ? (
+                    <Text style={scopeStyles.comment}>{line.comment}</Text>
+                  ) : null}
+                </View>
+              ))}
+            </View>
+          </>
+        ) : null}
 
         {previouslyInvoiced ? (
           <View style={priorStyles.box}>

@@ -119,6 +119,17 @@ export async function loadInvoicePdfInput(
         }
       : null;
 
+  // Scope-of-work detail shown on the invoice: each line item from the quote
+  // (base package + adders) with its customer-facing comment underneath when
+  // present. No per-line prices here — the invoice bills by percentage of the
+  // contract, so line prices would clash with the charge amounts. This is the
+  // "detailed invoice" view: the customer sees exactly what work the invoice
+  // covers, and the per-adder comments appear.
+  const scopeLines = row.calculation_data.clientFacingLines.map((line) => ({
+    name: line.name,
+    comment: line.comment
+  }));
+
   const pdfProps: InvoicePdfProps = {
     businessName: settings.businessName,
     businessEmail: settings.businessEmail,
@@ -131,6 +142,7 @@ export async function loadInvoicePdfInput(
     projectType: quote.projectType,
     squareFootageLabel: `${quote.squareFootage.toLocaleString()} sq ft`,
     lines,
+    scopeLines,
     previouslyInvoiced,
     amountDue: formatCurrency(invoice.amountCents),
     paymentTerms: settings.invoicePaymentTerms,

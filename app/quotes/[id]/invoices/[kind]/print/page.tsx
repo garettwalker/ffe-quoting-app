@@ -119,6 +119,21 @@ export default async function PrintInvoicePage({ params }: PageProps) {
           </div>
         </div>
 
+        {pdfProps.scopeLines.length > 0 ? (
+          <div className="mt-6">
+            <p className="mb-3 text-sm font-black uppercase tracking-[0.12em] text-clay">
+              Scope of work
+            </p>
+            <div className="overflow-hidden rounded-xl1 border border-pine/10">
+              <div className="divide-y divide-pine/10 bg-cream">
+                {pdfProps.scopeLines.map((line) => (
+                  <InvoiceScopeLine key={line.name} name={line.name} comment={line.comment} />
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {pdfProps.previouslyInvoiced ? (
           <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
             <div className="flex items-center justify-between gap-4">
@@ -165,6 +180,19 @@ function InvoiceLine({ label, amount }: { label: string; amount: string }) {
     <div className="flex items-center justify-between gap-4 p-3">
       <span className="font-bold text-charcoal">{label}</span>
       <span className="font-black text-deep-pine">{amount}</span>
+    </div>
+  );
+}
+
+function InvoiceScopeLine({ name, comment }: { name: string; comment: string }) {
+  return (
+    <div className="p-3">
+      <p className="font-bold text-charcoal">{name}</p>
+      {comment ? (
+        <p className="mt-1 break-words text-xs italic leading-5 text-charcoal/60">
+          {comment}
+        </p>
+      ) : null}
     </div>
   );
 }
