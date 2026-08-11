@@ -128,7 +128,8 @@ export function QuoteBuilder({
         ...current.lineItems,
         {
           pricingItemId,
-          quantity: 1
+          quantity: 1,
+          comment: ""
         }
       ]
     }));
@@ -157,6 +158,22 @@ export function QuoteBuilder({
       ...current,
       lineItems: current.lineItems.filter(
         (lineItem) => lineItem.pricingItemId !== pricingItemId
+      )
+    }));
+  }
+
+  function handleUpdateComment(pricingItemId: string, comment: string) {
+    setCompletionMessage("");
+    setDraftMessage("");
+    setQuote((current) => ({
+      ...current,
+      lineItems: current.lineItems.map((lineItem) =>
+        lineItem.pricingItemId === pricingItemId
+          ? {
+              ...lineItem,
+              comment
+            }
+          : lineItem
       )
     }));
   }
@@ -603,6 +620,7 @@ export function QuoteBuilder({
           lineItems={quote.lineItems}
           onAddLineItem={handleAddLineItem}
           onUpdateQuantity={handleUpdateQuantity}
+          onUpdateComment={handleUpdateComment}
           onRemoveLineItem={handleRemoveLineItem}
         />
 
@@ -626,7 +644,14 @@ export function QuoteBuilder({
               <tbody className="divide-y divide-pine/10 bg-cream">
                 {result.clientFacingLines.map((line) => (
                   <tr key={line.pricingItemId}>
-                    <td className="p-3 font-bold text-charcoal">{line.name}</td>
+                    <td className="p-3 font-bold text-charcoal">
+                      <div>{line.name}</div>
+                      {line.comment ? (
+                        <div className="mt-1 text-xs font-medium italic leading-5 text-charcoal/60">
+                          {line.comment}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="p-3">{line.quantity.toLocaleString()}</td>
                     <td className="p-3">{line.unitType}</td>
                     <td className="p-3">

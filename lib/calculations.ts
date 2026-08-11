@@ -70,7 +70,12 @@ export function calculateQuote(
         return null;
       }
 
-      return calculateLineItem(item, line.quantity, combinedClientMultiplier);
+      return calculateLineItem(
+        item,
+        line.quantity,
+        combinedClientMultiplier,
+        line.comment
+      );
     })
     .filter((line): line is CalculatedLineItem => Boolean(line));
 
@@ -100,7 +105,8 @@ export function calculateQuote(
     baseLineTotalCents: basePackageBaseTotalCents,
     clientUnitPriceCents: baseClientUnitPriceCents,
     clientLineTotalCents: safeSquareFootage * baseClientUnitPriceCents,
-    notes: baseRate.label
+    notes: baseRate.label,
+    comment: ""
   };
 
   return {
@@ -185,7 +191,8 @@ function getBaseRate(quote: QuoteFormState): {
 function calculateLineItem(
   item: PricingItem,
   quantity: number,
-  combinedClientMultiplier: number
+  combinedClientMultiplier: number,
+  comment?: string
 ): CalculatedLineItem {
   const safeQuantity = sanitizeQuantity(quantity);
   const clientUnitPriceCents = Math.round(
@@ -202,7 +209,8 @@ function calculateLineItem(
     baseLineTotalCents: item.basePriceCents * safeQuantity,
     clientUnitPriceCents,
     clientLineTotalCents: clientUnitPriceCents * safeQuantity,
-    notes: "Add-on"
+    notes: "Add-on",
+    comment: (comment ?? "").trim()
   };
 }
 

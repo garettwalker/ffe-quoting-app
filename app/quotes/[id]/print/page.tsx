@@ -137,7 +137,14 @@ export default async function PrintQuotePage({ params }: PageProps) {
               ) : (
                 result.clientFacingLines.map((line) => (
                   <tr key={line.pricingItemId}>
-                    <td className="p-3 font-bold text-charcoal">{line.name}</td>
+                    <td className="p-3 font-bold text-charcoal">
+                      <div>{line.name}</div>
+                      {line.comment ? (
+                        <div className="mt-1 text-xs font-medium italic leading-5 text-charcoal/60">
+                          {line.comment}
+                        </div>
+                      ) : null}
+                    </td>
                     <td className="p-3 text-right">
                       {line.quantity.toLocaleString()}
                     </td>

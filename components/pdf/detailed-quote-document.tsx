@@ -24,6 +24,7 @@ export type DetailedQuotePdfProps = {
     unitType: string;
     unitPrice: string; // formatCurrency(...)
     lineTotal: string; // formatCurrency(...)
+    comment: string; // customer-facing note under the item name; "" = none
   }>;
   quoteTotal: string; // formatCurrency(result.clientQuoteTotalCents)
   quoteNotes: string; // settings.defaultQuoteNotes
@@ -333,9 +334,25 @@ export function DetailedQuotePdfDocument(props: DetailedQuotePdfProps) {
                     index === lines.length - 1 ? 0 : styles.tableRow.borderBottomWidth
                 }}
               >
-                <Text style={{ ...styles.td, ...styles.tdBold, width: COL.item }}>
-                  {line.name}
-                </Text>
+                <View style={{ width: COL.item }}>
+                  <Text style={{ ...styles.td, ...styles.tdBold }}>
+                    {line.name}
+                  </Text>
+                  {line.comment ? (
+                    <Text
+                      style={{
+                        ...styles.td,
+                        fontSize: 8.5,
+                        lineHeight: 1.35,
+                        color: "#61635f",
+                        fontStyle: "italic",
+                        marginTop: 1
+                      }}
+                    >
+                      {line.comment}
+                    </Text>
+                  ) : null}
+                </View>
                 <Text style={{ ...styles.td, ...styles.tdRight, width: COL.qty }}>
                   {line.quantityLabel}
                 </Text>

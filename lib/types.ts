@@ -168,6 +168,11 @@ export type PricingCatalog = {
 export type QuoteLineInput = {
   pricingItemId: string;
   quantity: number;
+  // Optional customer-facing comment on this adder line, shown on the
+  // Detailed Quote (preview + PDF) under the item name. Empty/undefined
+  // means no comment. Stored inside quote_data.lineItems (JSONB), so no
+  // schema migration is needed; old saved quotes simply have no comment.
+  comment?: string;
 };
 
 export type QuoteFormState = {
@@ -201,6 +206,9 @@ export type CalculatedLineItem = {
   clientUnitPriceCents: number;
   clientLineTotalCents: number;
   notes: string;
+  // Customer-facing comment carried through from the adder line input.
+  // Shown on the Detailed Quote under the item name. Empty string when none.
+  comment: string;
 };
 
 export type QuoteCalculationResult = {

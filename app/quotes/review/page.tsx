@@ -259,7 +259,12 @@ export default function QuoteReviewPage() {
                   {result.clientFacingLines.map((line) => (
                     <tr key={line.pricingItemId}>
                       <td className="p-3 font-bold text-charcoal">
-                        {line.name}
+                        <div>{line.name}</div>
+                        {line.comment ? (
+                          <div className="mt-1 text-xs font-medium italic leading-5 text-charcoal/60">
+                            {line.comment}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="p-3">{line.quantity.toLocaleString()}</td>
                       <td className="p-3">{line.unitType}</td>

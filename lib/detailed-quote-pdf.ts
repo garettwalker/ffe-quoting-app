@@ -78,7 +78,8 @@ export async function loadDetailedQuotePdfInput(
       quantityLabel: line.quantity.toLocaleString(),
       unitType: line.unitType,
       unitPrice: formatCurrency(line.clientUnitPriceCents),
-      lineTotal: formatCurrency(line.clientLineTotalCents)
+      lineTotal: formatCurrency(line.clientLineTotalCents),
+      comment: line.comment
     })),
     quoteTotal: formatCurrency(result.clientQuoteTotalCents),
     quoteNotes: settings.defaultQuoteNotes,
