@@ -119,16 +119,25 @@ export async function loadInvoicePdfInput(
         }
       : null;
 
-  // Scope-of-work detail shown on the invoice: each line item from the quote
-  // (base package + adders) with its customer-facing comment underneath when
-  // present. No per-line prices here — the invoice bills by percentage of the
-  // contract, so line prices would clash with the charge amounts. This is the
-  // "detailed invoice" view: the customer sees exactly what work the invoice
-  // covers, and the per-adder comments appear.
-  const scopeLines = row.calculation_data.clientFacingLines.map((line) => ({
-    name: line.name,
-    comment: line.comment
-  }));
+  // Scope-of-work detail shown on the invoice: each line item with its
+  // customer-facing comment underneath when present. No per-line prices here —
+  // the invoice bills by percentage of the contract, so line prices would
+  // clash with the charge amounts. The invoice's scope is INDEPENDENT of the
+  // quote: once invoicing is set up the scope lines live on the invoice
+  // (invoice_data.scopeLines) and are edited there, so the quote stays a
+  // point-in-time estimate. For invoices set up before this field existed
+  // (no scopeLines on the row yet), fall back to the quote's
+  // calculation_data.clientFacingLines so nothing breaks — and the first time
+  // the owner re-saves the invoice setup, the builder persists scopeLines.
+  const scopeLines = Array.isArray(invoiceData.scopeLines)
+    ? invoiceData.scopeLines.map((line) => ({
+        name: line.name,
+        comment: line.comment
+      }))
+    : row.calculation_data.clientFacingLines.map((line) => ({
+        name: line.name,
+        comment: line.comment
+      }));
 
   const pdfProps: InvoicePdfProps = {
     businessName: settings.businessName,

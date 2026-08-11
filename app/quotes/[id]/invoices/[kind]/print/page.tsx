@@ -126,8 +126,8 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             </p>
             <div className="overflow-hidden rounded-xl1 border border-pine/10">
               <div className="divide-y divide-pine/10 bg-cream">
-                {pdfProps.scopeLines.map((line) => (
-                  <InvoiceScopeLine key={line.name} name={line.name} comment={line.comment} />
+                {pdfProps.scopeLines.map((line, index) => (
+                  <InvoiceScopeLine key={index} name={line.name} comment={line.comment} />
                 ))}
               </div>
             </div>

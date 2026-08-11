@@ -74,6 +74,13 @@ export type InvoiceData = {
   generatedAt: string;
   // Exactly two records: initial then finish.
   invoices: InvoiceRecord[];
+  // Scope-of-work detail shown on both invoices. Seeded from the quote's
+  // line items + comments when invoicing is first set up, then lives on the
+  // invoice and is edited independently of the quote (so the quote stays a
+  // point-in-time estimate and final adjustments happen here). Optional so
+  // invoices set up before this field existed still load; the PDF/print path
+  // backfills from the quote's calculation_data.clientFacingLines when absent.
+  scopeLines?: Array<{ name: string; comment: string }>;
 };
 
 // One invoice flattened for the Accounts Receivable view. `outstandingCents`

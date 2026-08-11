@@ -18,6 +18,11 @@ type InvoiceBuilderProps = {
   initialInvoiceData: InvoiceData | null;
   // The accepted quote total, used to default the contract amount on first setup.
   quoteTotalCents: number;
+  // The quote's line items + comments, used to seed the invoice's scope-of-work
+  // section the first time invoicing is set up. Once saved, the invoice's scope
+  // lives on the invoice (invoice_data.scopeLines) and is edited independently
+  // of the quote, so this seed is only used when there is no existing scope.
+  seedScopeLines: Array<{ name: string; comment: string }>;
 };
 
 const KIND_LABEL: Record<InvoiceKind, string> = {
@@ -28,7 +33,8 @@ const KIND_LABEL: Record<InvoiceKind, string> = {
 export function InvoiceBuilder({
   quoteId,
   initialInvoiceData,
-  quoteTotalCents
+  quoteTotalCents,
+  seedScopeLines
 }: InvoiceBuilderProps) {
   const router = useRouter();
   const existing = initialInvoiceData;
@@ -46,6 +52,21 @@ export function InvoiceBuilder({
     existing ? centsToDollars(existing.permitFeeCents) : 0
   );
 
+  // Scope-of-work lines for the invoice. Seeded from the existing invoice's
+  // scope if it has one (independent of the quote), otherwise from the quote's
+  // line items + comments (first setup). The owner edits names + comments here;
+  // they are saved on the invoice and shown on both invoice PDFs. No per-line
+  // amounts (the invoice bills by percentage of the contract).
+  const [scopeLines, setScopeLines] = useState<Array<{ name: string; comment: string }>>(
+    () =>
+      Array.isArray(existing?.scopeLines)
+        ? (existing!.scopeLines as Array<{ name: string; comment: string }>).map((l) => ({
+            name: l.name,
+            comment: l.comment
+          }))
+        : seedScopeLines.map((l) => ({ name: l.name, comment: l.comment }))
+  );
+
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState(false);
@@ -54,7 +75,7 @@ export function InvoiceBuilder({
   useEffect(() => {
     setSaveMessage("");
     setSaveError(false);
-  }, [contractDollars, roughInPercent, finishPercent, permitDollars]);
+  }, [contractDollars, roughInPercent, finishPercent, permitDollars, scopeLines]);
 
   // Build a preview InvoiceData from the current inputs so amounts update live.
   const previewData: InvoiceData = {
@@ -63,7 +84,8 @@ export function InvoiceBuilder({
     finishPercent,
     permitFeeCents: dollarsToCents(permitDollars),
     generatedAt: existing?.generatedAt ?? new Date().toISOString(),
-    invoices: existing?.invoices ?? []
+    invoices: existing?.invoices ?? [],
+    scopeLines
   };
 
   const amounts = useMemo(
@@ -124,6 +146,32 @@ export function InvoiceBuilder({
     };
   }
 
+  // --- Scope-of-work line editing -------------------------------------
+  // The invoice's scope lines are editable here independently of the quote.
+  // Names + comments only — no per-line amounts (the invoice bills by
+  // percentage of the contract). Editing comments on a paid invoice is safe:
+  // it does not change any money, so the paid-amount reset below never fires.
+
+  function updateScopeName(index: number, name: string) {
+    setScopeLines((prev) =>
+      prev.map((line, i) => (i === index ? { ...line, name } : line))
+    );
+  }
+
+  function updateScopeComment(index: number, comment: string) {
+    setScopeLines((prev) =>
+      prev.map((line, i) => (i === index ? { ...line, comment } : line))
+    );
+  }
+
+  function removeScopeLine(index: number) {
+    setScopeLines((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addScopeLine() {
+    setScopeLines((prev) => [...prev, { name: "", comment: "" }]);
+  }
+
   async function saveInvoices() {
     if (isSaving) return;
 
@@ -147,7 +195,14 @@ export function InvoiceBuilder({
       finishPercent,
       permitFeeCents: dollarsToCents(permitDollars),
       generatedAt: now,
-      invoices: [buildInvoiceRecord("initial", now), buildInvoiceRecord("finish", now)]
+      invoices: [buildInvoiceRecord("initial", now), buildInvoiceRecord("finish", now)],
+      // Persist the invoice's own scope lines so the invoice is independent of
+      // the quote from this save onward (PDFs/print read this field first, only
+      // falling back to the quote when an old invoice lacks it).
+      scopeLines: scopeLines.map((line) => ({
+        name: line.name.trim(),
+        comment: line.comment.trim()
+      }))
     };
 
     const { error } = await supabase
@@ -297,6 +352,77 @@ export function InvoiceBuilder({
             </p>
           )}
         </div>
+      </div>
+
+      <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">
+        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+          <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
+            Scope of Work
+          </p>
+          <p className="text-xs font-bold text-charcoal/55">
+            Seeded from the quote. Edit here to make the invoice independent.
+          </p>
+        </div>
+        <p className="mb-3 text-sm font-bold text-charcoal/65">
+          These lines + comments print on both invoices. Names and comments only
+          — amounts stay on the contract / split above.
+        </p>
+
+        <div className="space-y-3">
+          {scopeLines.length === 0 ? (
+            <p className="rounded-soft border border-dashed border-stone bg-whitewarm/60 px-3 py-4 text-sm font-bold text-charcoal/55">
+              No scope lines yet. Add one below.
+            </p>
+          ) : null}
+
+          {scopeLines.map((line, index) => (
+            <div
+              key={index}
+              className="rounded-soft border border-pine/10 bg-whitewarm p-3"
+            >
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
+                    Line item
+                  </label>
+                  <input
+                    type="text"
+                    value={line.name}
+                    onChange={(event) => updateScopeName(index, event.target.value)}
+                    placeholder="e.g. Recessed LED lighting"
+                    className="form-input"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => removeScopeLine(index)}
+                  title="Remove this scope line"
+                  className="mt-6 shrink-0 rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
+                >
+                  Remove
+                </button>
+              </div>
+              <label className="mb-1 mt-3 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
+                Comment (shown on invoice)
+              </label>
+              <textarea
+                value={line.comment}
+                onChange={(event) => updateScopeComment(index, event.target.value)}
+                placeholder="Customer-facing note for this line (optional)"
+                rows={2}
+                className="form-input w-full max-w-full resize-y"
+              />
+            </div>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={addScopeLine}
+          className="mt-3 rounded-full border border-pine/30 px-4 py-2 text-sm font-black text-deep-pine hover:bg-sage/20"
+        >
+          + Add scope line
+        </button>
       </div>
 
       {paidAmountChanges.length > 0 ? (

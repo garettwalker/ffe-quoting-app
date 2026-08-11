@@ -104,6 +104,10 @@ export default async function InvoicingPage({ params }: PageProps) {
             quoteId={row.id}
             initialInvoiceData={invoiceData}
             quoteTotalCents={result.clientQuoteTotalCents}
+            seedScopeLines={result.clientFacingLines.map((line) => ({
+              name: line.name,
+              comment: line.comment
+            }))}
           />
 
           {invoiceData ? (
