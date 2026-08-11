@@ -650,7 +650,7 @@ export function QuoteBuilder({
                     <td className="p-3 font-bold text-charcoal">
                       <div>{line.name}</div>
                       {line.comment ? (
-                        <div className="mt-1 text-xs font-medium italic leading-5 text-charcoal/60">
+                        <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
                           {line.comment}
                         </div>
                       ) : null}

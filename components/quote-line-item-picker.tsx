@@ -126,7 +126,7 @@ export function QuoteLineItemPicker({
                     </button>
                   </div>
 
-                  <label className="mt-3 grid min-w-0 gap-1">
+                  <label className="mt-3 flex min-w-0 flex-col gap-1">
                     <span className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                       Comment (shown on quote)
                     </span>
@@ -137,7 +137,7 @@ export function QuoteLineItemPicker({
                       }
                       placeholder="Optional customer-facing note for this line..."
                       rows={2}
-                      className="focus-ring min-w-0 resize-y rounded-soft border border-pine/20 bg-whitewarm px-3 py-2 text-sm font-bold text-charcoal"
+                      className="focus-ring w-full max-w-full resize-y rounded-soft border border-pine/20 bg-whitewarm px-3 py-2 text-sm font-bold text-charcoal"
                     />
                   </label>
                 </div>
