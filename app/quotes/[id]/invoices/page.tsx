@@ -130,81 +130,84 @@ export default async function InvoicingPage({ params }: PageProps) {
         </div>
       </div>
 
-      <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-6">
-          <InvoiceBuilder
-            quoteId={row.id}
-            initialInvoiceData={invoiceData}
-            quoteTotalCents={result.clientQuoteTotalCents}
-            pricingItems={catalog.items}
-            // Default unit price for a line added on the invoice = catalog base
-            // price x the quote's pricing-level/contingency multiplier, so an
-            // added line matches the job's pricing level (still editable).
-            clientMultiplier={result.combinedClientMultiplier}
-            seedScopeLines={result.clientFacingLines.map((line) => ({
-              pricingItemId: line.pricingItemId,
-              name: line.name,
-              unitType: line.unitType,
-              quantity: line.quantity,
-              unitPriceCents: line.clientUnitPriceCents,
-              comment: line.comment
-            }))}
-          />
-
-          {invoiceData ? (
-            <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
-              <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
-                Current invoices
-              </p>
-
-              <div className="grid gap-4">
-                {initialInvoice ? (
-                  <InvoiceCard
-                    quoteId={row.id}
-                    invoiceData={invoiceData}
-                    kind="initial"
-                    reference={invoiceReference(row.quote_id, "initial")}
-                    title="Invoice 1: Rough-In (Initial)"
-                    amountCents={initialInvoice.amountCents}
-                    status={initialInvoice.status}
-                    recordedBy={user?.email ?? ""}
-                    payUrl={buildPayUrl(row.id, "initial")}
-                  />
-                ) : null}
-
-                {finishInvoice ? (
-                  <InvoiceCard
-                    quoteId={row.id}
-                    invoiceData={invoiceData}
-                    kind="finish"
-                    reference={invoiceReference(row.quote_id, "finish")}
-                    title="Invoice 2: Final"
-                    amountCents={finishInvoice.amountCents}
-                    status={finishInvoice.status}
-                    recordedBy={user?.email ?? ""}
-                    payUrl={buildPayUrl(row.id, "finish")}
-                  />
-                ) : null}
-              </div>
-            </section>
-          ) : (
-            <section className="rounded-xl2 border border-pine/10 bg-cream p-6 text-sm font-bold text-charcoal/70">
-              No invoices yet. Set up the line items, split, and permit fee
-              above, then click Save Invoices.
-            </section>
-          )}
-        </div>
-
-        <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-clay">
+      {/* How invoicing works — full-width note at the top of the page. Lives
+          above the builder so it reads first and no longer eats the side
+          column; the dynamic copy flips when the rough-in is paid and locked. */}
+      <div className="mb-8 rounded-xl1 border border-pine/10 bg-whitewarm/80 p-4 shadow-soft">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-4">
+          <p className="shrink-0 text-sm font-black uppercase tracking-[0.16em] text-clay">
             How invoicing works
           </p>
-          <div className="rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/75">
+          <p className="text-sm font-bold leading-6 text-charcoal/75">
             {roughInPaid
               ? "The contract is the sum of the line items. The rough-in invoice is paid and locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Mark the final invoice paid when it is collected."
               : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Mark each invoice paid as it is collected."}
-          </div>
-        </aside>
+          </p>
+        </div>
+      </div>
+
+      <div className="min-w-0 space-y-6">
+        <InvoiceBuilder
+          quoteId={row.id}
+          initialInvoiceData={invoiceData}
+          quoteTotalCents={result.clientQuoteTotalCents}
+          pricingItems={catalog.items}
+          // Default unit price for a line added on the invoice = catalog base
+          // price x the quote's pricing-level/contingency multiplier, so an
+          // added line matches the job's pricing level (still editable).
+          clientMultiplier={result.combinedClientMultiplier}
+          seedScopeLines={result.clientFacingLines.map((line) => ({
+            pricingItemId: line.pricingItemId,
+            name: line.name,
+            unitType: line.unitType,
+            quantity: line.quantity,
+            unitPriceCents: line.clientUnitPriceCents,
+            comment: line.comment
+          }))}
+        />
+
+        {invoiceData ? (
+          <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
+            <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
+              Current invoices
+            </p>
+
+            <div className="grid gap-4">
+              {initialInvoice ? (
+                <InvoiceCard
+                  quoteId={row.id}
+                  invoiceData={invoiceData}
+                  kind="initial"
+                  reference={invoiceReference(row.quote_id, "initial")}
+                  title="Invoice 1: Rough-In (Initial)"
+                  amountCents={initialInvoice.amountCents}
+                  status={initialInvoice.status}
+                  recordedBy={user?.email ?? ""}
+                  payUrl={buildPayUrl(row.id, "initial")}
+                />
+              ) : null}
+
+              {finishInvoice ? (
+                <InvoiceCard
+                  quoteId={row.id}
+                  invoiceData={invoiceData}
+                  kind="finish"
+                  reference={invoiceReference(row.quote_id, "finish")}
+                  title="Invoice 2: Final"
+                  amountCents={finishInvoice.amountCents}
+                  status={finishInvoice.status}
+                  recordedBy={user?.email ?? ""}
+                  payUrl={buildPayUrl(row.id, "finish")}
+                />
+              ) : null}
+            </div>
+          </section>
+        ) : (
+          <section className="rounded-xl2 border border-pine/10 bg-cream p-6 text-sm font-bold text-charcoal/70">
+            No invoices yet. Set up the line items, split, and permit fee
+            above, then click Save Invoices.
+          </section>
+        )}
       </div>
     </AppShell>
   );
