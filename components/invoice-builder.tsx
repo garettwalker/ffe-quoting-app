@@ -509,7 +509,7 @@ export function InvoiceBuilder({
                       </td>
                       <td className="p-3 align-top">
                         <div className="relative">
-                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-charcoal/55">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-charcoal/55">
                             $
                           </span>
                           <FormattedNumberInput
@@ -519,7 +519,7 @@ export function InvoiceBuilder({
                             min={0}
                             placeholder="0"
                             aria-label="Unit price in dollars"
-                            className="form-input w-28 pl-6"
+                            className="form-input w-28 pl-8"
                           />
                         </div>
                       </td>

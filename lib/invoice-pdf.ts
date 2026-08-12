@@ -115,7 +115,7 @@ export async function loadInvoicePdfInput(
         ]
       : [
           {
-            label: `Finish (${invoiceData.finishPercent}% of contract)`,
+            label: "Final Invoice",
             amount: formatCurrency(amounts.finishAmountCents)
           }
         ];

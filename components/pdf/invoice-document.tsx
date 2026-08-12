@@ -180,10 +180,17 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
         {scopeLines.length > 0 ? (
           <>
             <PdfSectionLabel>SCOPE OF WORK</PdfSectionLabel>
+            {/* react-pdf auto-wraps this list across pages when the scope is
+                long. Each row has wrap={false} so a single line item (name +
+                comment + total) is never split across a page break: if a row
+                does not fit in the remaining space it moves whole to the next
+                page. The fixed header/footer above repeat on every page and
+                the footer prints "Page X of Y" when there is more than one. */}
             <View style={scopeStyles.list}>
               {scopeLines.map((line, index) => (
                 <View
                   key={`${line.name}-${index}`}
+                  wrap={false}
                   style={{
                     ...scopeStyles.row,
                     borderBottomWidth:
