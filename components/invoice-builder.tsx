@@ -55,8 +55,8 @@ type InvoiceBuilderProps = {
 };
 
 const KIND_LABEL: Record<InvoiceKind, string> = {
-  initial: "Initial (Rough-In)",
-  finish: "Finish"
+  initial: "Rough-In (Invoice 1)",
+  finish: "Final (Invoice 2)"
 };
 
 export function InvoiceBuilder({
@@ -434,10 +434,9 @@ export function InvoiceBuilder({
           Line items, split, and permit fee
         </h2>
         <p className="mt-2 text-sm font-bold text-charcoal/65">
-          The contract is the sum of the line items below. The initial invoice
-          is the rough-in percent of that contract plus the permit fee; the
-          finish invoice is the remainder. Add line items from your pricing
-          catalog, set quantity and price, and adjust the split.
+          {roughInPaid
+            ? "The contract is the sum of the line items below. The rough-in invoice is paid and locked, so any change you make to the line items, contract, or permit fee adjusts the final invoice only. Add line items from your pricing catalog and set quantity and price."
+            : "The contract is the sum of the line items below. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Add line items from your pricing catalog, set quantity and price, and adjust the split."}
         </p>
       </div>
 
@@ -681,30 +680,17 @@ export function InvoiceBuilder({
 
       <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">
         <p className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-clay">
-          Live Preview
+          Invoice amounts (before saving)
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           <PreviewLine
-            label="Rough-in amount"
-            value={formatCurrency(amounts.roughInAmountCents)}
-            sub={
-              roughInPaid
-                ? "paid and locked"
-                : `${roughInPercent}% of contract`
-            }
-          />
-          <PreviewLine
-            label="Permit fee"
-            value={formatCurrency(dollarsToCents(permitDollars))}
-          />
-          <PreviewLine
-            label={roughInPaid ? "Initial invoice (locked)" : "Initial invoice total"}
+            label="Invoice 1: Rough-In"
             value={formatCurrency(amounts.initialInvoiceAmountCents)}
-            sub={roughInPaid ? "frozen — collected" : "rough-in + permit"}
+            sub={roughInPaid ? "paid and locked" : `${roughInPercent}% + permit`}
             emphasize
           />
           <PreviewLine
-            label="Finish invoice total"
+            label="Invoice 2: Final"
             value={formatCurrency(amounts.finishInvoiceAmountCents)}
             sub={
               roughInPaid
@@ -713,13 +699,24 @@ export function InvoiceBuilder({
             }
             emphasize
           />
+          <PreviewLine
+            label="Permit fee (in Invoice 1)"
+            value={formatCurrency(dollarsToCents(permitDollars))}
+            sub={roughInPaid ? "already collected" : "collected with rough-in"}
+          />
+          <PreviewLine
+            label="Total to collect"
+            value={formatCurrency(amounts.totalInvoicedCents)}
+            sub="contract + permit"
+            emphasize
+          />
         </div>
 
         <div className="mt-3 text-sm font-bold">
           {roughInPaid ? (
             <p className="text-deep-pine">
               Rough-in is paid and locked at{" "}
-              {formatCurrency(amounts.initialInvoiceAmountCents)}. The finish
+              {formatCurrency(amounts.initialInvoiceAmountCents)}. The final
               invoice carries the remaining{" "}
               {formatCurrency(amounts.finishInvoiceAmountCents)} of the{" "}
               {formatCurrency(amounts.totalInvoicedCents)} total.

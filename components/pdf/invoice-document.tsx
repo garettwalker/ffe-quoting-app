@@ -25,7 +25,7 @@ export type InvoicePdfProps = {
   businessEmail: string;
   reference: string; // e.g. "Q-20260619-001-R"
   invoiceDateLabel: string; // long form
-  title: string; // "Initial Invoice" or "Finish Invoice"
+  title: string; // "Initial Invoice" or "Final Invoice"
   clientName: string;
   clientEmail: string;
   fullAddress: string;

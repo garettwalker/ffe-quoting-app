@@ -72,6 +72,11 @@ export default async function InvoicingPage({ params }: PageProps) {
   const finishInvoice =
     invoiceData?.invoices.find((invoice) => invoice.kind === "finish") ?? null;
 
+  // Once the rough-in (initial) invoice is paid, it is frozen and edits flow
+  // only to the finish invoice (see computeInvoiceAmounts). Used to tailor the
+  // header hint, the aside note, and the invoice-card copy below.
+  const roughInPaid = initialInvoice?.status === "paid";
+
   const contractTotalCents = invoiceData
     ? invoiceData.contractAmountCents
     : result.clientQuoteTotalCents;
@@ -116,6 +121,12 @@ export default async function InvoicingPage({ params }: PageProps) {
           <p className="mt-1 text-xs font-bold text-charcoal/60">
             {row.quote_id}
           </p>
+          {roughInPaid ? (
+            <p className="mt-2 text-xs font-bold leading-5 text-clay">
+              Rough-in is paid. Changes to line items apply to the final invoice
+              only.
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -143,7 +154,7 @@ export default async function InvoicingPage({ params }: PageProps) {
           {invoiceData ? (
             <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
               <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
-                Invoices
+                Current invoices
               </p>
 
               <div className="grid gap-4">
@@ -167,7 +178,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     invoiceData={invoiceData}
                     kind="finish"
                     reference={invoiceReference(row.quote_id, "finish")}
-                    title="Invoice 2: Finish"
+                    title="Invoice 2: Final"
                     amountCents={finishInvoice.amountCents}
                     status={finishInvoice.status}
                     recordedBy={user?.email ?? ""}
@@ -189,10 +200,9 @@ export default async function InvoicingPage({ params }: PageProps) {
             How invoicing works
           </p>
           <div className="rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/75">
-            The contract is the sum of the line items. The initial invoice is
-            the rough-in percent of that contract plus the permit fee; the
-            finish invoice is the remainder. Mark each invoice paid as it is
-            collected.
+            {roughInPaid
+              ? "The contract is the sum of the line items. The rough-in invoice is paid and locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Mark the final invoice paid when it is collected."
+              : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Mark each invoice paid as it is collected."}
           </div>
         </aside>
       </div>

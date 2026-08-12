@@ -23,7 +23,7 @@ export type EmailAttachment = {
   clientName: string;
   quoteId: string;
   reference: string; // quote_id for quotes, invoice reference for invoices
-  docTitle: string; // "Detailed Quote" / "Summary Quote" / "Initial Invoice" / "Finish Invoice"
+  docTitle: string; // "Detailed Quote" / "Summary Quote" / "Initial Invoice" / "Final Invoice"
 };
 
 // Renders the requested document to a PDF buffer by dispatching to the existing

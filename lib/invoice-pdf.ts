@@ -84,7 +84,7 @@ export async function loadInvoicePdfInput(
     .filter(Boolean)
     .join(", ");
 
-  const title = kind === "initial" ? "Initial Invoice" : "Finish Invoice";
+  const title = kind === "initial" ? "Initial Invoice" : "Final Invoice";
 
   // When the rough-in is paid, its amount is locked and the finish absorbs
   // any later changes (see computeInvoiceAmounts). The initial invoice is a
