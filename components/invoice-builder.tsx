@@ -123,6 +123,22 @@ export function InvoiceBuilder({
     existing?.invoices.find((invoice) => invoice.kind === "initial")
       ?.status === "paid";
 
+  // Unit prices of lines loaded from the SAVED invoice, keyed by
+  // pricingItemId. Used on save to catch accidental price edits: if a loaded
+  // line's unit price changed, we confirm before committing (the owner asked
+  // for a guard after accidentally editing a price instead of a quantity).
+  // Newly added lines are NOT tracked here, so setting their price on a new
+  // line is not treated as an accidental change.
+  const [originalPriceByItemId] = useState<Record<string, number>>(() => {
+    const map: Record<string, number> = {};
+    if (existing && Array.isArray(existing.scopeLines)) {
+      for (const line of existing.scopeLines) {
+        if (line.pricingItemId) map[line.pricingItemId] = line.unitPriceCents;
+      }
+    }
+    return map;
+  });
+
   // The contract is the sum of line totals when there are lines, otherwise the
   // manual contract amount.
   const contractCents = useMemo(() => {
@@ -314,6 +330,33 @@ export function InvoiceBuilder({
       return;
     }
 
+    // Guard against accidental unit-price edits (the owner asked for this
+    // after changing a price by mistake instead of a quantity). Before
+    // committing, list any line loaded from the saved invoice whose unit
+    // price changed and confirm. Cancel aborts the save so the owner can
+    // review. Newly added lines are not tracked, so setting their price is
+    // not flagged.
+    const priceChanges = scopeLines.filter(
+      (line) =>
+        line.pricingItemId &&
+        originalPriceByItemId[line.pricingItemId] !== undefined &&
+        originalPriceByItemId[line.pricingItemId] !== line.unitPriceCents
+    );
+    if (priceChanges.length > 0) {
+      const list = priceChanges
+        .map((line) => {
+          const itemName = resolveName(line.pricingItemId, line.name);
+          const from = formatCurrency(originalPriceByItemId[line.pricingItemId]);
+          const to = formatCurrency(line.unitPriceCents);
+          return `${itemName}: ${from} to ${to}`;
+        })
+        .join("\n");
+      const ok = window.confirm(
+        `You changed the unit price on ${priceChanges.length} line(s):\n\n${list}\n\nAre you sure you want to save these price changes?`
+      );
+      if (!ok) return;
+    }
+
     setIsSaving(true);
     setSaveError(false);
     setSaveMessage("");
@@ -442,33 +485,43 @@ export function InvoiceBuilder({
                         <p className="break-words font-black text-deep-pine">{name}</p>
                       </td>
                       <td className="p-3 align-top">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={line.quantity === 0 ? "" : line.quantity}
-                          onChange={(event) =>
-                            updateScopeQuantity(
-                              index,
-                              event.target.value === "" ? 0 : Number(event.target.value)
-                            )
-                          }
-                          placeholder="1"
-                          className="form-input w-24"
-                        />
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={line.quantity === 0 ? "" : line.quantity}
+                            onChange={(event) =>
+                              updateScopeQuantity(
+                                index,
+                                event.target.value === "" ? 0 : Number(event.target.value)
+                              )
+                            }
+                            placeholder="1"
+                            aria-label="Quantity"
+                            className="form-input w-20"
+                          />
+                          <span className="text-xs font-bold text-charcoal/55">qty</span>
+                        </div>
                       </td>
                       <td className="whitespace-nowrap p-3 align-top text-charcoal/70">
                         {line.unitType}
                       </td>
                       <td className="p-3 align-top">
-                        <FormattedNumberInput
-                          value={centsToDollars(line.unitPriceCents)}
-                          onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
-                          allowDecimal
-                          min={0}
-                          placeholder="0"
-                          className="form-input w-28"
-                        />
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-charcoal/55">
+                            $
+                          </span>
+                          <FormattedNumberInput
+                            value={centsToDollars(line.unitPriceCents)}
+                            onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
+                            allowDecimal
+                            min={0}
+                            placeholder="0"
+                            aria-label="Unit price in dollars"
+                            className="form-input w-28 pl-6"
+                          />
+                        </div>
                       </td>
                       <td className="whitespace-nowrap p-3 align-top font-black text-deep-pine">
                         {formatCurrency(lineTotalCents)}
