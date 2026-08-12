@@ -508,10 +508,8 @@ export function InvoiceBuilder({
                         {line.unitType}
                       </td>
                       <td className="p-3 align-top">
-                        <div className="relative">
-                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-bold text-charcoal/55">
-                            $
-                          </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-sm font-bold text-charcoal/55">$</span>
                           <FormattedNumberInput
                             value={centsToDollars(line.unitPriceCents)}
                             onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
@@ -519,7 +517,7 @@ export function InvoiceBuilder({
                             min={0}
                             placeholder="0"
                             aria-label="Unit price in dollars"
-                            className="form-input w-28 pl-8"
+                            className="form-input w-24"
                           />
                         </div>
                       </td>
