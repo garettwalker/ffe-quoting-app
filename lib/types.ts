@@ -93,6 +93,9 @@ export type InvoiceData = {
     pricingItemId: string;
     // Name snapshot for display (PDF/print do not have the catalog).
     name: string;
+    // Unit type snapshot (per_sqft / per_unit / flat / per_hour) shown in the
+    // line-items table like the quote's "Unit" column.
+    unitType: string;
     quantity: number;
     unitPriceCents: number;
     comment: string;

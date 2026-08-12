@@ -72,33 +72,51 @@ export default async function InvoicingPage({ params }: PageProps) {
   const finishInvoice =
     invoiceData?.invoices.find((invoice) => invoice.kind === "finish") ?? null;
 
+  const contractTotalCents = invoiceData
+    ? invoiceData.contractAmountCents
+    : result.clientQuoteTotalCents;
+
   return (
     <AppShell>
-      <div className="mb-8">
-        <Link
-          href={`/quotes/${row.id}`}
-          className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
-        >
-          Back to quote
-        </Link>
+      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+        <div>
+          <Link
+            href={`/quotes/${row.id}`}
+            className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
+          >
+            Back to quote
+          </Link>
 
-        <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
-          Invoicing
-        </p>
-        <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
-          {quote.clientName || "Unnamed Client"}
-        </h1>
-        <p className="mt-3 max-w-2xl text-base leading-7 text-charcoal/70">
-          {fullAddress || "No project address entered"}
-        </p>
-
-        {invoiceData ? (
-          <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
-            {isPaidInFull(invoiceData)
-              ? "Paid in full"
-              : `Outstanding: ${formatCurrency(outstandingCents(invoiceData))}`}
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
+            Invoicing
           </p>
-        ) : null}
+          <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
+            {quote.clientName || "Unnamed Client"}
+          </h1>
+          <p className="mt-3 max-w-2xl text-base leading-7 text-charcoal/70">
+            {fullAddress || "No project address entered"}
+          </p>
+
+          {invoiceData ? (
+            <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
+              {isPaidInFull(invoiceData)
+                ? "Paid in full"
+                : `Outstanding: ${formatCurrency(outstandingCents(invoiceData))}`}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="rounded-xl1 border border-pine/10 bg-whitewarm/75 px-5 py-4 shadow-card">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-clay">
+            {invoiceData ? "Contract Total" : "Quote Total"}
+          </p>
+          <p className="font-display text-4xl font-bold tracking-[-0.04em] text-deep-pine">
+            {formatCurrency(contractTotalCents)}
+          </p>
+          <p className="mt-1 text-xs font-bold text-charcoal/60">
+            {row.quote_id}
+          </p>
+        </div>
       </div>
 
       <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -115,11 +133,9 @@ export default async function InvoicingPage({ params }: PageProps) {
             seedScopeLines={result.clientFacingLines.map((line) => ({
               pricingItemId: line.pricingItemId,
               name: line.name,
-              quantity: line.category === "Base" ? 1 : line.quantity,
-              unitPriceCents:
-                line.category === "Base"
-                  ? line.clientLineTotalCents
-                  : line.clientUnitPriceCents,
+              unitType: line.unitType,
+              quantity: line.quantity,
+              unitPriceCents: line.clientUnitPriceCents,
               comment: line.comment
             }))}
           />
@@ -162,7 +178,7 @@ export default async function InvoicingPage({ params }: PageProps) {
             </section>
           ) : (
             <section className="rounded-xl2 border border-pine/10 bg-cream p-6 text-sm font-bold text-charcoal/70">
-              No invoices yet. Set up the contract amount, split, and permit fee
+              No invoices yet. Set up the line items, split, and permit fee
               above, then click Save Invoices.
             </section>
           )}
@@ -170,17 +186,13 @@ export default async function InvoicingPage({ params }: PageProps) {
 
         <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
           <p className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-clay">
-            Quote Reference
+            How invoicing works
           </p>
-          <p className="font-black text-deep-pine">{row.quote_id}</p>
-          <p className="mt-1 text-sm font-bold text-charcoal/70">
-            Quote total: {formatCurrency(result.clientQuoteTotalCents)}
-          </p>
-
-          <div className="mt-5 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/75">
-            The initial invoice is the rough-in amount plus the permit fee. The
-            finish invoice is the remainder of the contract. Mark each invoice
-            paid as it is collected.
+          <div className="rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/75">
+            The contract is the sum of the line items. The initial invoice is
+            the rough-in percent of that contract plus the permit fee; the
+            finish invoice is the remainder. Mark each invoice paid as it is
+            collected.
           </div>
         </aside>
       </div>

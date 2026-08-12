@@ -25,6 +25,7 @@ import { FormattedNumberInput } from "@/components/formatted-number-input";
 type ScopeLine = {
   pricingItemId: string;
   name: string;
+  unitType: string;
   quantity: number;
   unitPriceCents: number;
   comment: string;
@@ -96,6 +97,7 @@ export function InvoiceBuilder({
       return (existing!.scopeLines as ScopeLine[]).map((line) => ({
         pricingItemId: line.pricingItemId ?? "",
         name: line.name,
+        unitType: line.unitType ?? "",
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
         comment: line.comment
@@ -255,6 +257,7 @@ export function InvoiceBuilder({
       {
         pricingItemId: item.id,
         name: item.name,
+        unitType: item.unitType,
         quantity: 1,
         unitPriceCents: Math.round(item.basePriceCents * clientMultiplier),
         comment: ""
@@ -307,6 +310,7 @@ export function InvoiceBuilder({
             scopeLines: scopeLines.map((line) => ({
               pricingItemId: line.pricingItemId,
               name: line.name.trim(),
+              unitType: line.unitType,
               quantity: line.quantity,
               unitPriceCents: line.unitPriceCents,
               comment: line.comment.trim()
@@ -366,14 +370,156 @@ export function InvoiceBuilder({
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        {scopeLines.length > 0 ? (
-          <Field label="Contract (sum of line items)">
-            <div className="form-input flex items-center bg-sand/60 font-display text-lg font-bold text-deep-pine">
-              {formatCurrency(contractCents)}
-            </div>
-          </Field>
-        ) : (
+      {/* Line items — same detail as the quote's customer-facing line items
+          (Item / Qty / Unit / Unit Price / Line Total). Pulled from the
+          pricing catalog; quantity + unit price + comment are editable. The
+          contract is the sum of the line totals (shown in the table footer). */}
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-black uppercase tracking-[0.16em] text-clay">
+          Line Items
+        </p>
+        <p className="text-xs font-bold text-charcoal/55">
+          Pulled from your pricing catalog. Quantities and prices are editable;
+          the contract is the sum of the line totals.
+        </p>
+      </div>
+
+      <div className="responsive-table-wrap overflow-hidden rounded-xl1 border border-pine/10">
+        <table className="responsive-table w-full border-collapse text-left text-sm">
+          <thead className="bg-sand text-deep-pine">
+            <tr>
+              <th className="p-3 font-black">Item</th>
+              <th className="p-3 font-black">Qty</th>
+              <th className="p-3 font-black">Unit</th>
+              <th className="p-3 font-black">Unit Price</th>
+              <th className="p-3 font-black">Line Total</th>
+              <th className="p-3" aria-hidden></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-pine/10 bg-cream">
+            {scopeLines.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-4 text-sm font-bold text-charcoal/55">
+                  No line items yet. Add one from the catalog below, or enter a
+                  contract amount in the split section to bill a lump sum.
+                </td>
+              </tr>
+            ) : (
+              scopeLines.map((line, index) => {
+                const name = resolveName(line.pricingItemId, line.name);
+                const lineTotalCents = line.quantity * line.unitPriceCents;
+                return (
+                  <tr key={index}>
+                    <td className="min-w-0 p-3 align-top">
+                      <p className="break-words font-black text-deep-pine">{name}</p>
+                      <textarea
+                        value={line.comment}
+                        onChange={(event) =>
+                          updateScopeComment(index, event.target.value)
+                        }
+                        placeholder="Customer-facing note (optional)"
+                        rows={2}
+                        className="form-input mt-2 w-full max-w-full resize-y text-xs"
+                      />
+                    </td>
+                    <td className="p-3 align-top">
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={line.quantity === 0 ? "" : line.quantity}
+                        onChange={(event) =>
+                          updateScopeQuantity(
+                            index,
+                            event.target.value === "" ? 0 : Number(event.target.value)
+                          )
+                        }
+                        placeholder="1"
+                        className="form-input w-24"
+                      />
+                    </td>
+                    <td className="whitespace-nowrap p-3 align-top text-charcoal/70">
+                      {line.unitType}
+                    </td>
+                    <td className="p-3 align-top">
+                      <FormattedNumberInput
+                        value={centsToDollars(line.unitPriceCents)}
+                        onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
+                        allowDecimal
+                        min={0}
+                        placeholder="0"
+                        className="form-input w-28"
+                      />
+                    </td>
+                    <td className="whitespace-nowrap p-3 align-top font-black text-deep-pine">
+                      {formatCurrency(lineTotalCents)}
+                    </td>
+                    <td className="p-3 align-top">
+                      <button
+                        type="button"
+                        onClick={() => removeScopeLine(index)}
+                        title="Remove this line item"
+                        className="rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
+                      >
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+          {scopeLines.length > 0 ? (
+            <tfoot className="bg-sand">
+              <tr>
+                <td
+                  colSpan={4}
+                  className="p-3 text-right font-black uppercase tracking-[0.1em] text-deep-pine"
+                >
+                  Contract (sum of line items)
+                </td>
+                <td className="whitespace-nowrap p-3 font-display text-lg font-bold text-deep-pine">
+                  {formatCurrency(contractCents)}
+                </td>
+                <td className="p-3" aria-hidden></td>
+              </tr>
+            </tfoot>
+          ) : null}
+        </table>
+      </div>
+
+      {availableItems.length > 0 ? (
+        <div className="mt-3">
+          <label className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
+            Add a line item
+          </label>
+          <select
+            className="form-input min-h-12"
+            defaultValue=""
+            onChange={(event) => {
+              if (!event.target.value) return;
+              addScopeLine(event.target.value);
+              event.target.value = "";
+            }}
+          >
+            <option value="">Choose an item from the catalog...</option>
+            {availableItems.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.category} - {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm font-bold text-charcoal/55">
+          All catalog adders are already on this invoice.
+        </p>
+      )}
+
+      {/* Split + permit. The contract is the sum of the line items above; when
+          there are no line items, a manual contract amount is used instead. */}
+      <div className="mt-6 grid gap-4 md:grid-cols-2">
+        {scopeLines.length === 0 ? (
           <Field label="Contract Amount ($)">
             <FormattedNumberInput
               value={contractDollars}
@@ -384,7 +530,7 @@ export function InvoiceBuilder({
               className="form-input"
             />
           </Field>
-        )}
+        ) : null}
 
         <Field label="Permit Fee ($)">
           <FormattedNumberInput
@@ -430,123 +576,6 @@ export function InvoiceBuilder({
             className="form-input"
           />
         </Field>
-      </div>
-
-      {/* Line items */}
-      <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">
-        <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
-            Line Items
-          </p>
-          <p className="text-xs font-bold text-charcoal/55">
-            Pulled from your pricing catalog. Quantities and prices are editable.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          {scopeLines.length === 0 ? (
-            <p className="rounded-soft border border-dashed border-stone bg-whitewarm/60 px-3 py-4 text-sm font-bold text-charcoal/55">
-              No line items yet. Add one from the catalog below, or enter a
-              contract amount above to bill a lump sum.
-            </p>
-          ) : null}
-
-          {scopeLines.map((line, index) => {
-            const name = resolveName(line.pricingItemId, line.name);
-            const lineTotalCents = line.quantity * line.unitPriceCents;
-            return (
-              <div
-                key={index}
-                className="rounded-soft border border-pine/10 bg-whitewarm p-3"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="break-words font-black text-deep-pine">{name}</p>
-                    <p className="text-sm font-bold text-charcoal/60">
-                      {formatCurrency(lineTotalCents)}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => removeScopeLine(index)}
-                    title="Remove this line item"
-                    className="shrink-0 rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
-                  >
-                    Remove
-                  </button>
-                </div>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Field label="Quantity">
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={line.quantity === 0 ? "" : line.quantity}
-                      onChange={(event) =>
-                        updateScopeQuantity(
-                          index,
-                          event.target.value === "" ? 0 : Number(event.target.value)
-                        )
-                      }
-                      placeholder="1"
-                      className="form-input"
-                    />
-                  </Field>
-                  <Field label="Unit Price ($)">
-                    <FormattedNumberInput
-                      value={centsToDollars(line.unitPriceCents)}
-                      onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
-                      allowDecimal
-                      min={0}
-                      placeholder="0"
-                      className="form-input"
-                    />
-                  </Field>
-                </div>
-
-                <label className="mb-1 mt-3 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
-                  Comment (shown on invoice)
-                </label>
-                <textarea
-                  value={line.comment}
-                  onChange={(event) => updateScopeComment(index, event.target.value)}
-                  placeholder="Customer-facing note for this line (optional)"
-                  rows={2}
-                  className="form-input w-full max-w-full resize-y"
-                />
-              </div>
-            );
-          })}
-        </div>
-
-        {availableItems.length > 0 ? (
-          <div className="mt-3">
-            <label className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
-              Add a line item
-            </label>
-            <select
-              className="form-input min-h-12"
-              defaultValue=""
-              onChange={(event) => {
-                if (!event.target.value) return;
-                addScopeLine(event.target.value);
-                event.target.value = "";
-              }}
-            >
-              <option value="">Choose an item from the catalog...</option>
-              {availableItems.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.category} - {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <p className="mt-3 text-sm font-bold text-charcoal/55">
-            All catalog adders are already on this invoice.
-          </p>
-        )}
       </div>
 
       <div className="mt-5 rounded-xl1 border border-pine/10 bg-cream p-4">

@@ -144,16 +144,11 @@ export async function loadInvoicePdfInput(
         };
       })
     : row.calculation_data.clientFacingLines.map((line) => {
-        const qty = line.category === "Base" ? 1 : line.quantity;
-        const unitCents =
-          line.category === "Base"
-            ? line.clientLineTotalCents
-            : line.clientUnitPriceCents;
-        const totalCents = qty * unitCents;
+        const totalCents = line.quantity * line.clientUnitPriceCents;
         return {
           name: line.name,
           comment: line.comment,
-          detail: `${qty} × ${formatCurrency(unitCents)}`,
+          detail: `${line.quantity} × ${formatCurrency(line.clientUnitPriceCents)}`,
           total: formatCurrency(totalCents)
         };
       });
