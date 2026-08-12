@@ -35,12 +35,52 @@ export type InvoiceAmounts = {
 // exactly to the contract (no rounding drift). When the split does not total
 // 100%, both amounts are computed from their percentages independently and
 // isBalanced is false so the UI can warn the owner.
+//
+// Once the rough-in (initial) invoice is PAID, its amount is frozen: the money
+// was already collected and must not change. Any later edit to the contract
+// (line items) or permit fee then flows ENTIRELY to the finish invoice, which
+// becomes (contract + permit) - (paid rough-in). The rough-in/finish split is
+// bypassed in this state — the finish absorbs the difference — so editing
+// line items after rough-in is collected only moves the finish invoice, never
+// the paid rough-in.
 export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
   const contract = Math.max(0, Math.round(data.contractAmountCents));
   const roughInPercent = clampPercent(data.roughInPercent);
   const finishPercent = clampPercent(data.finishPercent);
   const permitFeeCents = Math.max(0, Math.round(data.permitFeeCents));
   const percentTotal = roughInPercent + finishPercent;
+  const totalCollectible = contract + permitFeeCents;
+
+  const roughInInvoice =
+    data.invoices.find((invoice) => invoice.kind === "initial") ?? null;
+
+  if (roughInInvoice?.status === "paid") {
+    // Rough-in is locked at the collected amount. The finish invoice gets the
+    // remainder of everything still collectible (contract + permit). The
+    // rough-in portion shown in the live preview is an informational
+    // decomposition of that frozen total minus the current permit fee.
+    const initialInvoiceAmountCents = Math.round(roughInInvoice.amountCents) || 0;
+    const finishInvoiceAmountCents = Math.max(
+      0,
+      totalCollectible - initialInvoiceAmountCents
+    );
+    const roughInAmountCents = Math.max(
+      0,
+      initialInvoiceAmountCents - permitFeeCents
+    );
+    return {
+      roughInAmountCents,
+      finishAmountCents: finishInvoiceAmountCents,
+      initialInvoiceAmountCents,
+      finishInvoiceAmountCents,
+      totalInvoicedCents:
+        initialInvoiceAmountCents + finishInvoiceAmountCents,
+      // The split is bypassed while rough-in is locked, so treat the setup as
+      // balanced so saving is not blocked on the (now-irrelevant) percentages.
+      isBalanced: true,
+      percentTotal: 100
+    };
+  }
 
   const roughInAmountCents = Math.round((contract * roughInPercent) / 100);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import { computeInvoiceAmounts } from "@/lib/invoice-calculations";
@@ -113,6 +113,16 @@ export function InvoiceBuilder({
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState(false);
 
+  // Once the rough-in (initial) invoice is paid, its amount is frozen — the
+  // money was collected. Any later change to the line items, contract, or
+  // permit then flows ONLY to the finish invoice (computeInvoiceAmounts does
+  // this: finish = contract + permit - paid rough-in). The rough-in/finish
+  // split is bypassed while locked, so the % fields are disabled and the
+  // live preview shows the lock instead of the split.
+  const roughInPaid =
+    existing?.invoices.find((invoice) => invoice.kind === "initial")
+      ?.status === "paid";
+
   // The contract is the sum of line totals when there are lines, otherwise the
   // manual contract amount.
   const contractCents = useMemo(() => {
@@ -160,10 +170,11 @@ export function InvoiceBuilder({
     const changes: { kind: InvoiceKind; fromCents: number; toCents: number }[] = [];
     for (const prev of existing.invoices) {
       if (prev.status !== "paid") continue;
-      const toCents =
-        prev.kind === "initial"
-          ? amounts.initialInvoiceAmountCents
-          : amounts.finishInvoiceAmountCents;
+      // The paid rough-in is frozen and never changes (handled in
+      // buildInvoiceRecord), so it can never produce a paid-amount change.
+      // Only a paid FINISH invoice whose recomputed amount differs is flagged.
+      if (prev.kind === "initial") continue;
+      const toCents = amounts.finishInvoiceAmountCents;
       if (prev.amountCents !== toCents) {
         changes.push({ kind: prev.kind, fromCents: prev.amountCents, toCents });
       }
@@ -173,13 +184,29 @@ export function InvoiceBuilder({
 
   function buildInvoiceRecord(kind: InvoiceKind, now: string): InvoiceRecord {
     const prev = existing?.invoices.find((invoice) => invoice.kind === kind);
+
+    // The paid rough-in is frozen: never recompute or reset it. The finish
+    // invoice absorbs all changes (see computeInvoiceAmounts), so the rough-in
+    // keeps exactly the amount that was collected, stays paid, and keeps its
+    // issued/paid timestamps.
+    if (kind === "initial" && prev?.status === "paid") {
+      return {
+        kind,
+        amountCents: prev.amountCents,
+        status: "paid",
+        issuedAt: prev.issuedAt ?? now,
+        paidAt: prev.paidAt ?? now
+      };
+    }
+
     const amountCents =
       kind === "initial"
         ? amounts.initialInvoiceAmountCents
         : amounts.finishInvoiceAmountCents;
 
-    // Reset a previously-paid invoice when its amount changes (see note on
-    // paidAmountChanges). The owner must re-mark it paid against the new amount.
+    // Reset a previously-paid FINISH invoice when its amount changes (see note
+    // on paidAmountChanges). The owner must re-mark it paid against the new
+    // amount. (The paid rough-in is handled above and never reaches here.)
     if (prev?.status === "paid" && prev.amountCents !== amountCents) {
       return {
         kind,
@@ -396,7 +423,7 @@ export function InvoiceBuilder({
               <th className="p-3" aria-hidden></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-pine/10 bg-cream">
+          <tbody className="bg-cream">
             {scopeLines.length === 0 ? (
               <tr>
                 <td colSpan={6} className="p-4 text-sm font-bold text-charcoal/55">
@@ -409,62 +436,70 @@ export function InvoiceBuilder({
                 const name = resolveName(line.pricingItemId, line.name);
                 const lineTotalCents = line.quantity * line.unitPriceCents;
                 return (
-                  <tr key={index}>
-                    <td className="min-w-0 p-3 align-top">
-                      <p className="break-words font-black text-deep-pine">{name}</p>
-                      <textarea
-                        value={line.comment}
-                        onChange={(event) =>
-                          updateScopeComment(index, event.target.value)
-                        }
-                        placeholder="Customer-facing note (optional)"
-                        rows={2}
-                        className="form-input mt-2 w-full max-w-full resize-y text-xs"
-                      />
-                    </td>
-                    <td className="p-3 align-top">
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={line.quantity === 0 ? "" : line.quantity}
-                        onChange={(event) =>
-                          updateScopeQuantity(
-                            index,
-                            event.target.value === "" ? 0 : Number(event.target.value)
-                          )
-                        }
-                        placeholder="1"
-                        className="form-input w-24"
-                      />
-                    </td>
-                    <td className="whitespace-nowrap p-3 align-top text-charcoal/70">
-                      {line.unitType}
-                    </td>
-                    <td className="p-3 align-top">
-                      <FormattedNumberInput
-                        value={centsToDollars(line.unitPriceCents)}
-                        onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
-                        allowDecimal
-                        min={0}
-                        placeholder="0"
-                        className="form-input w-28"
-                      />
-                    </td>
-                    <td className="whitespace-nowrap p-3 align-top font-black text-deep-pine">
-                      {formatCurrency(lineTotalCents)}
-                    </td>
-                    <td className="p-3 align-top">
-                      <button
-                        type="button"
-                        onClick={() => removeScopeLine(index)}
-                        title="Remove this line item"
-                        className="rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
-                      >
-                        Remove
-                      </button>
-                    </td>
-                  </tr>
+                  <Fragment key={index}>
+                    <tr>
+                      <td className="min-w-0 p-3 align-top">
+                        <p className="break-words font-black text-deep-pine">{name}</p>
+                      </td>
+                      <td className="p-3 align-top">
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={line.quantity === 0 ? "" : line.quantity}
+                          onChange={(event) =>
+                            updateScopeQuantity(
+                              index,
+                              event.target.value === "" ? 0 : Number(event.target.value)
+                            )
+                          }
+                          placeholder="1"
+                          className="form-input w-24"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap p-3 align-top text-charcoal/70">
+                        {line.unitType}
+                      </td>
+                      <td className="p-3 align-top">
+                        <FormattedNumberInput
+                          value={centsToDollars(line.unitPriceCents)}
+                          onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
+                          allowDecimal
+                          min={0}
+                          placeholder="0"
+                          className="form-input w-28"
+                        />
+                      </td>
+                      <td className="whitespace-nowrap p-3 align-top font-black text-deep-pine">
+                        {formatCurrency(lineTotalCents)}
+                      </td>
+                      <td className="p-3 align-top">
+                        <button
+                          type="button"
+                          onClick={() => removeScopeLine(index)}
+                          title="Remove this line item"
+                          className="rounded-full border border-clay/30 px-3 py-2 text-xs font-black text-clay hover:bg-clay/10"
+                        >
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                    {/* Comment row — spans the full width of the table so the
+                        customer-facing note sits beneath the whole line item. */}
+                    <tr>
+                      <td colSpan={6} className="border-b border-pine/10 p-3 pt-0">
+                        <textarea
+                          value={line.comment}
+                          onChange={(event) =>
+                            updateScopeComment(index, event.target.value)
+                          }
+                          placeholder="Customer-facing note (optional)"
+                          rows={2}
+                          className="form-input w-full max-w-full resize-y text-xs"
+                        />
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })
             )}
@@ -517,7 +552,18 @@ export function InvoiceBuilder({
       )}
 
       {/* Split + permit. The contract is the sum of the line items above; when
-          there are no line items, a manual contract amount is used instead. */}
+          there are no line items, a manual contract amount is used instead.
+          Once the rough-in invoice is paid, the rough-in/finish split is
+          bypassed (the finish absorbs any change), so the % fields are locked. */}
+      {roughInPaid ? (
+        <div className="mt-6 rounded-soft border border-pine/15 bg-sage/20 p-4 text-sm font-bold leading-6 text-deep-pine">
+          The rough-in invoice is paid, so its amount is locked. Any change you
+          make to the line items, contract, or permit fee here will adjust the
+          finish invoice only — the paid rough-in will not move. The rough-in /
+          finish split is no longer used while the rough-in is paid.
+        </div>
+      ) : null}
+
       <div className="mt-6 grid gap-4 md:grid-cols-2">
         {scopeLines.length === 0 ? (
           <Field label="Contract Amount ($)">
@@ -556,7 +602,8 @@ export function InvoiceBuilder({
               )
             }
             placeholder="50"
-            className="form-input"
+            disabled={roughInPaid}
+            className="form-input disabled:cursor-not-allowed disabled:opacity-60"
           />
         </Field>
 
@@ -573,7 +620,8 @@ export function InvoiceBuilder({
               )
             }
             placeholder="50"
-            className="form-input"
+            disabled={roughInPaid}
+            className="form-input disabled:cursor-not-allowed disabled:opacity-60"
           />
         </Field>
       </div>
@@ -586,28 +634,44 @@ export function InvoiceBuilder({
           <PreviewLine
             label="Rough-in amount"
             value={formatCurrency(amounts.roughInAmountCents)}
-            sub={`${roughInPercent}% of contract`}
+            sub={
+              roughInPaid
+                ? "paid and locked"
+                : `${roughInPercent}% of contract`
+            }
           />
           <PreviewLine
             label="Permit fee"
             value={formatCurrency(dollarsToCents(permitDollars))}
           />
           <PreviewLine
-            label="Initial invoice total"
+            label={roughInPaid ? "Initial invoice (locked)" : "Initial invoice total"}
             value={formatCurrency(amounts.initialInvoiceAmountCents)}
-            sub="rough-in + permit"
+            sub={roughInPaid ? "frozen — collected" : "rough-in + permit"}
             emphasize
           />
           <PreviewLine
             label="Finish invoice total"
             value={formatCurrency(amounts.finishInvoiceAmountCents)}
-            sub={`${finishPercent}% of contract`}
+            sub={
+              roughInPaid
+                ? "balance after rough-in"
+                : `${finishPercent}% of contract`
+            }
             emphasize
           />
         </div>
 
         <div className="mt-3 text-sm font-bold">
-          {amounts.isBalanced ? (
+          {roughInPaid ? (
+            <p className="text-deep-pine">
+              Rough-in is paid and locked at{" "}
+              {formatCurrency(amounts.initialInvoiceAmountCents)}. The finish
+              invoice carries the remaining{" "}
+              {formatCurrency(amounts.finishInvoiceAmountCents)} of the{" "}
+              {formatCurrency(amounts.totalInvoicedCents)} total.
+            </p>
+          ) : amounts.isBalanced ? (
             <p className="text-deep-pine">
               Split totals 100% ({amounts.percentTotal}%). Invoices sum to{" "}
               {formatCurrency(amounts.totalInvoicedCents)}.

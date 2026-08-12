@@ -86,11 +86,20 @@ export async function loadInvoicePdfInput(
 
   const title = kind === "initial" ? "Initial Invoice" : "Finish Invoice";
 
+  // When the rough-in is paid, its amount is locked and the finish absorbs
+  // any later changes (see computeInvoiceAmounts). The initial invoice is a
+  // historical record of what was collected, so label the rough-in line as
+  // paid/locked rather than quoting a now-stale percentage of a contract
+  // that may have been edited since.
+  const roughInPaid = invoice.status === "paid";
+
   const lines =
     kind === "initial"
       ? [
           {
-            label: `Rough-In (${invoiceData.roughInPercent}% of contract)`,
+            label: roughInPaid
+              ? "Rough-In (paid, locked)"
+              : `Rough-In (${invoiceData.roughInPercent}% of contract)`,
             amount: formatCurrency(amounts.roughInAmountCents)
           },
           // Only show the permit fee line when there is one; a $0 permit fee
