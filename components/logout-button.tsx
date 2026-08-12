@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-// Small client logout control shown in the app header. Clears the Supabase
-// session and returns to /login.
-export function LogoutButton() {
+// Small client logout control shown in the app header (and now in the nav
+// panel foot). Clears the Supabase session and returns to /login. Accepts an
+// optional className so the nav foot can restyle it (full-width, clay) while
+// the header keeps its default pill look.
+export function LogoutButton({ className }: { className?: string }) {
   const router = useRouter();
   const [isWorking, setIsWorking] = useState(false);
 
@@ -26,7 +28,10 @@ export function LogoutButton() {
       type="button"
       onClick={handleClick}
       disabled={isWorking}
-      className="rounded-full border border-pine/20 px-4 py-2 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine disabled:opacity-60"
+      className={
+        className ??
+        "rounded-full border border-pine/20 px-4 py-2 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine disabled:opacity-60"
+      }
     >
       {isWorking ? "..." : "Logout"}
     </button>

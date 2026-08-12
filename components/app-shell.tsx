@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LogoutButton } from "@/components/logout-button";
+import { NavMenu } from "@/components/nav-menu";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -30,51 +30,15 @@ export function AppShell({ children }: AppShellProps) {
             </div>
           </Link>
 
-          <nav className="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:items-center">
-            <Link
-              href="/"
-              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
-            >
-              Dashboard
-            </Link>
-            <Link
-              href="/quotes"
-              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
-            >
-              Quotes
-            </Link>
-            <Link
-              href="/receivables"
-              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
-            >
-              Receivables
-            </Link>
-            <Link
-              href="/schedule"
-              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
-            >
-              Schedule
-            </Link>
-            <Link
-              href="/email-log"
-              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
-            >
-              Email Log
-            </Link>
-            <Link
-              href="/pricing-admin"
-              className="rounded-full px-4 py-3 text-center text-sm font-bold text-charcoal/70 hover:bg-pine/10 hover:text-deep-pine"
-            >
-              Pricing
-            </Link>
+          <div className="flex w-full items-center gap-2 md:w-auto md:gap-3">
             <Link
               href="/quotes/new"
-              className="rounded-full bg-pine px-4 py-3 text-center text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine md:px-5"
+              className="focus-ring rounded-full bg-pine px-4 py-3 text-center text-sm font-black text-whitewarm shadow-card transition-colors hover:bg-deep-pine md:px-5"
             >
-              Start New Quote
+              + New Quote
             </Link>
-            <LogoutButton />
-          </nav>
+            <NavMenu />
+          </div>
         </div>
       </header>
 
