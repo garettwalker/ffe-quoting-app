@@ -164,7 +164,7 @@ function ReceivablesHeader() {
       <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
         Every invoiced job in one place. Pending Payments shows what is still
         outstanding; Historical Paid shows jobs that are paid in full. Filter by
-        period and sort to chase down balances.
+        period and sort to follow up on balances.
       </p>
     </div>
   );

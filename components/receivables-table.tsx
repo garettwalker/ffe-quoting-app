@@ -185,7 +185,7 @@ export function ReceivablesTable({ jobs }: ReceivablesTableProps) {
 
       <ReceivablesSection
         eyebrow="Pending Payments"
-        title="Outstanding balances to chase down"
+        title="Outstanding balances to follow up on"
         description="Jobs that still owe money. Mark the last unpaid invoice paid to move a job to Historical Paid."
         jobs={pending}
         emptyCopy="No outstanding invoices in this period. Everything is paid up."
