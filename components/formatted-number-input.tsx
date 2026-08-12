@@ -13,7 +13,8 @@ export function FormattedNumberInput({
   className,
   allowDecimal = false,
   min,
-  max
+  max,
+  onBlur
 }: {
   value: number;
   onChange: (value: number) => void;
@@ -22,6 +23,7 @@ export function FormattedNumberInput({
   allowDecimal?: boolean;
   min?: number;
   max?: number;
+  onBlur?: () => void;
 }) {
   const [draft, setDraft] = useState("");
   const [focused, setFocused] = useState(false);
@@ -68,7 +70,10 @@ export function FormattedNumberInput({
       placeholder={placeholder}
       onChange={(event) => handleChange(event.target.value)}
       onFocus={handleFocus}
-      onBlur={() => setFocused(false)}
+      onBlur={() => {
+        setFocused(false);
+        onBlur?.();
+      }}
       className={className}
     />
   );

@@ -123,18 +123,27 @@ export function InvoiceBuilder({
     existing?.invoices.find((invoice) => invoice.kind === "initial")
       ?.status === "paid";
 
-  // Unit prices of lines loaded from the SAVED invoice, keyed by
-  // pricingItemId. Used on save to catch accidental price edits: if a loaded
-  // line's unit price changed, we confirm before committing (the owner asked
-  // for a guard after accidentally editing a price instead of a quantity).
-  // Newly added lines are NOT tracked here, so setting their price on a new
-  // line is not treated as an accidental change.
+  // Starting unit price of each line that was on the form at load, keyed by
+  // pricingItemId. Used to catch accidental price edits: when the owner
+  // leaves a unit-price field whose value no longer matches its starting
+  // price, we confirm before keeping the change (the owner asked for a guard
+  // after accidentally editing a price instead of a quantity). Covers lines
+  // loaded from the saved invoice AND lines seeded from the quote on a
+  // first-time setup. Lines added by the owner during this session are NOT
+  // tracked here, so setting the price on a line they just added is not
+  // treated as an accidental change.
   const [originalPriceByItemId] = useState<Record<string, number>>(() => {
     const map: Record<string, number> = {};
-    if (existing && Array.isArray(existing.scopeLines)) {
-      for (const line of existing.scopeLines) {
-        if (line.pricingItemId) map[line.pricingItemId] = line.unitPriceCents;
-      }
+    // Match the scope-lines seeding logic: saved invoice scope if present,
+    // else the quote seed for a brand-new setup. A legacy invoice (existing
+    // but no scopeLines) starts with no tracked lines.
+    const baseline = Array.isArray(existing?.scopeLines)
+      ? existing!.scopeLines
+      : existing
+        ? []
+        : seedScopeLines;
+    for (const line of baseline) {
+      if (line.pricingItemId) map[line.pricingItemId] = line.unitPriceCents;
     }
     return map;
   });
@@ -272,6 +281,25 @@ export function InvoiceBuilder({
     );
   }
 
+  // When the owner leaves a unit-price field, confirm the change if the price
+  // no longer matches its starting value (catches accidental price edits
+  // instead of a quantity edit). Cancel reverts the price to its starting
+  // value. Lines the owner added this session have no tracked starting price,
+  // so setting their price is not flagged.
+  function confirmScopeUnitPrice(index: number) {
+    const line = scopeLines[index];
+    if (!line || !line.pricingItemId) return;
+    const original = originalPriceByItemId[line.pricingItemId];
+    if (original === undefined || original === line.unitPriceCents) return;
+    const name = resolveName(line.pricingItemId, line.name);
+    const ok = window.confirm(
+      `You changed the unit price for ${name} from ${formatCurrency(original)} to ${formatCurrency(line.unitPriceCents)}.\n\nKeep this price change?`
+    );
+    if (!ok) {
+      updateScopeUnitPrice(index, centsToDollars(original));
+    }
+  }
+
   function updateScopeComment(index: number, comment: string) {
     setScopeLines((prev) =>
       prev.map((line, i) => (i === index ? { ...line, comment } : line))
@@ -328,33 +356,6 @@ export function InvoiceBuilder({
         `The rough-in (${roughInPercent}%) and finish (${finishPercent}%) percentages must total 100% before saving. They currently total ${amounts.percentTotal}%.`
       );
       return;
-    }
-
-    // Guard against accidental unit-price edits (the owner asked for this
-    // after changing a price by mistake instead of a quantity). Before
-    // committing, list any line loaded from the saved invoice whose unit
-    // price changed and confirm. Cancel aborts the save so the owner can
-    // review. Newly added lines are not tracked, so setting their price is
-    // not flagged.
-    const priceChanges = scopeLines.filter(
-      (line) =>
-        line.pricingItemId &&
-        originalPriceByItemId[line.pricingItemId] !== undefined &&
-        originalPriceByItemId[line.pricingItemId] !== line.unitPriceCents
-    );
-    if (priceChanges.length > 0) {
-      const list = priceChanges
-        .map((line) => {
-          const itemName = resolveName(line.pricingItemId, line.name);
-          const from = formatCurrency(originalPriceByItemId[line.pricingItemId]);
-          const to = formatCurrency(line.unitPriceCents);
-          return `${itemName}: ${from} to ${to}`;
-        })
-        .join("\n");
-      const ok = window.confirm(
-        `You changed the unit price on ${priceChanges.length} line(s):\n\n${list}\n\nAre you sure you want to save these price changes?`
-      );
-      if (!ok) return;
     }
 
     setIsSaving(true);
@@ -513,6 +514,7 @@ export function InvoiceBuilder({
                           <FormattedNumberInput
                             value={centsToDollars(line.unitPriceCents)}
                             onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
+                            onBlur={() => confirmScopeUnitPrice(index)}
                             allowDecimal
                             min={0}
                             placeholder="0"
