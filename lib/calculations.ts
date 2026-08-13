@@ -58,6 +58,15 @@ export function calculateQuote(
 
   const safeSquareFootage = sanitizeQuantity(quote.squareFootage);
 
+  // Count adder lines the owner has given a per-customer price override, so
+  // the internal math breakdown can state their scope explicitly (they bypass
+  // the pricing-level/contingency multiplier).
+  const overriddenAdderLineCount = quote.lineItems.filter(
+    (line) =>
+      typeof line.unitPriceCents === "number" &&
+      Number.isFinite(line.unitPriceCents)
+  ).length;
+
   const basePackageBaseTotalCents = safeSquareFootage * baseRate.cents;
 
   // Adder lines whose unit price the owner has overridden snap to that
@@ -139,9 +148,12 @@ export function calculateQuote(
     selectedAddersBaseTotalCents,
     totalBeforeClientMultiplierCents,
     pricingLevelMultiplier: pricingLevel.multiplier,
+    pricingLevelName: pricingLevel.name,
     contingencyMultiplier: contingency.multiplier,
+    contingencyName: contingency.name,
     combinedClientMultiplier,
     clientQuoteTotalCents,
+    overriddenAdderLineCount,
     clientFacingLines: [baseLine, ...selectedAdders]
   };
 }
@@ -173,13 +185,41 @@ export function categoryDisplayName(category: string): string {
   return category;
 }
 
+// Resolve the per-square-foot base rate for a quote. The primary source is the
+// owner's chosen rate stored directly on the quote (baseRateCents + a label),
+// which is a point-in-time snapshot. Quotes saved before that field existed
+// fall back to the legacy auto logic (base-pricing mode + high-ceiling toggle
+// + square footage) so they keep rendering at the rate they were built with
+// until they are re-saved in the new builder.
 function getBaseRate(quote: QuoteFormState): {
+  cents: number;
+  label: string;
+} {
+  if (
+    typeof quote.baseRateCents === "number" &&
+    Number.isFinite(quote.baseRateCents) &&
+    quote.baseRateCents > 0
+  ) {
+    return {
+      cents: Math.round(quote.baseRateCents),
+      label: quote.baseRateLabel?.trim() || "Selected base rate"
+    };
+  }
+
+  return deriveLegacyBaseRate(quote);
+}
+
+// Legacy base-rate derivation, kept only so pre-base-rate-preset quotes still
+// load. New quotes never use this: the builder stores the chosen rate directly.
+// Exported so the builder can pre-fill the new base-rate dropdown when opening
+// a quote saved under the old model.
+export function deriveLegacyBaseRate(quote: QuoteFormState): {
   cents: number;
   label: string;
 } {
   if (quote.basePricingMode === "manual") {
     return {
-      cents: sanitizeMoneyCents(quote.manualBaseRateCents),
+      cents: sanitizeMoneyCents(quote.manualBaseRateCents ?? 0),
       label: "Manual base rate"
     };
   }

@@ -188,7 +188,21 @@ export type PricingCatalog = {
   levels: PricingLevel[];
   contingencies: ContingencyOption[];
   projectTypes: ProjectType[];
+  baseRates: BaseRate[];
   settings: AppSettings;
+};
+
+// A named per-square-foot base-rate preset the owner picks from in the builder
+// (e.g. "Standard - $6.00", "Big complex / all-in - $8.00"). Admin-editable in
+// Pricing Admin (see components/base-rate-editor.tsx). The quote stores the
+// chosen rate cents directly (a snapshot), so editing a preset later does not
+// move already-saved quotes.
+export type BaseRate = {
+  id: string;
+  name: string;
+  rateCents: number;
+  active: boolean;
+  sortOrder: number;
 };
 
 export type QuoteLineInput = {
@@ -221,9 +235,19 @@ export type QuoteFormState = {
   projectZip: string;
   projectType: string;
   squareFootage: number;
-  basePricingMode: BasePricingMode;
-  manualBaseRateCents: number;
-  highCeilingOrComplexSwitching: boolean;
+  // The primary price lever: the per-square-foot rate for the Base Package.
+  // The owner picks a named preset (baseRateId) or enters a custom rate; the
+  // effective rate is stored directly as a snapshot (baseRateCents +
+  // baseRateLabel). This replaces the old base-pricing-mode + high-ceiling
+  // auto logic. The three legacy fields below are kept ONLY so saved quotes
+  // from before this change still load; they are optional and no longer edited
+  // in the builder. See lib/calculations.ts (getBaseRate legacy fallback).
+  baseRateCents?: number;
+  baseRateLabel?: string;
+  baseRateId?: string | null;
+  basePricingMode?: BasePricingMode;
+  manualBaseRateCents?: number;
+  highCeilingOrComplexSwitching?: boolean;
   pricingLevelId: string;
   contingencyId: string;
   internalNotes: string;
@@ -253,8 +277,14 @@ export type QuoteCalculationResult = {
   selectedAddersBaseTotalCents: number;
   totalBeforeClientMultiplierCents: number;
   pricingLevelMultiplier: number;
+  pricingLevelName: string;
   contingencyMultiplier: number;
+  contingencyName: string;
   combinedClientMultiplier: number;
   clientQuoteTotalCents: number;
+  // How many adder lines have a per-customer unit-price override (those lines
+  // bypass the pricing-level/contingency multiplier). Surfaced in the internal
+  // math breakdown so the scope of each lever is explicit.
+  overriddenAdderLineCount: number;
   clientFacingLines: CalculatedLineItem[];
 };

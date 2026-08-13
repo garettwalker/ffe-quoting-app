@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { QuoteStatusButton } from "@/components/quote-status-button";
 import { StatusBadge } from "@/components/status-badge";
-import { formatCurrency, formatDate } from "@/lib/currency";
+import { formatCurrency, formatDate, formatPercent } from "@/lib/currency";
 import { getEmailHistoryForQuote } from "@/lib/email-log";
 import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -151,7 +151,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
             />
             <ReviewField
               label="Base Rate"
-              value={formatCurrency(result.baseRateCents)}
+              value={`${result.baseRateLabel ?? "Base rate"} - ${formatCurrency(result.baseRateCents)}/sf`}
             />
           </div>
 
@@ -194,6 +194,72 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+              Internal Math Breakdown
+            </p>
+            <p className="mb-4 text-xs font-medium leading-5 text-charcoal/55">
+              Not shown to the customer. Each lever is tagged with what it moves:
+              the Base Package only, the adders only, or both.
+            </p>
+
+            <div className="space-y-2 rounded-xl1 border border-pine/10 bg-cream p-4">
+              <BreakdownRow
+                label={`Base rate (${result.baseRateLabel ?? "Base rate"})`}
+                value={`${formatCurrency(result.baseRateCents)}/sf x ${quote.squareFootage.toLocaleString()} sf`}
+                total={formatCurrency(result.basePackageBaseTotalCents)}
+                scope="Base pkg only"
+              />
+              <BreakdownRow
+                label="Selected adders (catalog base prices)"
+                value={
+                  (result.overriddenAdderLineCount ?? 0) > 0
+                    ? `${result.overriddenAdderLineCount} custom-priced line${
+                        (result.overriddenAdderLineCount ?? 0) === 1 ? "" : "s"
+                      } skip the multipliers`
+                    : "pre-multiplier adder totals"
+                }
+                total={formatCurrency(result.selectedAddersBaseTotalCents)}
+                scope="Adders only"
+              />
+              <BreakdownRow
+                label="Before adjustments"
+                value="base pkg + adders"
+                total={formatCurrency(result.totalBeforeClientMultiplierCents)}
+              />
+              <BreakdownRow
+                label={`Pricing level: ${result.pricingLevelName ?? "Standard"}`}
+                value={formatPercent(result.pricingLevelMultiplier)}
+                scope="Base + adders"
+              />
+              <BreakdownRow
+                label={`Contingency: ${result.contingencyName ?? "0%"}`}
+                value={formatPercent(result.contingencyMultiplier)}
+                scope="Base + adders"
+              />
+              <BreakdownRow
+                label="Combined multiplier"
+                value={formatPercent(result.combinedClientMultiplier)}
+                scope="Base + adders"
+              />
+              <div className="flex items-center justify-between gap-4 border-t border-pine/15 pt-3">
+                <span className="text-sm font-black text-deep-pine">
+                  Final Quote
+                </span>
+                <span className="text-sm font-black text-deep-pine">
+                  {formatCurrency(result.clientQuoteTotalCents)}
+                </span>
+              </div>
+              {(result.overriddenAdderLineCount ?? 0) > 0 ? (
+                <p className="text-xs font-bold leading-4 text-charcoal/55">
+                  Includes {result.overriddenAdderLineCount} custom-priced adder
+                  line{(result.overriddenAdderLineCount ?? 0) === 1 ? "" : "s"}{" "}
+                  added at their set price (multipliers skipped).
+                </p>
+              ) : null}
             </div>
           </div>
         </section>
@@ -388,6 +454,37 @@ function ReviewField({ label, value }: { label: string; value: string }) {
         {label}
       </p>
       <p className="break-words font-black text-deep-pine">{value}</p>
+    </div>
+  );
+}
+
+function BreakdownRow({
+  label,
+  value,
+  total,
+  scope
+}: {
+  label: string;
+  value: string;
+  total?: string;
+  scope?: string;
+}) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <span className="block text-sm font-bold text-charcoal/70">{label}</span>
+        <span className="block text-xs font-medium text-charcoal/45">{value}</span>
+        {scope ? (
+          <span className="mt-1 inline-block rounded-full bg-sage/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-deep-pine">
+            {scope}
+          </span>
+        ) : null}
+      </div>
+      {total ? (
+        <span className="shrink-0 text-right text-sm font-black text-deep-pine">
+          {total}
+        </span>
+      ) : null}
     </div>
   );
 }

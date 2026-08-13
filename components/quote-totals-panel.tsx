@@ -5,6 +5,24 @@ type QuoteTotalsPanelProps = {
   result: QuoteCalculationResult;
 };
 
+// A small scope tag next to a lever row so the owner can see at a glance
+// whether that lever moves the Base Package, the adders, or both. The whole
+// point of this panel is to make the math legible instead of burying every
+// effect inside each line's final price.
+function ScopeTag({ scope }: { scope: "sqft" | "adders" | "both" | "line" }) {
+  const map = {
+    sqft: "Base pkg only",
+    adders: "Adders only",
+    both: "Base + adders",
+    line: "This line only"
+  } as const;
+  return (
+    <span className="rounded-full bg-sage/30 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-deep-pine">
+      {map[scope]}
+    </span>
+  );
+}
+
 export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
   return (
     <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
@@ -19,32 +37,48 @@ export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
       <div className="mt-6 space-y-3">
         <TotalRow
           label="Base rate used"
-          value={`${formatCurrency(result.baseRateCents)} / sq ft`}
+          value={`${formatCurrency(result.baseRateCents)}/sf`}
+          sub={result.baseRateLabel}
+          scope="sqft"
         />
-        <TotalRow label="Base rate logic" value={result.baseRateLabel} />
         <TotalRow
           label="Base package"
           value={formatCurrency(result.basePackageBaseTotalCents)}
+          sub="sq ft x base rate"
+          scope="sqft"
         />
         <TotalRow
           label="Selected adders"
           value={formatCurrency(result.selectedAddersBaseTotalCents)}
+          sub={
+            result.overriddenAdderLineCount > 0
+              ? `${result.overriddenAdderLineCount} custom-priced line${
+                  result.overriddenAdderLineCount === 1 ? "" : "s"
+                } (ignore multipliers)`
+              : "catalog base prices"
+          }
+          scope="adders"
         />
         <TotalRow
           label="Before adjustments"
           value={formatCurrency(result.totalBeforeClientMultiplierCents)}
+          sub="base pkg + adders, pre-multiplier"
         />
         <TotalRow
-          label="Pricing level"
+          label={`Pricing level: ${result.pricingLevelName}`}
           value={formatPercent(result.pricingLevelMultiplier)}
+          scope="both"
         />
         <TotalRow
-          label="Contingency"
+          label={`Contingency: ${result.contingencyName}`}
           value={formatPercent(result.contingencyMultiplier)}
+          scope="both"
         />
         <TotalRow
           label="Combined multiplier"
           value={formatPercent(result.combinedClientMultiplier)}
+          sub="level x contingency"
+          scope="both"
         />
       </div>
 
@@ -55,16 +89,45 @@ export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
             {formatCurrency(result.clientQuoteTotalCents)}
           </span>
         </div>
+        {result.overriddenAdderLineCount > 0 ? (
+          <p className="mt-2 text-xs font-bold leading-4 text-whitewarm/80">
+            Includes {result.overriddenAdderLineCount} custom-priced adder
+            line{result.overriddenAdderLineCount === 1 ? "" : "s"} added at their
+            set price (multipliers skipped).
+          </p>
+        ) : null}
       </div>
     </aside>
   );
 }
 
-function TotalRow({ label, value }: { label: string; value: string }) {
+function TotalRow({
+  label,
+  value,
+  sub,
+  scope
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  scope?: "sqft" | "adders" | "both" | "line";
+}) {
   return (
     <div className="flex items-start justify-between gap-4 border-b border-pine/10 pb-3 last:border-0 last:pb-0">
-      <span className="text-sm font-bold text-charcoal/65">{label}</span>
-      <span className="text-right text-sm font-black text-deep-pine">
+      <div className="min-w-0">
+        <span className="block text-sm font-bold text-charcoal/65">{label}</span>
+        {sub ? (
+          <span className="block text-xs font-medium text-charcoal/45">
+            {sub}
+          </span>
+        ) : null}
+        {scope ? (
+          <span className="mt-1 block">
+            <ScopeTag scope={scope} />
+          </span>
+        ) : null}
+      </div>
+      <span className="shrink-0 text-right text-sm font-black text-deep-pine">
         {value}
       </span>
     </div>

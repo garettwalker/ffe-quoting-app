@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { BaseRateEditor } from "@/components/base-rate-editor";
 import { ContingencyEditor } from "@/components/contingency-editor";
 import { CrewEditor } from "@/components/crew-editor";
 import { PricingItemEditor } from "@/components/pricing-item-editor";
@@ -54,6 +55,7 @@ export default async function PricingAdminPage() {
       ) : null}
 
       <div className="space-y-8">
+        <BaseRateEditor baseRates={catalog.baseRates} />
         <PricingItemEditor items={catalog.items} />
         <PricingLevelEditor levels={catalog.levels} />
         <ContingencyEditor contingencies={catalog.contingencies} />

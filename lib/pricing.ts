@@ -1,6 +1,7 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   AppSettings,
+  BaseRate,
   ContingencyOption,
   PricingCatalog,
   PricingItem,
@@ -50,35 +51,49 @@ export async function getSettings(): Promise<AppSettings> {
 // sort_order) plus the app settings. Used by the builder entry points.
 export async function getPricingCatalog(): Promise<PricingCatalog> {
   const supabase = getSupabaseServer();
-  const [itemsRes, levelsRes, contingenciesRes, projectTypesRes, settings] =
-    await Promise.all([
-      supabase
-        .from("pricing_items")
-        .select(
-          "id, category, name, unit_type, base_price_cents, active, sort_order"
-        )
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("pricing_levels")
-        .select("id, name, multiplier, description, active, sort_order")
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("contingency_options")
-        .select("id, name, multiplier, active, sort_order")
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("project_types")
-        .select("id, name, active, sort_order")
-        .order("sort_order", { ascending: true }),
-      getSettings()
-    ]);
+  const [
+    itemsRes,
+    levelsRes,
+    contingenciesRes,
+    projectTypesRes,
+    baseRatesRes,
+    settings
+  ] = await Promise.all([
+    supabase
+      .from("pricing_items")
+      .select(
+        "id, category, name, unit_type, base_price_cents, active, sort_order"
+      )
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("pricing_levels")
+      .select("id, name, multiplier, description, active, sort_order")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("contingency_options")
+      .select("id, name, multiplier, active, sort_order")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("project_types")
+      .select("id, name, active, sort_order")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("base_rates")
+      .select("id, name, rate_cents, active, sort_order")
+      .order("sort_order", { ascending: true }),
+    getSettings()
+  ]);
 
   const items = (itemsRes.data ?? []).map(toPricingItem);
   const levels = (levelsRes.data ?? []).map(toPricingLevel);
   const contingencies = (contingenciesRes.data ?? []).map(toContingencyOption);
   const projectTypes = (projectTypesRes.data ?? []).map(toProjectType);
+  // base_rates is a newer table; if the owner has not run the migration yet,
+  // treat it as empty so the builder falls back to a default rate rather than
+  // crashing (the builder also offers a manual rate entry).
+  const baseRates = (baseRatesRes.data ?? []).map(toBaseRate);
 
-  return { items, levels, contingencies, projectTypes, settings };
+  return { items, levels, contingencies, projectTypes, baseRates, settings };
 }
 
 type PricingItemRow = {
@@ -152,6 +167,24 @@ function toProjectType(row: ProjectTypeRow): ProjectType {
   return {
     id: row.id,
     name: row.name,
+    active: row.active ?? true,
+    sortOrder: row.sort_order ?? 0
+  };
+}
+
+type BaseRateRow = {
+  id: string;
+  name: string;
+  rate_cents: number;
+  active: boolean;
+  sort_order: number;
+};
+
+function toBaseRate(row: BaseRateRow): BaseRate {
+  return {
+    id: row.id,
+    name: row.name,
+    rateCents: row.rate_cents ?? 0,
     active: row.active ?? true,
     sortOrder: row.sort_order ?? 0
   };

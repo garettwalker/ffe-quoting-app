@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { calculateQuote } from "@/lib/calculations";
+import { calculateQuote, deriveLegacyBaseRate } from "@/lib/calculations";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import {
   clearActiveQuote,
@@ -16,7 +16,7 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 // Authenticated browser client (singleton). Carries the logged-in user's
 // session so RLS enforces admin-only writes after the Phase C pass.
 const supabase = getSupabaseBrowser();
-import type { BasePricingMode, PricingCatalog, QuoteFormState } from "@/lib/types";
+import type { PricingCatalog, QuoteFormState } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
@@ -35,13 +35,40 @@ function createDraftQuote(): QuoteFormState {
     projectZip: "",
     projectType: "Custom Home",
     squareFootage: 0,
-    basePricingMode: "auto",
-    manualBaseRateCents: 600,
-    highCeilingOrComplexSwitching: false,
+    // The primary price lever. New quotes start at the default $6.00/sf
+    // "Standard" preset; the owner picks a different preset or a custom rate
+    // in the Pricing Setup section. The legacy auto fields are deliberately
+    // omitted on new quotes (they are optional now).
+    baseRateCents: 600,
+    baseRateLabel: "Standard",
+    baseRateId: null,
     pricingLevelId: "standard-custom",
     contingencyId: "contingency-0",
     internalNotes: "",
     lineItems: []
+  };
+}
+
+// Backfill the new base-rate fields on a quote saved before they existed.
+// Quotes saved under the old model only carry basePricingMode +
+// manualBaseRateCents + highCeilingOrComplexSwitching; deriveLegacyBaseRate
+// replays that logic so the rate the quote was built with is preserved until
+// it is re-saved. baseRateId is left null (a custom/derived rate has no
+// preset). A quote that already has baseRateCents is returned untouched.
+function normalizeLegacyQuote(input: QuoteFormState): QuoteFormState {
+  if (
+    typeof input.baseRateCents === "number" &&
+    Number.isFinite(input.baseRateCents) &&
+    input.baseRateCents > 0
+  ) {
+    return input;
+  }
+  const legacy = deriveLegacyBaseRate(input);
+  return {
+    ...input,
+    baseRateCents: legacy.cents,
+    baseRateLabel: legacy.label,
+    baseRateId: null
   };
 }
 
@@ -63,8 +90,8 @@ export function QuoteBuilder({
   catalog
 }: QuoteBuilderProps) {
   const router = useRouter();
-  const [quote, setQuote] = useState<QuoteFormState>(
-    () => initialQuote ?? createDraftQuote()
+  const [quote, setQuote] = useState<QuoteFormState>(() =>
+    initialQuote ? normalizeLegacyQuote(initialQuote) : createDraftQuote()
   );
   const [savedQuoteId, setSavedQuoteId] = useState<string | undefined>(
     savedQuoteIdProp
@@ -86,7 +113,7 @@ export function QuoteBuilder({
     const storedQuote = getActiveQuote();
 
     if (storedQuote) {
-      setQuote(storedQuote.quote);
+      setQuote(normalizeLegacyQuote(storedQuote.quote));
       if (storedQuote.savedQuoteId) {
         setSavedQuoteId(storedQuote.savedQuoteId);
       }
@@ -117,6 +144,19 @@ export function QuoteBuilder({
       ...current,
       [key]: value
     }));
+  }
+
+  // Set the base-rate lever. The rate is stored as a snapshot (cents + a label
+  // + the preset id, or null for a custom/manual rate). Clears the stale
+  // draft/save messages the same way updateQuote does.
+  function changeBaseRate(next: {
+    baseRateId: string | null;
+    baseRateLabel: string;
+    baseRateCents: number;
+  }) {
+    setCompletionMessage("");
+    setDraftMessage("");
+    setQuote((current) => ({ ...current, ...next }));
   }
 
   function handleAddLineItem(pricingItemId: string) {
@@ -286,9 +326,9 @@ export function QuoteBuilder({
       project_zip: quote.projectZip,
       project_type: quote.projectType,
       square_footage: quote.squareFootage,
-      base_pricing_mode: quote.basePricingMode,
-      manual_base_rate_cents: quote.manualBaseRateCents,
-      high_ceiling_or_complex_switching: quote.highCeilingOrComplexSwitching,
+      base_pricing_mode: quote.basePricingMode ?? "auto",
+      manual_base_rate_cents: quote.manualBaseRateCents ?? quote.baseRateCents ?? 600,
+      high_ceiling_or_complex_switching: quote.highCeilingOrComplexSwitching ?? false,
       pricing_level_id: quote.pricingLevelId,
       contingency_id: quote.contingencyId,
       internal_notes: quote.internalNotes || null,
@@ -520,6 +560,15 @@ export function QuoteBuilder({
             <h2 className="font-display text-3xl font-bold tracking-[-0.035em] text-moss">
               Base rate, pricing level, and contingency.
             </h2>
+            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-charcoal/70">
+              Three levers control the price. The <strong>Base Rate</strong> sets
+              the per-square-foot price of the Base Package only. The{" "}
+              <strong>Pricing Level</strong> and <strong>Contingency</strong> are
+              multipliers that apply to the Base Package <em>and</em> every adder,
+              except adder lines you have given a custom unit price (those keep
+              their custom price and ignore the multipliers). Pick a preset or
+              enter any custom $/sf.
+            </p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -533,63 +582,75 @@ export function QuoteBuilder({
               />
             </Field>
 
-            <Field label="Base Pricing Mode">
+            <Field label="Base Rate (per sq ft)">
               <select
-                value={quote.basePricingMode}
-                onChange={(event) =>
-                  updateQuote(
-                    "basePricingMode",
-                    event.target.value as BasePricingMode
-                  )
+                value={
+                  catalog.baseRates.find((r) => r.id === quote.baseRateId)?.id ??
+                  "__custom"
                 }
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (value === "__custom") {
+                    changeBaseRate({
+                      baseRateId: null,
+                      baseRateLabel: "Custom base rate",
+                      baseRateCents: quote.baseRateCents ?? 600
+                    });
+                  } else {
+                    const preset = catalog.baseRates.find(
+                      (rate) => rate.id === value
+                    );
+                    if (preset) {
+                      changeBaseRate({
+                        baseRateId: preset.id,
+                        baseRateLabel: preset.name,
+                        baseRateCents: preset.rateCents
+                      });
+                    }
+                  }
+                }}
                 className="form-input"
               >
-                <option value="auto">Auto</option>
-                <option value="builder">Builder/Spec</option>
-                <option value="manual">Manual</option>
+                {catalog.baseRates
+                  .filter(
+                    (rate) => rate.active || rate.id === quote.baseRateId
+                  )
+                  .map((rate) => (
+                    <option key={rate.id} value={rate.id}>
+                      {rate.name} - {formatCurrency(rate.rateCents)}/sf
+                    </option>
+                  ))}
+                <option value="__custom">Custom rate...</option>
               </select>
+              <p className="text-xs font-bold leading-4 text-charcoal/55">
+                Affects the Base Package only. Adders are not changed.
+              </p>
             </Field>
 
-            {quote.basePricingMode === "manual" ? (
-              <Field label="Manual Base Rate">
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={
-                    quote.manualBaseRateCents === 0
-                      ? ""
-                      : centsToDollars(quote.manualBaseRateCents)
-                  }
-                  onChange={(event) =>
-                    updateQuote(
-                      "manualBaseRateCents",
-                      event.target.value === ""
-                        ? 0
-                        : dollarsToCents(Number(event.target.value))
-                    )
-                  }
-                  placeholder="Enter rate per sq ft"
-                  className="form-input"
-                />
+            {!catalog.baseRates.find((r) => r.id === quote.baseRateId) ? (
+              <Field label="Custom Base Rate ($/sf)">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-bold text-charcoal/55">$</span>
+                  <FormattedNumberInput
+                    value={centsToDollars(quote.baseRateCents ?? 600)}
+                    onChange={(dollars) =>
+                      changeBaseRate({
+                        baseRateCents: dollarsToCents(dollars),
+                        baseRateLabel: "Custom base rate",
+                        baseRateId: null
+                      })
+                    }
+                    allowDecimal
+                    min={0}
+                    placeholder="Enter rate per sq ft"
+                    className="form-input"
+                  />
+                </div>
+                <p className="text-xs font-bold leading-4 text-charcoal/55">
+                  Affects the Base Package only. Adders are not changed.
+                </p>
               </Field>
             ) : null}
-
-            <Field label="High Ceiling / Complex Switching">
-              <select
-                value={quote.highCeilingOrComplexSwitching ? "yes" : "no"}
-                onChange={(event) =>
-                  updateQuote(
-                    "highCeilingOrComplexSwitching",
-                    event.target.value === "yes"
-                  )
-                }
-                className="form-input"
-              >
-                <option value="no">No</option>
-                <option value="yes">Yes</option>
-              </select>
-            </Field>
 
             <Field label="Pricing Level">
               <select
@@ -609,6 +670,10 @@ export function QuoteBuilder({
                     </option>
                   ))}
               </select>
+              <p className="text-xs font-bold leading-4 text-charcoal/55">
+                Multiplier on the Base Package and all adders (except custom-priced
+                adder lines).
+              </p>
             </Field>
 
             <Field label="Contingency">
@@ -621,8 +686,7 @@ export function QuoteBuilder({
               >
                 {catalog.contingencies
                   .filter(
-                    (option) =>
-                      option.active || option.id === quote.contingencyId
+                    (option) => option.active || option.id === quote.contingencyId
                   )
                   .map((option) => (
                     <option key={option.id} value={option.id}>
@@ -630,6 +694,10 @@ export function QuoteBuilder({
                     </option>
                   ))}
               </select>
+              <p className="text-xs font-bold leading-4 text-charcoal/55">
+                Multiplier on the Base Package and all adders (except custom-priced
+                adder lines).
+              </p>
             </Field>
           </div>
         </section>

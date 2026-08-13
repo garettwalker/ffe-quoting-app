@@ -64,9 +64,9 @@ export default function QuoteReviewPage() {
       project_zip: quote.projectZip,
       project_type: quote.projectType,
       square_footage: quote.squareFootage,
-      base_pricing_mode: quote.basePricingMode,
-      manual_base_rate_cents: quote.manualBaseRateCents,
-      high_ceiling_or_complex_switching: quote.highCeilingOrComplexSwitching,
+      base_pricing_mode: quote.basePricingMode ?? "auto",
+      manual_base_rate_cents: quote.manualBaseRateCents ?? quote.baseRateCents ?? 600,
+      high_ceiling_or_complex_switching: quote.highCeilingOrComplexSwitching ?? false,
       pricing_level_id: quote.pricingLevelId,
       contingency_id: quote.contingencyId,
       internal_notes: quote.internalNotes || null,
@@ -235,7 +235,7 @@ export default function QuoteReviewPage() {
             />
             <ReviewField
               label="Base Rate"
-              value={formatCurrency(result.baseRateCents)}
+              value={`${result.baseRateLabel} - ${formatCurrency(result.baseRateCents)}/sf`}
             />
           </div>
 
