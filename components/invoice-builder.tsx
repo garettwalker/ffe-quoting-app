@@ -15,6 +15,7 @@ import type {
   InvoiceRecord,
   PricingItem
 } from "@/lib/types";
+import { CatalogPicker } from "@/components/catalog-picker";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 
 // One editable scope line on the invoice. The name is resolved from the
@@ -577,25 +578,12 @@ export function InvoiceBuilder({
 
       {availableItems.length > 0 ? (
         <div className="mt-3">
-          <label className="mb-1 block text-xs font-black uppercase tracking-[0.1em] text-deep-pine">
-            Add a line item
-          </label>
-          <select
-            className="form-input min-h-12"
-            defaultValue=""
-            onChange={(event) => {
-              if (!event.target.value) return;
-              addScopeLine(event.target.value);
-              event.target.value = "";
-            }}
-          >
-            <option value="">Choose an item from the catalog...</option>
-            {availableItems.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.category} - {item.name}
-              </option>
-            ))}
-          </select>
+          <CatalogPicker
+            items={availableItems}
+            onPick={addScopeLine}
+            label="Add a line item"
+            emptyLabel="All catalog adders are already on this invoice."
+          />
         </div>
       ) : (
         <p className="mt-3 text-sm font-bold text-charcoal/55">

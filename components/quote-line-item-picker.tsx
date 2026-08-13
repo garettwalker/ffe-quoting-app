@@ -2,6 +2,7 @@
 
 import type { PricingItem, QuoteLineInput } from "@/lib/types";
 import { formatCurrency } from "@/lib/currency";
+import { CatalogPicker } from "@/components/catalog-picker";
 
 type QuoteLineItemPickerProps = {
   // The full pricing-items catalog (active + inactive), fetched from Supabase
@@ -45,22 +46,12 @@ export function QuoteLineItemPicker({
       </div>
 
       <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-        <select
-          className="focus-ring min-h-12 min-w-0 rounded-soft border border-pine/20 bg-whitewarm px-4 font-bold text-charcoal"
-          defaultValue=""
-          onChange={(event) => {
-            if (!event.target.value) return;
-            onAddLineItem(event.target.value);
-            event.target.value = "";
-          }}
-        >
-          <option value="">Choose an item to add</option>
-          {availableItems.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.category} - {item.name} - {formatCurrency(item.basePriceCents)}
-            </option>
-          ))}
-        </select>
+        <CatalogPicker
+          items={availableItems}
+          onPick={onAddLineItem}
+          placeholder="Search the catalog to add an adder..."
+          emptyLabel="All catalog adders are already on this quote."
+        />
 
         <div className="rounded-soft border border-pine/10 bg-cream px-4 py-3 text-sm font-black text-deep-pine">
           {lineItems.length} selected
