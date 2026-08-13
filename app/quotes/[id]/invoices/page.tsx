@@ -4,6 +4,7 @@ import { AppShell } from "@/components/app-shell";
 import { InvoiceBuilder } from "@/components/invoice-builder";
 import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
+import { DeleteInvoicesButton } from "@/components/delete-invoices-button";
 import { formatCurrency } from "@/lib/currency";
 import { invoiceReference, outstandingCents, isPaidInFull } from "@/lib/invoice-calculations";
 import { buildPayUrl } from "@/lib/pay-token";
@@ -37,7 +38,7 @@ type PageProps = {
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [user, { data, error }, catalog] = await Promise.all([
+  const [user, { data, error }, catalog, paymentsRes] = await Promise.all([
     getServerUser(),
     supabase
       .from("quotes")
@@ -46,7 +47,14 @@ export default async function InvoicingPage({ params }: PageProps) {
       )
       .eq("id", params.id)
       .single(),
-    getPricingCatalog()
+    getPricingCatalog(),
+    // Count real payment ledger rows for this job (card / ACH / manual). Any
+    // row means money has been taken and the invoice setup cannot be cleared
+    // without orphaning the audit trail. head: true returns only the count.
+    supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_id", params.id)
   ]);
 
   if (error || !data || !data.quote_data || !data.calculation_data) {
@@ -80,6 +88,19 @@ export default async function InvoicingPage({ params }: PageProps) {
   const contractTotalCents = invoiceData
     ? invoiceData.contractAmountCents
     : result.clientQuoteTotalCents;
+
+  // Guard for "Delete invoices": block when a payment has been recorded (ledger
+  // row) or any invoice is flagged paid. Either means real money is tied to
+  // this setup and clearing it would orphan the audit trail.
+  const paymentCount = paymentsRes.count ?? 0;
+  const hasPaidInvoice = Boolean(
+    invoiceData && invoiceData.invoices.some((inv) => inv.status === "paid")
+  );
+  const deleteBlocked = paymentCount > 0 || hasPaidInvoice;
+  const deleteBlockedReason =
+    paymentCount > 0
+      ? "A payment has been recorded on this job (card, ACH, or manual), so the invoices cannot be deleted without orphaning that payment record. Reverse the payment in Stripe first if needed, then try again."
+      : "An invoice on this job is marked paid, so the invoices cannot be deleted. Mark it unpaid first (which also removes its manual ledger row), then try again.";
 
   return (
     <AppShell>
@@ -200,6 +221,14 @@ export default async function InvoicingPage({ params }: PageProps) {
                   payUrl={buildPayUrl(row.id, "finish")}
                 />
               ) : null}
+            </div>
+
+            <div className="mt-6 border-t border-pine/10 pt-5">
+              <DeleteInvoicesButton
+                quoteId={row.id}
+                blocked={deleteBlocked}
+                blockedReason={deleteBlockedReason}
+              />
             </div>
           </section>
         ) : (
