@@ -199,6 +199,15 @@ export type QuoteLineInput = {
   // means no comment. Stored inside quote_data.lineItems (JSONB), so no
   // schema migration is needed; old saved quotes simply have no comment.
   comment?: string;
+  // Optional per-line unit-price override in cents. When unset, the line's
+  // customer-facing unit price is derived from the catalog base price x the
+  // quote's pricing-level/contingency multiplier (the default). When set, this
+  // is the absolute per-unit price the customer pays for this line and the
+  // multiplier no longer applies to it. Lets Chad edit prices per customer
+  // (the catalog + pricing level are just the starting point). Stored in
+  // quote_data.lineItems (JSONB); old saved quotes have no field and keep the
+  // derived price. See lib/calculations.ts (calculateLineItem override branch).
+  unitPriceCents?: number;
 };
 
 export type QuoteFormState = {

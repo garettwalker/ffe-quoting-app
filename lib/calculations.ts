@@ -60,6 +60,15 @@ export function calculateQuote(
 
   const basePackageBaseTotalCents = safeSquareFootage * baseRate.cents;
 
+  // Adder lines whose unit price the owner has overridden snap to that
+  // absolute client price (the pricing-level/contingency multiplier no longer
+  // applies to them); the rest stay derived from catalog base x multiplier.
+  // The grand total must therefore split: derived lines roll up under the one
+  // multiplier pass (preserving the original rounding exactly for quotes with
+  // no overrides), and overridden lines add their absolute line totals on top.
+  let overriddenAddersClientTotalCents = 0;
+  let derivedAddersBaseTotalCents = 0;
+
   const selectedAdders = quote.lineItems
     .map((line) => {
       const item = items.find(
@@ -70,12 +79,24 @@ export function calculateQuote(
         return null;
       }
 
-      return calculateLineItem(
+      const calc = calculateLineItem(
         item,
         line.quantity,
         combinedClientMultiplier,
-        line.comment
+        line.comment,
+        line.unitPriceCents
       );
+
+      if (
+        typeof line.unitPriceCents === "number" &&
+        Number.isFinite(line.unitPriceCents)
+      ) {
+        overriddenAddersClientTotalCents += calc.clientLineTotalCents;
+      } else {
+        derivedAddersBaseTotalCents += calc.baseLineTotalCents;
+      }
+
+      return calc;
     })
     .filter((line): line is CalculatedLineItem => Boolean(line));
 
@@ -87,9 +108,11 @@ export function calculateQuote(
   const totalBeforeClientMultiplierCents =
     basePackageBaseTotalCents + selectedAddersBaseTotalCents;
 
-  const clientQuoteTotalCents = Math.round(
-    totalBeforeClientMultiplierCents * combinedClientMultiplier
-  );
+  const clientQuoteTotalCents =
+    Math.round(
+      (basePackageBaseTotalCents + derivedAddersBaseTotalCents) *
+        combinedClientMultiplier
+    ) + overriddenAddersClientTotalCents;
 
   const baseClientUnitPriceCents = Math.round(
     baseRate.cents * combinedClientMultiplier
@@ -192,12 +215,19 @@ function calculateLineItem(
   item: PricingItem,
   quantity: number,
   combinedClientMultiplier: number,
-  comment?: string
+  comment?: string,
+  unitPriceCentsOverride?: number
 ): CalculatedLineItem {
   const safeQuantity = sanitizeQuantity(quantity);
-  const clientUnitPriceCents = Math.round(
-    item.basePriceCents * combinedClientMultiplier
-  );
+  const overridden =
+    typeof unitPriceCentsOverride === "number" &&
+    Number.isFinite(unitPriceCentsOverride);
+  // An override is the absolute per-unit price the customer pays; the
+  // pricing-level/contingency multiplier is bypassed for that line. Without
+  // one, the client unit price is catalog base x the combined multiplier.
+  const clientUnitPriceCents = overridden
+    ? Math.round(unitPriceCentsOverride as number)
+    : Math.round(item.basePriceCents * combinedClientMultiplier);
 
   return {
     pricingItemId: item.id,

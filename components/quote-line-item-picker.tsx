@@ -1,8 +1,11 @@
 "use client";
 
+import { useRef } from "react";
+
 import type { PricingItem, QuoteLineInput } from "@/lib/types";
-import { formatCurrency } from "@/lib/currency";
+import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import { CatalogPicker } from "@/components/catalog-picker";
+import { FormattedNumberInput } from "@/components/formatted-number-input";
 
 type QuoteLineItemPickerProps = {
   // The full pricing-items catalog (active + inactive), fetched from Supabase
@@ -11,8 +14,13 @@ type QuoteLineItemPickerProps = {
   // an inactive selected item still displays.
   items: PricingItem[];
   lineItems: QuoteLineInput[];
+  // Combined pricing-level x contingency multiplier, so a line with no
+  // per-customer price override can show its derived client unit price
+  // (catalog base x multiplier) as the editable field's default.
+  clientMultiplier: number;
   onAddLineItem: (pricingItemId: string) => void;
   onUpdateQuantity: (pricingItemId: string, quantity: number) => void;
+  onUpdateUnitPrice: (pricingItemId: string, unitPriceCents: number) => void;
   onUpdateComment: (pricingItemId: string, comment: string) => void;
   onRemoveLineItem: (pricingItemId: string) => void;
 };
@@ -20,8 +28,10 @@ type QuoteLineItemPickerProps = {
 export function QuoteLineItemPicker({
   items,
   lineItems,
+  clientMultiplier,
   onAddLineItem,
   onUpdateQuantity,
+  onUpdateUnitPrice,
   onUpdateComment,
   onRemoveLineItem
 }: QuoteLineItemPickerProps) {
@@ -33,6 +43,47 @@ export function QuoteLineItemPicker({
     (item) =>
       !lineItems.some((lineItem) => lineItem.pricingItemId === item.id)
   );
+
+  // Per-line dollars value captured when the Unit Price field gains focus, so
+  // the on-blur price-change confirmation only fires on a real edit (not when
+  // the derived price shifted because the pricing level changed).
+  const priceAtFocus = useRef<Record<string, number>>({});
+
+  // The effective per-unit price (cents) for a line: the owner's override when
+  // set, otherwise the derived catalog base x the job's multiplier.
+  function effectiveUnitPriceCents(
+    line: QuoteLineInput,
+    item: PricingItem
+  ): number {
+    if (
+      typeof line.unitPriceCents === "number" &&
+      Number.isFinite(line.unitPriceCents)
+    ) {
+      return Math.round(line.unitPriceCents);
+    }
+    return Math.round(item.basePriceCents * clientMultiplier);
+  }
+
+  // On blur: if the owner changed the unit price, confirm before keeping it
+  // (mirrors the invoice builder's guard against accidental price edits).
+  function confirmUnitPrice(
+    line: QuoteLineInput,
+    item: PricingItem
+  ) {
+    const baselineDollars = priceAtFocus.current[line.pricingItemId];
+    if (baselineDollars === undefined) return;
+    const currentCents = effectiveUnitPriceCents(line, item);
+    const baselineCents = dollarsToCents(baselineDollars);
+    if (currentCents === baselineCents) return;
+    const keep = window.confirm(
+      `You changed the unit price for ${item.name} from ${formatCurrency(
+        baselineCents
+      )} to ${formatCurrency(currentCents)}.\n\nKeep this price change?`
+    );
+    if (!keep) {
+      onUpdateUnitPrice(line.pricingItemId, baselineCents);
+    }
+  }
 
   return (
     <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
@@ -72,6 +123,8 @@ export function QuoteLineItemPicker({
 
               if (!item) return null;
 
+              const unitPriceCents = effectiveUnitPriceCents(lineItem, item);
+
               return (
                 <div
                   key={lineItem.pricingItemId}
@@ -82,12 +135,12 @@ export function QuoteLineItemPicker({
                       {item.name}
                     </p>
                     <p className="break-words text-sm font-bold text-charcoal/60">
-                      {item.category} • {item.unitType} •{" "}
+                      {item.category} &middot; {item.unitType} &middot; List{" "}
                       {formatCurrency(item.basePriceCents)}
                     </p>
                   </div>
 
-                  <div className="mt-4 grid gap-3 sm:grid-cols-[180px_auto] sm:items-end sm:justify-between">
+                  <div className="mt-4 grid gap-3 sm:grid-cols-[170px_190px_auto] sm:items-end sm:justify-between">
                     <label className="grid min-w-0 gap-1">
                       <span className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                         Qty
@@ -106,6 +159,36 @@ export function QuoteLineItemPicker({
                         }
                         className="focus-ring h-12 w-full min-w-0 rounded-soft border border-pine/20 bg-whitewarm px-3 font-bold text-charcoal"
                       />
+                    </label>
+
+                    <label className="grid min-w-0 gap-1">
+                      <span className="text-xs font-black uppercase tracking-[0.12em] text-clay">
+                        Unit Price
+                      </span>
+                      <div
+                        className="flex items-center gap-1.5"
+                        onFocus={() => {
+                          priceAtFocus.current[lineItem.pricingItemId] =
+                            centsToDollars(unitPriceCents);
+                        }}
+                      >
+                        <span className="text-sm font-bold text-charcoal/55">
+                          $
+                        </span>
+                        <FormattedNumberInput
+                          value={centsToDollars(unitPriceCents)}
+                          onChange={(dollars) =>
+                            onUpdateUnitPrice(
+                              lineItem.pricingItemId,
+                              dollarsToCents(dollars)
+                            )
+                          }
+                          allowDecimal
+                          min={0}
+                          onBlur={() => confirmUnitPrice(lineItem, item)}
+                          className="form-input h-12 w-full min-w-0"
+                        />
+                      </div>
                     </label>
 
                     <button

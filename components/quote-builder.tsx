@@ -178,6 +178,22 @@ export function QuoteBuilder({
     }));
   }
 
+  function handleUpdateUnitPrice(pricingItemId: string, unitPriceCents: number) {
+    setCompletionMessage("");
+    setDraftMessage("");
+    setQuote((current) => ({
+      ...current,
+      lineItems: current.lineItems.map((lineItem) =>
+        lineItem.pricingItemId === pricingItemId
+          ? {
+              ...lineItem,
+              unitPriceCents
+            }
+          : lineItem
+      )
+    }));
+  }
+
   function resetQuote() {
     clearActiveQuote();
     setSavedQuoteId(undefined);
@@ -621,8 +637,10 @@ export function QuoteBuilder({
         <QuoteLineItemPicker
           items={catalog.items}
           lineItems={quote.lineItems}
+          clientMultiplier={result.combinedClientMultiplier}
           onAddLineItem={handleAddLineItem}
           onUpdateQuantity={handleUpdateQuantity}
+          onUpdateUnitPrice={handleUpdateUnitPrice}
           onUpdateComment={handleUpdateComment}
           onRemoveLineItem={handleRemoveLineItem}
         />
