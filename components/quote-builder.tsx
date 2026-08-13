@@ -16,7 +16,7 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 // Authenticated browser client (singleton). Carries the logged-in user's
 // session so RLS enforces admin-only writes after the Phase C pass.
 const supabase = getSupabaseBrowser();
-import type { PricingCatalog, QuoteFormState } from "@/lib/types";
+import type { BaseRate, PricingCatalog, QuoteFormState } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
@@ -72,6 +72,29 @@ function normalizeLegacyQuote(input: QuoteFormState): QuoteFormState {
   };
 }
 
+// If a quote's rate (cents) happens to exactly match one of the admin presets,
+// link it to that preset (set baseRateId + the preset's label) so the dropdown
+// shows the preset as selected and the manual-rate box stays hidden. This is
+// the "manual rate only applies when you DON'T pick a numerical choice" rule:
+// a new quote defaults to $6, which matches the Standard preset, so it opens
+// with Standard selected — not in custom mode. Runs only on initial load
+// (new quote, loaded saved quote, or resumed browser draft); typing a custom
+// rate later intentionally stays in custom mode even if it matches a preset.
+// A quote already linked to a preset (baseRateId set) is left alone.
+function adoptBaseRatePreset(
+  input: QuoteFormState,
+  baseRates: BaseRate[]
+): QuoteFormState {
+  if (input.baseRateId) return input;
+  const match = baseRates.find(
+    (rate) => rate.active && rate.rateCents === input.baseRateCents
+  );
+  if (match) {
+    return { ...input, baseRateId: match.id, baseRateLabel: match.name };
+  }
+  return input;
+}
+
 type QuoteBuilderProps = {
   // When provided, the builder opens in edit mode prefilled with this saved
   // quote and ignores the browser's active-quote storage for initial load.
@@ -91,7 +114,9 @@ export function QuoteBuilder({
 }: QuoteBuilderProps) {
   const router = useRouter();
   const [quote, setQuote] = useState<QuoteFormState>(() =>
-    initialQuote ? normalizeLegacyQuote(initialQuote) : createDraftQuote()
+    initialQuote
+      ? adoptBaseRatePreset(normalizeLegacyQuote(initialQuote), catalog.baseRates)
+      : adoptBaseRatePreset(createDraftQuote(), catalog.baseRates)
   );
   const [savedQuoteId, setSavedQuoteId] = useState<string | undefined>(
     savedQuoteIdProp
@@ -113,7 +138,12 @@ export function QuoteBuilder({
     const storedQuote = getActiveQuote();
 
     if (storedQuote) {
-      setQuote(normalizeLegacyQuote(storedQuote.quote));
+      setQuote(
+        adoptBaseRatePreset(
+          normalizeLegacyQuote(storedQuote.quote),
+          catalog.baseRates
+        )
+      );
       if (storedQuote.savedQuoteId) {
         setSavedQuoteId(storedQuote.savedQuoteId);
       }
