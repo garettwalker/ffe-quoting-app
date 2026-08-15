@@ -22,6 +22,11 @@ import type {
 // reload. No new tables — everything is derived from quotes.invoice_data.
 export const dynamic = "force-dynamic";
 
+// Ceiling on how many invoiced jobs the table loads. High enough that it
+// covers the full book for a long time; if it's ever reached the headline
+// totals would undercount, so a warning renders to tell the owner to raise it.
+const RECEIVABLES_LIMIT = 500;
+
 type ReceivablesRow = {
   id: string;
   quote_id: string;
@@ -94,7 +99,7 @@ export default async function ReceivablesPage() {
     .eq("status", "accepted")
     .not("invoice_data", "is", null)
     .order("created_at", { ascending: false })
-    .limit(200);
+    .limit(RECEIVABLES_LIMIT);
 
   if (error) {
     return (
@@ -124,9 +129,21 @@ export default async function ReceivablesPage() {
   );
   const totalPaid = totalInvoiced - totalOutstanding;
 
+  // True when the query hit its cap: invoiced jobs older than the cap are
+  // dropped, so the headline totals would undercount. Tell the owner.
+  const capped = rows.length >= RECEIVABLES_LIMIT;
+
   return (
     <AppShell>
       <ReceivablesHeader />
+
+      {capped ? (
+        <p className="mb-6 rounded-soft border border-clay/30 bg-clay/10 px-4 py-3 text-sm font-bold text-clay">
+          This view reached its cap ({RECEIVABLES_LIMIT} invoiced jobs), so older
+          jobs are not included and these totals may be undercounting. Raise the
+          cap in app/receivables/page.tsx to fix the count.
+        </p>
+      ) : null}
 
       <div className="mb-8 grid gap-3 sm:grid-cols-3">
         <SummaryCard label="Total Invoiced" value={formatCurrency(totalInvoiced)} />

@@ -12,6 +12,12 @@ import type { DashboardQuoteRow } from "@/lib/types";
 // is where the day-to-day quoting work lives.
 export const dynamic = "force-dynamic";
 
+// Ceiling on how many quotes the pipeline loads. High enough that every
+// non-archived quote shows up in some stage for a long time; if it's ever
+// reached a warning renders so the owner knows older quotes are being dropped
+// and the cap should be raised.
+const PIPELINE_LIMIT = 500;
+
 export default async function QuotesPage() {
   const supabase = getSupabaseServer();
   const { data, error } = await supabase
@@ -20,7 +26,7 @@ export default async function QuotesPage() {
       "id, quote_id, quote_date, client_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
     )
     .order("created_at", { ascending: false })
-    .limit(50);
+    .limit(PIPELINE_LIMIT);
 
   if (error) {
     return (
@@ -48,9 +54,21 @@ export default async function QuotesPage() {
   const pending = rows.filter((row) => stageOf(row) === "pending_payment");
   const paid = rows.filter((row) => stageOf(row) === "paid_in_full");
 
+  // True when the query hit its cap: quotes older than the cap are dropped and
+  // won't appear in any stage. Tell the owner so they can raise PIPELINE_LIMIT.
+  const capped = rows.length >= PIPELINE_LIMIT;
+
   return (
     <AppShell>
       <QuotesHeader />
+
+      {capped ? (
+        <p className="mb-6 rounded-soft border border-clay/30 bg-clay/10 px-4 py-3 text-sm font-bold text-clay">
+          The pipeline reached its cap ({PIPELINE_LIMIT} quotes), so quotes older
+          than that are not shown in any stage. Raise the cap in
+          app/quotes/page.tsx to surface them.
+        </p>
+      ) : null}
 
       <DashboardQuoteSection
         eyebrow="Stage 1"

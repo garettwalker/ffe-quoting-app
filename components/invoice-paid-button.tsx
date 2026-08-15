@@ -19,12 +19,21 @@ export function InvoicePaidButton({
   quoteId,
   invoiceData,
   kind,
-  recordedBy
+  recordedBy,
+  markUnpaidBlocked,
+  markUnpaidBlockedReason
 }: {
   quoteId: string;
   invoiceData: InvoiceData;
   kind: InvoiceKind;
   recordedBy: string;
+  // True when a real online payment (card or ACH) has succeeded for this
+  // invoice. The invoice flag is then the webhook's to manage: reversing real
+  // money is a Stripe refund (charge.refunded flips the flag back), not a
+  // manual toggle here. Blocking only the Mark Unpaid direction keeps Mark
+  // Paid always available (that direction can never desync the ledger).
+  markUnpaidBlocked?: boolean;
+  markUnpaidBlockedReason?: string;
 }) {
   const router = useRouter();
   const [isWorking, setIsWorking] = useState(false);
@@ -33,6 +42,13 @@ export function InvoicePaidButton({
   const current = invoiceData.invoices.find((invoice) => invoice.kind === kind);
   const isPaid = current?.status === "paid";
   const label = isPaid ? "Mark Unpaid" : "Mark Paid";
+
+  // A paid invoice that was paid online can't be flipped unpaid from here,
+  // because that would desync the flag from the succeeded payment row (AR
+  // would show money owed that was actually collected). Show the notice
+  // instead of the button; the owner refunds in Stripe and the webhook
+  // un-marks it.
+  const showUnpaidBlock = isPaid && markUnpaidBlocked;
 
   async function handleClick() {
     if (isWorking) return;
@@ -124,6 +140,17 @@ export function InvoicePaidButton({
     }
 
     router.refresh();
+  }
+
+  if (showUnpaidBlock) {
+    return (
+      <div className="rounded-xl1 border border-clay/20 bg-cream/60 p-4">
+        <p className="text-sm font-black text-clay">Paid online</p>
+        <p className="mt-1 text-sm font-bold leading-6 text-charcoal/70">
+          {markUnpaidBlockedReason}
+        </p>
+      </div>
+    );
   }
 
   const variantClass = isPaid

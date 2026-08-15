@@ -38,7 +38,7 @@ type PageProps = {
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [user, { data, error }, catalog, paymentsRes] = await Promise.all([
+  const [user, { data, error }, catalog, paymentsRes, stripePaidRes] = await Promise.all([
     getServerUser(),
     supabase
       .from("quotes")
@@ -54,7 +54,20 @@ export default async function InvoicingPage({ params }: PageProps) {
     supabase
       .from("payments")
       .select("id", { count: "exact", head: true })
+      .eq("quote_id", params.id),
+    // Succeeded ONLINE payments (card / ACH) per invoice kind. A succeeded
+    // Stripe row means real money was collected; the Mark Unpaid button is
+    // blocked for that invoice because flipping the flag back to unpaid here
+    // would desync it from the ledger (AR would show money owed that was
+    // collected). The reversal path for real online money is a Stripe refund,
+    // which the webhook catches (charge.refunded) and flips the flag itself.
+    // Manual-paid invoices are not blocked: Mark Unpaid reverses those.
+    supabase
+      .from("payments")
+      .select("invoice_kind")
       .eq("quote_id", params.id)
+      .neq("method", "manual")
+      .eq("status", "succeeded")
   ]);
 
   if (error || !data || !data.quote_data || !data.calculation_data) {
@@ -101,6 +114,16 @@ export default async function InvoicingPage({ params }: PageProps) {
     paymentCount > 0
       ? "A payment has been recorded on this job (card, ACH, or manual), so the invoices cannot be deleted without orphaning that payment record. Reverse the payment in Stripe first if needed, then try again."
       : "An invoice on this job is marked paid, so the invoices cannot be deleted. Mark it unpaid first (which also removes its manual ledger row), then try again.";
+
+  // Invoice kinds that have a succeeded online (card / ACH) payment. Marking
+  // those unpaid is blocked (see InvoicePaidButton).
+  const stripePaidKinds = new Set<string>(
+    ((stripePaidRes.data ?? []) as { invoice_kind: string }[]).map(
+      (r) => r.invoice_kind
+    )
+  );
+  const markUnpaidBlockedReason =
+    "This invoice was paid online by card or bank transfer, so it can't be marked unpaid from here. To reverse it, issue a refund in Stripe and this invoice will mark itself unpaid automatically once the refund is confirmed.";
 
   return (
     <AppShell>
@@ -205,6 +228,8 @@ export default async function InvoicingPage({ params }: PageProps) {
                   status={initialInvoice.status}
                   recordedBy={user?.email ?? ""}
                   payUrl={buildPayUrl(row.id, "initial")}
+                  markUnpaidBlocked={stripePaidKinds.has("initial")}
+                  markUnpaidBlockedReason={markUnpaidBlockedReason}
                 />
               ) : null}
 
@@ -219,6 +244,8 @@ export default async function InvoicingPage({ params }: PageProps) {
                   status={finishInvoice.status}
                   recordedBy={user?.email ?? ""}
                   payUrl={buildPayUrl(row.id, "finish")}
+                  markUnpaidBlocked={stripePaidKinds.has("finish")}
+                  markUnpaidBlockedReason={markUnpaidBlockedReason}
                 />
               ) : null}
             </div>
@@ -251,7 +278,9 @@ function InvoiceCard({
   amountCents,
   status,
   recordedBy,
-  payUrl
+  payUrl,
+  markUnpaidBlocked,
+  markUnpaidBlockedReason
 }: {
   quoteId: string;
   invoiceData: InvoiceData;
@@ -262,6 +291,8 @@ function InvoiceCard({
   status: "unpaid" | "paid";
   recordedBy: string;
   payUrl: string | null;
+  markUnpaidBlocked: boolean;
+  markUnpaidBlockedReason: string;
 }) {
   return (
     <div className="rounded-xl1 border border-pine/10 bg-cream p-4">
@@ -285,7 +316,14 @@ function InvoiceCard({
         >
           View invoice
         </Link>
-        <InvoicePaidButton quoteId={quoteId} invoiceData={invoiceData} kind={kind} recordedBy={recordedBy} />
+        <InvoicePaidButton
+          quoteId={quoteId}
+          invoiceData={invoiceData}
+          kind={kind}
+          recordedBy={recordedBy}
+          markUnpaidBlocked={markUnpaidBlocked}
+          markUnpaidBlockedReason={markUnpaidBlockedReason}
+        />
       </div>
 
       {payUrl ? (

@@ -9,7 +9,7 @@ import {
 } from "@/lib/invoice-calculations";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
-import type { DashboardQuoteRow } from "@/lib/types";
+import type { DashboardQuoteRow, InvoiceData } from "@/lib/types";
 
 // Overview dashboard: the landing hub for the whole app. At-a-glance tiles
 // link into each tool — Quotes (the lifecycle pipeline at /quotes), Receivables
@@ -18,43 +18,78 @@ import type { DashboardQuoteRow } from "@/lib/types";
 export const dynamic = "force-dynamic";
 
 const RECENT_COUNT = 5;
+// Ceiling on the money-tiles query (accepted quotes with invoice setup). High
+// enough that it won't bite for a long time; if it's ever reached the tiles
+// would undercount, so a warning renders when the result hits this cap.
+const MONEY_LIMIT = 500;
 
 export default async function DashboardPage() {
   const supabase = getSupabaseServer();
-  const { data, error } = await supabase
-    .from("quotes")
-    .select(
-      "id, quote_id, quote_date, client_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
-    )
-    .order("created_at", { ascending: false })
-    .limit(50);
+  // Three queries so the tiles are accurate at any volume instead of being
+  // derived from the most-recent rows:
+  //   1. Active quotes = exact count of draft + prepared (head-only).
+  //   2. Money tiles = accepted quotes with invoice setup, newest first. Only
+  //      accepted quotes can be Pending Payments or Paid in Full, and these
+  //      are the only rows the money math needs.
+  //   3. Recent list = the latest few quotes (full columns for the cards).
+  const [activeCountRes, moneyRes, recentRes] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["draft", "prepared"]),
+    supabase
+      .from("quotes")
+      .select("invoice_data, created_at")
+      .eq("status", "accepted")
+      .not("invoice_data", "is", null)
+      .order("created_at", { ascending: false })
+      .limit(MONEY_LIMIT),
+    supabase
+      .from("quotes")
+      .select(
+        "id, quote_id, quote_date, client_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(RECENT_COUNT)
+  ]);
 
-  if (error) {
+  const firstError = activeCountRes.error || moneyRes.error || recentRes.error;
+  if (firstError) {
     return (
       <AppShell>
         <DashboardHeader />
         <p className="rounded-xl2 border border-clay/30 bg-cream p-5 font-bold text-clay">
-          Could not load quotes from the database. {error.message}
+          Could not load quotes from the database. {firstError.message}
         </p>
       </AppShell>
     );
   }
 
-  const rows = (data ?? []) as DashboardQuoteRow[];
-  const stageOf = (row: DashboardQuoteRow) =>
-    lifecycleStage(normalizeStatus(row.status), row.invoice_data);
+  const activeQuotes = activeCountRes.count ?? 0;
 
-  const activeQuotes = rows.filter(
-    (row) => stageOf(row) === "draft" || stageOf(row) === "prepared"
-  ).length;
-  const pendingJobs = rows.filter((row) => stageOf(row) === "pending_payment");
-  const paidJobs = rows.filter((row) => stageOf(row) === "paid_in_full");
+  // Money tiles from the accepted+invoiced rows. All of these are status
+  // "accepted", so the stage is derived purely from the invoice setup.
+  const moneyRows = (moneyRes.data ?? []) as {
+    invoice_data: InvoiceData | null;
+  }[];
+  const moneyStageOf = (row: { invoice_data: InvoiceData | null }) =>
+    lifecycleStage("accepted", row.invoice_data);
+  const pendingJobs = moneyRows.filter(
+    (row) => moneyStageOf(row) === "pending_payment"
+  );
+  const paidJobs = moneyRows.filter(
+    (row) => moneyStageOf(row) === "paid_in_full"
+  );
   const totalOutstanding = pendingJobs.reduce(
     (sum, row) => sum + outstandingCents(row.invoice_data),
     0
   );
+  // If the money query hit its cap, the tiles may undercount (there could be
+  // more accepted+invoiced jobs beyond the cap). Surface a warning so the owner
+  // knows to raise MONEY_LIMIT.
+  const moneyCapped = moneyRows.length >= MONEY_LIMIT;
 
-  const recent = rows.slice(0, RECENT_COUNT);
+  const recent = (recentRes.data ?? []) as DashboardQuoteRow[];
 
   return (
     <AppShell>
@@ -114,6 +149,14 @@ export default async function DashboardPage() {
           sub="Items, levels, business info"
         />
       </div>
+
+      {moneyCapped ? (
+        <p className="mb-8 rounded-soft border border-clay/30 bg-clay/10 px-4 py-3 text-sm font-bold text-clay">
+          The collections tiles reached their internal cap ({MONEY_LIMIT} accepted
+          invoiced jobs), so these totals may be undercounting. Raise the cap in
+          app/page.tsx to fix the count.
+        </p>
+      ) : null}
 
       <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
         <div className="mb-4 flex items-baseline justify-between gap-3">
