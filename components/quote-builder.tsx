@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { calculateQuote, deriveLegacyBaseRate } from "@/lib/calculations";
+import { DEFAULT_BASE_RATES } from "@/lib/base-rates";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import {
   clearActiveQuote,
@@ -113,10 +114,16 @@ export function QuoteBuilder({
   catalog
 }: QuoteBuilderProps) {
   const router = useRouter();
+  // The DB is the source of truth for base-rate presets when it has rows; when
+  // the base_rates table is empty/missing (migration not run, fresh env) fall
+  // back to the built-in DEFAULT_BASE_RATES so the dropdown is never empty.
+  // Pricing Admin does NOT get this fallback — it shows the real DB state.
+  const effectiveBaseRates =
+    catalog.baseRates.length > 0 ? catalog.baseRates : DEFAULT_BASE_RATES;
   const [quote, setQuote] = useState<QuoteFormState>(() =>
     initialQuote
-      ? adoptBaseRatePreset(normalizeLegacyQuote(initialQuote), catalog.baseRates)
-      : adoptBaseRatePreset(createDraftQuote(), catalog.baseRates)
+      ? adoptBaseRatePreset(normalizeLegacyQuote(initialQuote), effectiveBaseRates)
+      : adoptBaseRatePreset(createDraftQuote(), effectiveBaseRates)
   );
   const [savedQuoteId, setSavedQuoteId] = useState<string | undefined>(
     savedQuoteIdProp
@@ -141,7 +148,7 @@ export function QuoteBuilder({
       setQuote(
         adoptBaseRatePreset(
           normalizeLegacyQuote(storedQuote.quote),
-          catalog.baseRates
+          effectiveBaseRates
         )
       );
       if (storedQuote.savedQuoteId) {
@@ -615,7 +622,7 @@ export function QuoteBuilder({
             <Field label="Base Rate (per sq ft)">
               <select
                 value={
-                  catalog.baseRates.find((r) => r.id === quote.baseRateId)?.id ??
+                  effectiveBaseRates.find((r) => r.id === quote.baseRateId)?.id ??
                   "__custom"
                 }
                 onChange={(event) => {
@@ -627,7 +634,7 @@ export function QuoteBuilder({
                       baseRateCents: quote.baseRateCents ?? 600
                     });
                   } else {
-                    const preset = catalog.baseRates.find(
+                    const preset = effectiveBaseRates.find(
                       (rate) => rate.id === value
                     );
                     if (preset) {
@@ -641,7 +648,7 @@ export function QuoteBuilder({
                 }}
                 className="form-input"
               >
-                {catalog.baseRates
+                {effectiveBaseRates
                   .filter(
                     (rate) => rate.active || rate.id === quote.baseRateId
                   )
@@ -657,7 +664,7 @@ export function QuoteBuilder({
               </p>
             </Field>
 
-            {!catalog.baseRates.find((r) => r.id === quote.baseRateId) ? (
+            {!effectiveBaseRates.find((r) => r.id === quote.baseRateId) ? (
               <Field label="Custom Base Rate ($/sf)">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-bold text-charcoal/55">$</span>
