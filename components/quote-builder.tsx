@@ -30,6 +30,7 @@ function createDraftQuote(): QuoteFormState {
     quoteDate: today,
     clientName: "",
     clientEmail: "",
+    projectName: "",
     projectStreet: "",
     projectCity: "",
     projectState: "NC",
@@ -357,6 +358,7 @@ export function QuoteBuilder({
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
+      project_name: quote.projectName || null,
       project_street: quote.projectStreet,
       project_city: quote.projectCity,
       project_state: quote.projectState,
@@ -496,18 +498,29 @@ export function QuoteBuilder({
               />
             </Field>
 
-            <Field label="Client Name">
+            <Field label="Project Name">
+              <input
+                value={quote.projectName}
+                onChange={(event) =>
+                  updateQuote("projectName", event.target.value)
+                }
+                placeholder="e.g. Fulk Residence"
+                className="form-input"
+              />
+            </Field>
+
+            <Field label="Builder / Customer">
               <input
                 value={quote.clientName}
                 onChange={(event) =>
                   updateQuote("clientName", event.target.value)
                 }
-                placeholder="Client or builder name"
+                placeholder="Who is billed (builder or direct customer)"
                 className="form-input"
               />
             </Field>
 
-            <Field label="Client Email">
+            <Field label="Builder / Customer Email">
               <input
                 type="email"
                 value={quote.clientEmail}

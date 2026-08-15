@@ -70,8 +70,14 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
         </p>
 
         <h1 className="font-display text-5xl font-bold tracking-[-0.04em] text-moss md:text-6xl">
-          {quote.clientName || "Unnamed Client"}
+          {quote.projectName || quote.clientName || "Unnamed Client"}
         </h1>
+
+        {quote.projectName ? (
+          <p className="mt-2 text-base font-bold leading-7 text-charcoal/65">
+            {quote.clientName}
+          </p>
+        ) : null}
 
         <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
           Update the quote details, then complete and save to update the

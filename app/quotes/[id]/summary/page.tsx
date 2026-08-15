@@ -40,9 +40,15 @@ export default async function SummaryQuotePage({ params }: PageProps) {
 
   const { quote, settings, fullAddress, quoteDateLabel, pdfProps } = input;
   const categories = pdfProps.categories;
-  const projectSecondary = [quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
-    .filter(Boolean)
-    .join(" · ");
+  const projectName = quote.projectName || "";
+  const projectPrimary = projectName || fullAddress;
+  const projectSecondary = projectName
+    ? [fullAddress, quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
+        .filter(Boolean)
+        .join(" · ")
+    : [quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
+        .filter(Boolean)
+        .join(" · ");
 
   const emailDefaults = buildEmailDefaults({
     doc: "summary",
@@ -114,7 +120,7 @@ export default async function SummaryQuotePage({ params }: PageProps) {
             <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
               Project
             </p>
-            <p className="font-bold text-charcoal">{fullAddress}</p>
+            <p className="font-bold text-charcoal">{projectPrimary}</p>
             {projectSecondary ? (
               <p className="text-sm text-charcoal/70">{projectSecondary}</p>
             ) : null}

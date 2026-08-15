@@ -58,6 +58,7 @@ export default function QuoteReviewPage() {
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
+      project_name: quote.projectName || null,
       project_street: quote.projectStreet,
       project_city: quote.projectCity,
       project_state: quote.projectState,
@@ -222,9 +223,13 @@ export default function QuoteReviewPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <ReviewField label="Quote ID" value={quote.quoteId || "Assigned on save"} />
             <ReviewField label="Quote Date" value={quote.quoteDate} />
-            <ReviewField label="Client" value={quote.clientName} />
             <ReviewField
-              label="Client Email"
+              label="Project Name"
+              value={quote.projectName || "Not entered"}
+            />
+            <ReviewField label="Builder / Customer" value={quote.clientName} />
+            <ReviewField
+              label="Builder / Customer Email"
               value={quote.clientEmail || "Not entered"}
             />
             <ReviewField label="Project Address" value={fullAddress} />

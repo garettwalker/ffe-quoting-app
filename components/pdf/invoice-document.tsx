@@ -28,6 +28,7 @@ export type InvoicePdfProps = {
   title: string; // "Initial Invoice" or "Final Invoice"
   clientName: string;
   clientEmail: string;
+  projectName: string; // residence / site name, "" when not set
   fullAddress: string;
   projectType: string;
   squareFootageLabel: string;
@@ -137,6 +138,7 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
     title,
     clientName,
     clientEmail,
+    projectName,
     fullAddress,
     projectType,
     squareFootageLabel,
@@ -170,8 +172,12 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
           leftPrimary={clientName}
           leftSecondary={clientEmail || undefined}
           rightLabel="PROJECT"
-          rightPrimary={fullAddress}
-          rightSecondary={projectSecondary || undefined}
+          rightPrimary={projectName || fullAddress}
+          rightSecondary={
+            projectName
+              ? [fullAddress, projectSecondary].filter(Boolean).join(" · ") || undefined
+              : projectSecondary || undefined
+          }
         />
 
         <PdfSectionLabel>{title}</PdfSectionLabel>

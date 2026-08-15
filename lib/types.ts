@@ -35,6 +35,7 @@ export type DashboardQuoteRow = {
   quote_id: string;
   quote_date: string;
   client_name: string;
+  project_name: string | null;
   project_street: string;
   project_city: string;
   project_state: string;
@@ -124,6 +125,7 @@ export type ReceivableJob = {
   id: string;
   quoteId: string;
   clientName: string;
+  projectName: string;
   projectType: string;
   initial: ReceivableInvoice | null;
   finish: ReceivableInvoice | null;
@@ -229,6 +231,13 @@ export type QuoteFormState = {
   quoteDate: string;
   clientName: string;
   clientEmail: string;
+  // The residence / site name (e.g. "Fulk Residence") — the job identity shown
+  // as the job name on the dashboard, pipeline, receivables, and schedule.
+  // The clientName/clientEmail fields below it are the paying party, labeled
+  // "Builder / Customer" in the UI (a builder/GC OR a direct homeowner).
+  // Optional: old quotes predate the field and leave it blank (display falls
+  // back to clientName); spec homes / unfilled jobs leave it blank too.
+  projectName?: string;
   projectStreet: string;
   projectCity: string;
   projectState: string;

@@ -29,6 +29,7 @@ export type SummaryQuotePdfProps = {
   quoteDateLabel: string; // long form, e.g. "June 18, 2026"
   clientName: string;
   clientEmail: string;
+  projectName: string; // residence / site name, "" when not set
   fullAddress: string; // pre-joined street/city/state/zip
   projectType: string;
   squareFootageLabel: string; // e.g. "2,500 sq ft"
@@ -49,6 +50,7 @@ export function SummaryQuotePdfDocument(props: SummaryQuotePdfProps) {
     quoteDateLabel,
     clientName,
     clientEmail,
+    projectName,
     fullAddress,
     projectType,
     squareFootageLabel,
@@ -81,8 +83,12 @@ export function SummaryQuotePdfDocument(props: SummaryQuotePdfProps) {
           leftPrimary={clientName}
           leftSecondary={clientEmail || undefined}
           rightLabel="PROJECT"
-          rightPrimary={fullAddress}
-          rightSecondary={projectSecondary || undefined}
+          rightPrimary={projectName || fullAddress}
+          rightSecondary={
+            projectName
+              ? [fullAddress, projectSecondary].filter(Boolean).join(" · ") || undefined
+              : projectSecondary || undefined
+          }
         />
 
         <PdfSectionLabel>SCOPE SUMMARY</PdfSectionLabel>

@@ -72,7 +72,12 @@ function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
             <span className="font-black text-deep-pine">{quote.quote_id}</span>
             <StatusBadge stage={lifecycleStage(quote.status, quote.invoice_data)} />
           </div>
-          <p className="mt-1 font-bold text-charcoal">{quote.client_name}</p>
+          <p className="mt-1 font-bold text-charcoal">
+            {quote.project_name || quote.client_name}
+          </p>
+          {quote.project_name ? (
+            <p className="text-sm text-charcoal/60">{quote.client_name}</p>
+          ) : null}
           <p className="text-sm text-charcoal/70">{address}</p>
 
           {quote.status === "accepted" && quote.invoice_data ? (

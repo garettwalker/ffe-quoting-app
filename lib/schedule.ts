@@ -46,6 +46,7 @@ export type SchedulableJob = {
   id: string;
   quoteId: string;
   clientName: string;
+  projectName: string;
   fullAddress: string;
   projectType: string;
 };
@@ -82,6 +83,7 @@ type SchedulableJobRow = {
   id: string;
   quote_id: string;
   client_name: string;
+  project_name: string | null;
   project_street: string;
   project_city: string;
   project_state: string;
@@ -177,7 +179,7 @@ export async function fetchSchedulableJobs(
   const { data, error } = await client
     .from("quotes")
     .select(
-      "id, quote_id, client_name, project_street, project_city, project_state, project_zip, project_type"
+      "id, quote_id, client_name, project_name, project_street, project_city, project_state, project_zip, project_type"
     )
     .eq("status", "accepted")
     .order("created_at", { ascending: false })
@@ -188,6 +190,7 @@ export async function fetchSchedulableJobs(
     id: row.id,
     quoteId: row.quote_id,
     clientName: row.client_name,
+    projectName: row.project_name || "",
     fullAddress: [row.project_street, `${row.project_city}, ${row.project_state} ${row.project_zip}`]
       .filter(Boolean)
       .join(" · "),

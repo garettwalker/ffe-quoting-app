@@ -25,9 +25,15 @@ export default async function PrintInvoicePage({ params }: PageProps) {
   }
 
   const { pdfProps } = input;
-  const projectSecondary = [pdfProps.projectType, pdfProps.squareFootageLabel]
-    .filter(Boolean)
-    .join(" · ");
+  const projectName = pdfProps.projectName || "";
+  const projectPrimary = projectName || pdfProps.fullAddress;
+  const projectSecondary = projectName
+    ? [pdfProps.fullAddress, pdfProps.projectType, pdfProps.squareFootageLabel]
+        .filter(Boolean)
+        .join(" · ")
+    : [pdfProps.projectType, pdfProps.squareFootageLabel]
+        .filter(Boolean)
+        .join(" · ");
 
   const emailDefaults = buildEmailDefaults({
     doc: "invoice",
@@ -100,7 +106,7 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
               Project
             </p>
-            <p className="font-bold text-charcoal">{pdfProps.fullAddress}</p>
+            <p className="font-bold text-charcoal">{projectPrimary}</p>
             {projectSecondary ? (
               <p className="text-sm text-charcoal/70">{projectSecondary}</p>
             ) : null}

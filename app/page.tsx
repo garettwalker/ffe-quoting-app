@@ -47,7 +47,7 @@ export default async function DashboardPage() {
     supabase
       .from("quotes")
       .select(
-        "id, quote_id, quote_date, client_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
+        "id, quote_id, quote_date, client_name, project_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
       )
       .order("created_at", { ascending: false })
       .limit(RECENT_COUNT)
@@ -276,7 +276,12 @@ function RecentQuoteRow({ row }: { row: DashboardQuoteRow }) {
               stage={lifecycleStage(normalizeStatus(row.status), row.invoice_data)}
             />
           </div>
-          <p className="mt-1 font-bold text-charcoal">{row.client_name}</p>
+          <p className="mt-1 font-bold text-charcoal">
+            {row.project_name || row.client_name}
+          </p>
+          {row.project_name ? (
+            <p className="text-sm text-charcoal/60">{row.client_name}</p>
+          ) : null}
           {address ? (
             <p className="text-sm text-charcoal/70">{address}</p>
           ) : null}

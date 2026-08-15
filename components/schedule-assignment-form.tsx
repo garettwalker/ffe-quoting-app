@@ -86,7 +86,7 @@ export function ScheduleAssignmentForm({
     // Pre-fill the editable snapshot from the quote. Selecting a job is an explicit
     // action, so overwriting manual edits here is fine (and keeps title/location in
     // sync with the chosen job).
-    setTitle(job.clientName);
+    setTitle(job.projectName || job.clientName);
     setLocation(job.fullAddress);
   }
 
@@ -284,7 +284,7 @@ export function ScheduleAssignmentForm({
                 <option value="">Select a job…</option>
                 {jobs.map((job) => (
                   <option key={job.id} value={job.id}>
-                    {job.clientName} — {job.fullAddress} ({job.quoteId})
+                    {job.projectName || job.clientName} — {job.fullAddress} ({job.quoteId})
                   </option>
                 ))}
               </select>

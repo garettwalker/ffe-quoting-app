@@ -31,6 +31,7 @@ type ReceivablesRow = {
   id: string;
   quote_id: string;
   client_name: string;
+  project_name: string | null;
   project_type: string;
   status: string;
   invoice_data: InvoiceData | null;
@@ -79,6 +80,7 @@ function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
     id: row.id,
     quoteId: row.quote_id,
     clientName: row.client_name || "Unnamed Client",
+    projectName: row.project_name || "",
     projectType: row.project_type || "",
     initial,
     finish,
@@ -94,7 +96,7 @@ export default async function ReceivablesPage() {
   const { data, error } = await supabase
     .from("quotes")
     .select(
-      "id, quote_id, client_name, project_type, status, invoice_data, created_at"
+      "id, quote_id, client_name, project_name, project_type, status, invoice_data, created_at"
     )
     .eq("status", "accepted")
     .not("invoice_data", "is", null)

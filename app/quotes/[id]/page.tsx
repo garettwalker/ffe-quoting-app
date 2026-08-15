@@ -104,8 +104,14 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </p>
 
           <h1 className="font-display text-5xl font-bold tracking-[-0.04em] text-moss md:text-6xl">
-            {quote.clientName || "Unnamed Client"}
+            {quote.projectName || quote.clientName || "Unnamed Client"}
           </h1>
+
+          {quote.projectName ? (
+            <p className="mt-2 text-base font-bold leading-7 text-charcoal/65">
+              {quote.clientName}
+            </p>
+          ) : null}
 
           <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
             {fullAddress || "No project address entered"}
@@ -138,9 +144,13 @@ export default async function SavedQuotePage({ params }: PageProps) {
           <div className="grid gap-4 md:grid-cols-2">
             <ReviewField label="Quote ID" value={quote.quoteId} />
             <ReviewField label="Quote Date" value={quote.quoteDate} />
-            <ReviewField label="Client" value={quote.clientName} />
             <ReviewField
-              label="Client Email"
+              label="Project Name"
+              value={quote.projectName || "Not entered"}
+            />
+            <ReviewField label="Builder / Customer" value={quote.clientName} />
+            <ReviewField
+              label="Builder / Customer Email"
               value={quote.clientEmail || "Not entered"}
             />
             <ReviewField label="Project Address" value={fullAddress} />

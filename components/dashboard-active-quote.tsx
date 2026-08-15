@@ -28,7 +28,8 @@ export function DashboardResumeActiveQuote() {
   // No working copy, or it is already tied to a saved Supabase row.
   if (!storedQuote || storedQuote.savedQuoteId) return null;
 
-  const clientName = storedQuote.quote.clientName || "Unnamed client";
+  const clientName =
+    storedQuote.quote.projectName || storedQuote.quote.clientName || "Unnamed client";
 
   function handleDiscard() {
     clearActiveQuote();

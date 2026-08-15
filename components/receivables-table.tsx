@@ -67,8 +67,10 @@ function sortJobs(list: ReceivableJob[], sort: Sort): ReceivableJob[] {
       case "largest":
         return b.job.totalOutstandingCents - a.job.totalOutstandingCents;
       case "client":
-        return a.job.clientName
-          .localeCompare(b.job.clientName, undefined, { sensitivity: "base" });
+        return (a.job.projectName || a.job.clientName)
+          .localeCompare(b.job.projectName || b.job.clientName, undefined, {
+            sensitivity: "base"
+          });
       case "newest": {
         const at = a.job.earliestIssuedAt
           ? new Date(a.job.earliestIssuedAt).getTime()
@@ -255,7 +257,7 @@ function ReceivablesSection({
           <table className="responsive-table w-full border-collapse text-sm">
             <thead>
               <tr className="border-b border-pine/15 text-left text-xs font-black uppercase tracking-[0.12em] text-charcoal/60">
-                <th className="py-3 pr-4 font-black">Client</th>
+                <th className="py-3 pr-4 font-black">Job</th>
                 <th className="py-3 pr-4 font-black">Rough-In</th>
                 <th className="py-3 pr-4 font-black">Finish</th>
                 <th className="py-3 pr-4 font-black">Total Outstanding</th>
@@ -279,7 +281,10 @@ function JobRow({ job }: { job: ReceivableJob }) {
   return (
     <tr className="border-b border-pine/10 align-top">
       <td className="py-4 pr-4">
-        <p className="font-black text-deep-pine">{job.clientName}</p>
+        <p className="font-black text-deep-pine">{job.projectName || job.clientName}</p>
+        {job.projectName ? (
+          <p className="text-xs font-bold text-charcoal/60">{job.clientName}</p>
+        ) : null}
         <Link
           href={`/quotes/${job.id}/invoices`}
           className="text-xs font-bold text-charcoal/70 underline decoration-clay/40 underline-offset-2 hover:text-deep-pine"

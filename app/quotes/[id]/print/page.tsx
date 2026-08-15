@@ -32,9 +32,15 @@ export default async function PrintQuotePage({ params }: PageProps) {
   }
 
   const { quote, result, settings, fullAddress, quoteDateLabel } = input;
-  const projectSecondary = [quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
-    .filter(Boolean)
-    .join(" · ");
+  const projectName = quote.projectName || "";
+  const projectPrimary = projectName || fullAddress;
+  const projectSecondary = projectName
+    ? [fullAddress, quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
+        .filter(Boolean)
+        .join(" · ")
+    : [quote.projectType, `${quote.squareFootage.toLocaleString()} sq ft`]
+        .filter(Boolean)
+        .join(" · ");
 
   const emailDefaults = buildEmailDefaults({
     doc: "detailed",
@@ -106,7 +112,7 @@ export default async function PrintQuotePage({ params }: PageProps) {
             <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
               Project
             </p>
-            <p className="font-bold text-charcoal">{fullAddress}</p>
+            <p className="font-bold text-charcoal">{projectPrimary}</p>
             {projectSecondary ? (
               <p className="text-sm text-charcoal/70">{projectSecondary}</p>
             ) : null}

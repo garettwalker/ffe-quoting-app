@@ -71,6 +71,7 @@ export async function loadSummaryQuotePdfInput(
     quoteDateLabel,
     clientName: quote.clientName,
     clientEmail: quote.clientEmail,
+    projectName: quote.projectName ?? "",
     fullAddress,
     projectType: quote.projectType,
     squareFootageLabel,

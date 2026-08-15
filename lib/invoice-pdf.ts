@@ -170,6 +170,7 @@ export async function loadInvoicePdfInput(
     title,
     clientName: quote.clientName,
     clientEmail: quote.clientEmail,
+    projectName: quote.projectName ?? "",
     fullAddress,
     projectType: quote.projectType,
     squareFootageLabel: `${quote.squareFootage.toLocaleString()} sq ft`,
