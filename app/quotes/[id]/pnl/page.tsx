@@ -14,7 +14,7 @@ import type { QuoteFormState } from "@/lib/types";
 // Internal per-job P&L view. Reads the quote's existing revenue data (quote
 // total, invoices, outstanding) plus any saved cost estimate, and shows
 // revenue vs cost vs margin under a chosen basis (Contracted / Invoiced / Paid).
-// The owner enters the job's cost (wire / devices / adders / labor) below.
+// The owner enters the job's cost (material $ buckets + per-person labor) below.
 // INTERNAL ONLY — nothing here appears on customer-facing surfaces.
 export const dynamic = "force-dynamic";
 
@@ -59,7 +59,8 @@ export default async function JobPnlPage({
   const hasSavedCost = row.cost_estimate_data != null && typeof row.cost_estimate_data === "object";
 
   // Saved estimate is normalized (tolerates a partial/old shape); otherwise
-  // build the default from the quote's sqft so the editor always has real boxes.
+  // build the default (empty material buckets + a blank labor line) so the
+  // editor always has real boxes. sqft is no longer used for materials.
   const initialData = hasSavedCost
     ? normalizeCostEstimate(row.cost_estimate_data, defaults)
     : buildDefaultCostEstimate(sqft, defaults);
@@ -90,7 +91,6 @@ export default async function JobPnlPage({
 
       <JobPnlEditor
         quoteId={row.id}
-        sqft={sqft}
         jobPnl={jobPnl}
         hasSavedCost={hasSavedCost}
         initialData={initialData}

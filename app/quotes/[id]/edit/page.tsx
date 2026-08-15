@@ -3,11 +3,14 @@ import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
 import { getPricingCatalog } from "@/lib/pricing";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import type { QuoteFormState } from "@/lib/types";
+import { normalizeStatus } from "@/lib/types";
+import type { InvoiceData, QuoteFormState } from "@/lib/types";
 
 type SavedQuoteRow = {
   id: string;
+  status: string;
   quote_data: QuoteFormState;
+  invoice_data: InvoiceData | null;
 };
 
 type PageProps = {
@@ -20,9 +23,22 @@ export const dynamic = "force-dynamic";
 
 export default async function EditSavedQuotePage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [quoteResult, catalog] = await Promise.all([
-    supabase.from("quotes").select("id, quote_data").eq("id", params.id).single(),
-    getPricingCatalog()
+  const [quoteResult, catalog, paymentsRes] = await Promise.all([
+    // status + invoice_data are read only to decide whether to show the
+    // "this is accepted/invoiced" warning banner (see below). They are not
+    // passed into QuoteBuilder.
+    supabase
+      .from("quotes")
+      .select("id, status, quote_data, invoice_data")
+      .eq("id", params.id)
+      .single(),
+    getPricingCatalog(),
+    // Any payment ledger row means real money is tied to this job. Counted
+    // head-only so we never load payment details into the edit page.
+    supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_id", params.id)
   ]);
 
   const { data, error } = quoteResult;
@@ -54,6 +70,18 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
 
   const row = data as SavedQuoteRow;
   const quote = row.quote_data;
+  const status = normalizeStatus(row.status);
+  const paymentCount = paymentsRes.count ?? 0;
+  const hasInvoices = !!row.invoice_data;
+
+  // The edit page is only linked from draft / prepared quotes, but the URL
+  // works on any quote. Saving here forces status back to "draft" and
+  // overwrites quote_data / calculation_data, while invoice_data and payments
+  // stay on the row — so an accepted or paid job would silently look like a
+  // draft on the dashboard while the money is still recorded. Warn loudly when
+  // the quote is past the safe-to-edit stage so this only happens on purpose.
+  const showProtectedBanner =
+    status === "accepted" || hasInvoices || paymentCount > 0;
 
   return (
     <AppShell>
@@ -84,6 +112,21 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
           existing record.
         </p>
       </div>
+
+      {showProtectedBanner ? (
+        <section className="mb-6 rounded-xl2 border border-clay/30 bg-clay/10 p-5 shadow-soft">
+          <p className="mb-1 text-sm font-black uppercase tracking-[0.14em] text-clay">
+            This quote is accepted or has invoices / payments
+          </p>
+          <p className="text-sm font-bold leading-6 text-charcoal/80">
+            Saving here reopens the quote as a draft and overwrites the saved
+            quote. Any invoices and payments stay on the record, so the
+            dashboard will then show it as a draft while that money is still
+            collected. If you only meant a small change, go back. To edit
+            deliberately, continue and use Save as draft.
+          </p>
+        </section>
+      ) : null}
 
       <QuoteBuilder
         initialQuote={quote}

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { DeleteQuoteButton } from "@/components/delete-quote-button";
 import { QuoteStatusButton } from "@/components/quote-status-button";
+import { ReopenQuoteButton } from "@/components/reopen-quote-button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/currency";
 import { getEmailHistoryForQuote } from "@/lib/email-log";
@@ -33,13 +34,24 @@ type PageProps = {
 
 export default async function SavedQuotePage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const { data, error } = await supabase
-    .from("quotes")
-    .select(
-      "id, quote_id, status, created_at, quote_data, calculation_data, invoice_data"
-    )
-    .eq("id", params.id)
-    .single();
+  const [{ data, error }, paymentsRes, emailHistory] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select(
+        "id, quote_id, status, created_at, quote_data, calculation_data, invoice_data"
+      )
+      .eq("id", params.id)
+      .single(),
+    // Count real payment ledger rows for this job (card / ACH / manual). Any
+    // row means money has been taken, so the quote is "protected": deletion
+    // is locked behind a type-to-confirm step and reopen warns loudly. head:
+    // true returns only the count (mirrors app/quotes/[id]/invoices/page.tsx).
+    supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("quote_id", params.id),
+    getEmailHistoryForQuote(params.id)
+  ]);
 
   if (error || !data) {
     return (
@@ -71,6 +83,21 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const result = row.calculation_data;
   const status = normalizeStatus(row.status);
 
+  // Protection state for the delete + reopen guards. Mirrors the guard on the
+  // invoicing page: any payment ledger row or any paid invoice means real money
+  // is tied to this quote, so deleting it is locked behind type-to-confirm and
+  // reopening it warns that a paid job will look un-invoiced on the dashboard.
+  const paymentCount = paymentsRes.count ?? 0;
+  const hasInvoices = !!row.invoice_data;
+  const hasPaidInvoice = Boolean(
+    row.invoice_data &&
+      row.invoice_data.invoices.some((inv) => inv.status === "paid")
+  );
+
+  // The display name shown in the H1. Reused as the type-to-match token for the
+  // locked delete, so the user types exactly the name they see on the page.
+  const jobName = quote.projectName || quote.clientName || "Unnamed Client";
+
   const fullAddress = [
     quote.projectStreet,
     quote.projectCity,
@@ -85,8 +112,6 @@ export default async function SavedQuotePage({ params }: PageProps) {
     day: "numeric",
     year: "numeric"
   });
-
-  const emailHistory = await getEmailHistoryForQuote(params.id);
 
   return (
     <AppShell>
@@ -104,7 +129,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </p>
 
           <h1 className="font-display text-5xl font-bold tracking-[-0.04em] text-moss md:text-6xl">
-            {quote.projectName || quote.clientName || "Unnamed Client"}
+            {jobName}
           </h1>
 
           {quote.projectName ? (
@@ -366,11 +391,11 @@ export default async function SavedQuotePage({ params }: PageProps) {
                 >
                   Invoicing
                 </Link>
-                <QuoteStatusButton
+                <ReopenQuoteButton
                   quoteId={row.id}
-                  newStatus="prepared"
-                  label="Reopen as prepared"
-                  variant="secondary"
+                  hasInvoices={hasInvoices}
+                  hasPaidInvoice={hasPaidInvoice}
+                  paymentCount={paymentCount}
                 />
               </>
             ) : null}
@@ -385,7 +410,13 @@ export default async function SavedQuotePage({ params }: PageProps) {
           ) : null}
 
           <div className="mt-6">
-            <DeleteQuoteButton quoteId={row.id} />
+            <DeleteQuoteButton
+              quoteId={row.id}
+              jobName={jobName}
+              hasInvoices={hasInvoices}
+              hasPaidInvoice={hasPaidInvoice}
+              paymentCount={paymentCount}
+            />
           </div>
 
           <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/70">

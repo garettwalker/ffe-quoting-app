@@ -174,9 +174,10 @@ export type ProjectType = {
 
 // The single app_settings row: business identity + customer-facing boilerplate
 // text shown on printable quotes and invoices, plus the internal cost-estimate
-// defaults (wire costs, labor rate, adder %) edited in Pricing Admin. Lives in
-// the app_settings table. costEstimateDefaults is null when the column is empty
-// / not yet saved; callers fall back to the built-in defaults in lib/cost-estimate.
+// defaults (default material bucket names + labor rate) edited in Pricing Admin.
+// Lives in the app_settings table. costEstimateDefaults is null when the column
+// is empty / not yet saved; callers fall back to the built-in defaults in
+// lib/cost-estimate.
 import type { CostEstimateDefaults } from "@/lib/cost-estimate";
 
 export type AppSettings = {
