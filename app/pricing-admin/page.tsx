@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { BaseRateEditor } from "@/components/base-rate-editor";
 import { ContingencyEditor } from "@/components/contingency-editor";
+import { CostEstimateDefaultsEditor } from "@/components/cost-estimate-defaults-editor";
 import { CrewEditor } from "@/components/crew-editor";
 import { PricingItemEditor } from "@/components/pricing-item-editor";
 import { PricingLevelEditor } from "@/components/pricing-level-editor";
@@ -62,6 +63,7 @@ export default async function PricingAdminPage() {
         <ProjectTypeEditor projectTypes={catalog.projectTypes} />
         <CrewEditor crew={crew} />
         <SettingsEditor settings={catalog.settings} />
+        <CostEstimateDefaultsEditor settings={catalog.settings} />
       </div>
     </AppShell>
   );

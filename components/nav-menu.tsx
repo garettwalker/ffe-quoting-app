@@ -87,6 +87,13 @@ const ICONS = {
       <circle cx="15" cy="12" r="2.2" fill="whitewarm" />
       <circle cx="8" cy="18" r="2.2" fill="whitewarm" />
     </Icon>
+  ),
+  pnl: (
+    <Icon>
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <path d="m7 15 4-5 3 3 4-6" />
+    </Icon>
   )
 };
 
@@ -122,6 +129,12 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
         label: "Receivables",
         description: "Outstanding and paid invoices",
         icon: ICONS.receivables
+      },
+      {
+        href: "/pnl",
+        label: "P&L Report",
+        description: "Per-job and quarterly profit / loss",
+        icon: ICONS.pnl
       },
       {
         href: "/email-log",

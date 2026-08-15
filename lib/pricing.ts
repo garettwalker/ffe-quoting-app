@@ -25,7 +25,7 @@ export async function getSettings(): Promise<AppSettings> {
   const { data } = await supabase
     .from("app_settings")
     .select(
-      "business_name, business_email, business_tagline, default_quote_notes, invoice_payment_terms"
+      "business_name, business_email, business_tagline, default_quote_notes, invoice_payment_terms, cost_estimate_defaults"
     )
     .eq("id", 1)
     .single();
@@ -36,6 +36,7 @@ export async function getSettings(): Promise<AppSettings> {
     business_tagline: string;
     default_quote_notes: string;
     invoice_payment_terms: string;
+    cost_estimate_defaults: unknown;
   }>;
 
   return {
@@ -43,7 +44,13 @@ export async function getSettings(): Promise<AppSettings> {
     businessEmail: row.business_email ?? "",
     businessTagline: row.business_tagline ?? "",
     defaultQuoteNotes: row.default_quote_notes ?? "",
-    invoicePaymentTerms: row.invoice_payment_terms ?? ""
+    invoicePaymentTerms: row.invoice_payment_terms ?? "",
+    // Null when the column is empty or the migration hasn't been run; callers
+    // fall back to the built-in defaults (Chad's numbers) via normalizeDefaults.
+    costEstimateDefaults:
+      row.cost_estimate_defaults && typeof row.cost_estimate_defaults === "object"
+        ? (row.cost_estimate_defaults as AppSettings["costEstimateDefaults"])
+        : null
   };
 }
 

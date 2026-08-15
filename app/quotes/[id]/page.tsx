@@ -287,6 +287,13 @@ export default async function SavedQuotePage({ params }: PageProps) {
               Back to Quotes
             </Link>
 
+            <Link
+              href={`/quotes/${row.id}/pnl`}
+              className="rounded-full border border-clay/30 px-5 py-3 text-center font-black text-clay hover:bg-clay/10"
+            >
+              Job P&amp;L (internal)
+            </Link>
+
             {status === "draft" ? (
               <>
                 <Link
