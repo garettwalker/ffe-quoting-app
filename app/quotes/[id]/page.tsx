@@ -5,6 +5,7 @@ import { QuoteStatusButton } from "@/components/quote-status-button";
 import { ReopenQuoteButton } from "@/components/reopen-quote-button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/currency";
+import { getAdderPriceVariance } from "@/lib/calculations";
 import { getEmailHistoryForQuote } from "@/lib/email-log";
 import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -82,6 +83,15 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const quote = row.quote_data;
   const result = row.calculation_data;
   const status = normalizeStatus(row.status);
+  // Net effect of per-line unit-price overrides — the bridge from
+  // "(before-adjustments x multiplier)" to the final quote. Zero (hidden)
+  // when no adder lines are custom-priced. Computed on the fly so historical
+  // quotes saved before the field existed reconcile too.
+  const varianceCents = getAdderPriceVariance(result);
+  const varianceTotal =
+    varianceCents >= 0
+      ? `+${formatCurrency(varianceCents)}`
+      : formatCurrency(varianceCents);
 
   // Protection state for the delete + reopen guards. Mirrors the guard on the
   // invoicing page: any payment ledger row or any paid invoice means real money
@@ -280,6 +290,14 @@ export default async function SavedQuotePage({ params }: PageProps) {
                 value={formatPercent(result.combinedClientMultiplier)}
                 scope="Base + adders"
               />
+              {varianceCents !== 0 ? (
+                <BreakdownRow
+                  label="Adder price variance (vs price list)"
+                  value="custom-priced lines vs catalog base"
+                  total={varianceTotal}
+                  scope="Adders only"
+                />
+              ) : null}
               <div className="flex items-center justify-between gap-4 border-t border-pine/15 pt-3">
                 <span className="text-sm font-black text-deep-pine">
                   Final Quote
@@ -288,6 +306,12 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   {formatCurrency(result.clientQuoteTotalCents)}
                 </span>
               </div>
+              <p className="text-xs font-bold leading-5 text-charcoal/55">
+                {formatCurrency(result.totalBeforeClientMultiplierCents)} ×{" "}
+                {formatPercent(result.combinedClientMultiplier)}
+                {varianceCents !== 0 ? ` + ${varianceTotal}` : ""} ={" "}
+                {formatCurrency(result.clientQuoteTotalCents)}
+              </p>
               {(result.overriddenAdderLineCount ?? 0) > 0 ? (
                 <p className="text-xs font-bold leading-4 text-charcoal/55">
                   Includes {result.overriddenAdderLineCount} custom-priced adder

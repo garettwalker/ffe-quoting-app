@@ -123,6 +123,20 @@ export function calculateQuote(
         combinedClientMultiplier
     ) + overriddenAddersClientTotalCents;
 
+  // The exact bridge from "(before-adjustments x combined multiplier)" to the
+  // final quote. Per-line unit-price overrides skip the multiplier and are
+  // priced absolutely, so once the owner custom-prices any adder line the
+  // "Before adjustments x multiplier" math no longer lands on the final — this
+  // variance is the residual that reconciles the two. Surfaced as its own row
+  // in the live-total / breakdown panel so the owner sees WHY the numbers
+  // differ instead of a silent gap. It is zero (and the row is hidden) when no
+  // adder lines are custom-priced, so existing quotes with no overrides render
+  // exactly as before. See getAdderPriceVariance for the on-the-fly fallback
+  // used by quotes saved before this field existed.
+  const adderPriceVarianceCents =
+    clientQuoteTotalCents -
+    Math.round(totalBeforeClientMultiplierCents * combinedClientMultiplier);
+
   const baseClientUnitPriceCents = Math.round(
     baseRate.cents * combinedClientMultiplier
   );
@@ -153,9 +167,33 @@ export function calculateQuote(
     contingencyName: contingency.name,
     combinedClientMultiplier,
     clientQuoteTotalCents,
+    adderPriceVarianceCents,
     overriddenAdderLineCount,
     clientFacingLines: [baseLine, ...selectedAdders]
   };
+}
+
+// Read the adder-price variance for a saved quote's calculation snapshot.
+// Fresh quotes store it directly (above). Quotes saved before the field existed
+// compute it on the fly from the stored totals so they too reconcile in the
+// panel without needing a re-save — important because the owner has many
+// historical quotes and should not have to re-open each one. Used by both the
+// live QuoteTotalsPanel and the saved-quote breakdown view.
+export function getAdderPriceVariance(
+  result: Pick<
+    QuoteCalculationResult,
+    | "adderPriceVarianceCents"
+    | "clientQuoteTotalCents"
+    | "totalBeforeClientMultiplierCents"
+    | "combinedClientMultiplier"
+  >
+): number {
+  if (typeof result.adderPriceVarianceCents === "number") {
+    return result.adderPriceVarianceCents;
+  }
+  const before = result.totalBeforeClientMultiplierCents ?? 0;
+  const multiplier = result.combinedClientMultiplier ?? 1;
+  return (result.clientQuoteTotalCents ?? 0) - Math.round(before * multiplier);
 }
 
 // Group the client-facing lines by category and sum each category's

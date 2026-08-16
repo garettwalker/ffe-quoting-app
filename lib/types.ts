@@ -298,6 +298,13 @@ export type QuoteCalculationResult = {
   contingencyName: string;
   combinedClientMultiplier: number;
   clientQuoteTotalCents: number;
+  // The cents gap between "(before-adjustments x combined multiplier)" and the
+  // final quote — i.e. the net effect of per-line unit-price overrides, which
+  // skip the multiplier and are priced absolutely. Surfaced as its own row in
+  // the internal math breakdown so the totals reconcile visibly. Zero when no
+  // adder lines are custom-priced. Quotes saved before this field existed are
+  // reconciled on the fly via getAdderPriceVariance (lib/calculations.ts).
+  adderPriceVarianceCents: number;
   // How many adder lines have a per-customer unit-price override (those lines
   // bypass the pricing-level/contingency multiplier). Surfaced in the internal
   // math breakdown so the scope of each lever is explicit.

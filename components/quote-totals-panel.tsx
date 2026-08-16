@@ -1,4 +1,5 @@
 import { formatCurrency, formatPercent } from "@/lib/currency";
+import { getAdderPriceVariance } from "@/lib/calculations";
 import type { QuoteCalculationResult } from "@/lib/types";
 
 type QuoteTotalsPanelProps = {
@@ -24,6 +25,23 @@ function ScopeTag({ scope }: { scope: "sqft" | "adders" | "both" | "line" }) {
 }
 
 export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
+  const varianceCents = getAdderPriceVariance(result);
+  const showVariance = varianceCents !== 0;
+  // Signed currency so the direction of the bump is obvious: +$3,055 vs -$200.
+  const varianceValue =
+    varianceCents >= 0
+      ? `+${formatCurrency(varianceCents)}`
+      : formatCurrency(varianceCents);
+  // The one-line reconciliation with real numbers, so the panel reads as an
+  // equation instead of a stack of unrelated figures. The variance term only
+  // appears when there's an actual override gap; with no overrides the formula
+  // collapses to "before x multiplier = final" (which is then exact).
+  const reconciliation = `${formatCurrency(
+    result.totalBeforeClientMultiplierCents
+  )} × ${formatPercent(result.combinedClientMultiplier)}${
+    showVariance ? ` + ${varianceValue}` : ""
+  } = ${formatCurrency(result.clientQuoteTotalCents)}`;
+
   return (
     <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
       <p className="mb-2 text-sm font-black uppercase tracking-[0.16em] text-clay">
@@ -80,6 +98,14 @@ export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
           sub="level x contingency"
           scope="both"
         />
+        {showVariance ? (
+          <TotalRow
+            label="Adder price variance (vs price list)"
+            value={varianceValue}
+            sub="custom-priced lines vs catalog base"
+            scope="adders"
+          />
+        ) : null}
       </div>
 
       <div className="mt-6 rounded-soft bg-pine p-4 text-whitewarm">
@@ -89,6 +115,9 @@ export function QuoteTotalsPanel({ result }: QuoteTotalsPanelProps) {
             {formatCurrency(result.clientQuoteTotalCents)}
           </span>
         </div>
+        <p className="mt-2 text-xs font-bold leading-5 text-whitewarm/70">
+          {reconciliation}
+        </p>
         {result.overriddenAdderLineCount > 0 ? (
           <p className="mt-2 text-xs font-bold leading-4 text-whitewarm/80">
             Includes {result.overriddenAdderLineCount} custom-priced adder
