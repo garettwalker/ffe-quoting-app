@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { formatCurrency } from "@/lib/currency";
-import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
+import type { InvoiceReceipts } from "@/lib/email-log";
+import {
+  isPaidInFull,
+  lifecycleStage,
+  outstandingCents,
+  scheduledFinishCents
+} from "@/lib/invoice-calculations";
 import type { DashboardQuoteRow } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
 import { QuoteStatusButton } from "@/components/quote-status-button";
@@ -10,14 +16,22 @@ export function DashboardQuoteSection({
   title,
   description,
   quotes,
-  emptyCopy
+  emptyCopy,
+  receiptsById
 }: {
   eyebrow: string;
   title: string;
   description?: string;
   quotes: DashboardQuoteRow[];
   emptyCopy: string;
+  // Per-quote emailed-state of invoices: a not-yet-emailed finish is "scheduled"
+  // (not owed yet). Omitted or a missing id = no emailed finish (legacy). Drives
+  // the card's lifecycle stage and outstanding/pending copy.
+  receiptsById?: Map<string, InvoiceReceipts>;
 }) {
+  const receiptsOf = (id: string): InvoiceReceipts | undefined =>
+    receiptsById?.get(id);
+
   return (
     <section className="mb-8 rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
       <div className="mb-4 flex items-baseline justify-between gap-3">
@@ -46,7 +60,11 @@ export function DashboardQuoteSection({
       ) : (
         <div className="grid gap-3">
           {quotes.map((quote) => (
-            <QuoteCard key={quote.id} quote={quote} />
+            <QuoteCard
+              key={quote.id}
+              quote={quote}
+              receipts={receiptsOf(quote.id)}
+            />
           ))}
         </div>
       )}
@@ -54,7 +72,13 @@ export function DashboardQuoteSection({
   );
 }
 
-function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
+function QuoteCard({
+  quote,
+  receipts
+}: {
+  quote: DashboardQuoteRow;
+  receipts?: InvoiceReceipts;
+}) {
   const address = [
     quote.project_street,
     quote.project_city,
@@ -64,13 +88,19 @@ function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
     .filter(Boolean)
     .join(", ");
 
+  const paidInFull = isPaidInFull(quote.invoice_data, receipts);
+  const owed = outstandingCents(quote.invoice_data, receipts);
+  const finishPending = scheduledFinishCents(quote.invoice_data, receipts);
+
   return (
     <div className="rounded-xl1 border border-pine/10 bg-cream p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{quote.quote_id}</span>
-            <StatusBadge stage={lifecycleStage(quote.status, quote.invoice_data)} />
+            <StatusBadge
+              stage={lifecycleStage(quote.status, quote.invoice_data, receipts)}
+            />
           </div>
           <p className="mt-1 font-bold text-charcoal">
             {quote.project_name || quote.client_name}
@@ -83,12 +113,16 @@ function QuoteCard({ quote }: { quote: DashboardQuoteRow }) {
           {quote.status === "accepted" && quote.invoice_data ? (
             <p
               className={`mt-1 text-sm font-black ${
-                isPaidInFull(quote.invoice_data) ? "text-deep-pine" : "text-clay"
+                paidInFull ? "text-deep-pine" : "text-clay"
               }`}
             >
-              {isPaidInFull(quote.invoice_data)
+              {paidInFull
                 ? "Invoices paid in full"
-                : `Outstanding: ${formatCurrency(outstandingCents(quote.invoice_data))}`}
+                : owed > 0
+                  ? `Outstanding: ${formatCurrency(owed)}`
+                  : finishPending > 0
+                    ? `Finish pending: ${formatCurrency(finishPending)}`
+                    : "Invoices paid in full"}
             </p>
           ) : null}
         </div>

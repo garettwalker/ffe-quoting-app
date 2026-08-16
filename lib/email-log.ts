@@ -91,3 +91,88 @@ export async function getRecentEmailLog(
   if (error || !data) return [];
   return data as EmailLogRow[];
 }
+
+// When each invoice was first emailed, per quote. `null` means that invoice
+// kind has never been emailed (the row may still exist in invoice setup but is
+// not yet "receivable"). Used by the receivables / dashboard / lifecycle code
+// to decide whether the finish invoice is actually due yet — the finish is
+// created at invoice setup but not billed until after the sheetrock gap, so a
+// finish that has never been emailed (and isn't paid) is "scheduled", not owed.
+// The rough-in (initial) is treated as receivable from setup regardless.
+export type InvoiceReceipts = {
+  initial: string | null;
+  finish: string | null;
+};
+
+function emptyReceipts(): InvoiceReceipts {
+  return { initial: null, finish: null };
+}
+
+// Fold a set of sent-invoice-email rows into the earliest sent_at per kind.
+function foldReceipts(rows: { invoice_kind: string | null; sent_at: string }[]): InvoiceReceipts {
+  const out = emptyReceipts();
+  for (const row of rows) {
+    if (row.invoice_kind === "initial" || row.invoice_kind === "finish") {
+      const prev = out[row.invoice_kind];
+      if (prev === null || row.sent_at < prev) {
+        out[row.invoice_kind] = row.sent_at;
+      }
+    }
+  }
+  return out;
+}
+
+// Batch: for a set of quote ids, the earliest sent invoice email date per
+// kind. One query, folded in memory. Empty input returns an empty map; callers
+// should treat a missing key as "never emailed" (both kinds null).
+export async function loadInvoiceReceipts(
+  quoteIds: string[]
+): Promise<Map<string, InvoiceReceipts>> {
+  const map = new Map<string, InvoiceReceipts>();
+  if (quoteIds.length === 0) return map;
+  const supabase = getSupabaseServer();
+  const { data, error } = await supabase
+    .from("email_log")
+    .select("quote_id, invoice_kind, sent_at")
+    .in("quote_id", quoteIds)
+    .eq("doc", "invoice")
+    .eq("status", "sent");
+
+  if (error || !data) return map;
+  for (const row of data as {
+    quote_id: string | null;
+    invoice_kind: string | null;
+    sent_at: string;
+  }[]) {
+    if (!row.quote_id) continue;
+    const existing = map.get(row.quote_id) ?? emptyReceipts();
+    const candidate = foldReceipts([
+      { invoice_kind: row.invoice_kind, sent_at: row.sent_at }
+    ]);
+    map.set(row.quote_id, {
+      initial:
+        candidate.initial &&
+        (existing.initial === null || candidate.initial < existing.initial)
+          ? candidate.initial
+          : existing.initial,
+      finish:
+        candidate.finish &&
+        (existing.finish === null || candidate.finish < existing.finish)
+          ? candidate.finish
+          : existing.finish
+    });
+  }
+  return map;
+}
+
+// From already-loaded email history for a single quote (the saved-quote and
+// invoicing pages already fetch this). Filters to sent invoice emails and
+// folds to the earliest sent_at per kind.
+export function receiptsFromHistory(rows: EmailLogRow[]): InvoiceReceipts {
+  const sent = rows.filter(
+    (row) => row.doc === "invoice" && row.status === "sent"
+  );
+  return foldReceipts(
+    sent.map((row) => ({ invoice_kind: row.invoice_kind, sent_at: row.sent_at }))
+  );
+}

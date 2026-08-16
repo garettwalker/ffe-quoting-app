@@ -7,6 +7,7 @@ import {
   lifecycleStage,
   outstandingCents
 } from "@/lib/invoice-calculations";
+import { loadInvoiceReceipts, type InvoiceReceipts } from "@/lib/email-log";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
 import type { DashboardQuoteRow, InvoiceData } from "@/lib/types";
@@ -39,7 +40,7 @@ export default async function DashboardPage() {
       .in("status", ["draft", "prepared"]),
     supabase
       .from("quotes")
-      .select("invoice_data, created_at")
+      .select("id, invoice_data, created_at")
       .eq("status", "accepted")
       .not("invoice_data", "is", null)
       .order("created_at", { ascending: false })
@@ -68,12 +69,24 @@ export default async function DashboardPage() {
   const activeQuotes = activeCountRes.count ?? 0;
 
   // Money tiles from the accepted+invoiced rows. All of these are status
-  // "accepted", so the stage is derived purely from the invoice setup.
+  // "accepted", so the stage is derived purely from the invoice setup, plus the
+  // emailed-state of each invoice (a not-yet-emailed finish is "scheduled" and
+  // not counted as owed — see lib/invoice-calculations `invoiceIsReceivable`).
   const moneyRows = (moneyRes.data ?? []) as {
+    id: string;
     invoice_data: InvoiceData | null;
   }[];
-  const moneyStageOf = (row: { invoice_data: InvoiceData | null }) =>
-    lifecycleStage("accepted", row.invoice_data);
+  const recent = (recentRes.data ?? []) as DashboardQuoteRow[];
+  // One batched lookup for the emailed-state of every invoice on the money +
+  // recent rows. Missing entries default to "never emailed".
+  const receiptsMap = await loadInvoiceReceipts([
+    ...moneyRows.map((row) => row.id),
+    ...recent.map((row) => row.id)
+  ]);
+  const receiptsOf = (id: string): InvoiceReceipts =>
+    receiptsMap.get(id) ?? { initial: null, finish: null };
+  const moneyStageOf = (row: { id: string; invoice_data: InvoiceData | null }) =>
+    lifecycleStage("accepted", row.invoice_data, receiptsOf(row.id));
   const pendingJobs = moneyRows.filter(
     (row) => moneyStageOf(row) === "pending_payment"
   );
@@ -81,15 +94,13 @@ export default async function DashboardPage() {
     (row) => moneyStageOf(row) === "paid_in_full"
   );
   const totalOutstanding = pendingJobs.reduce(
-    (sum, row) => sum + outstandingCents(row.invoice_data),
+    (sum, row) => sum + outstandingCents(row.invoice_data, receiptsOf(row.id)),
     0
   );
   // If the money query hit its cap, the tiles may undercount (there could be
   // more accepted+invoiced jobs beyond the cap). Surface a warning so the owner
   // knows to raise MONEY_LIMIT.
   const moneyCapped = moneyRows.length >= MONEY_LIMIT;
-
-  const recent = (recentRes.data ?? []) as DashboardQuoteRow[];
 
   return (
     <AppShell>
@@ -183,7 +194,11 @@ export default async function DashboardPage() {
         ) : (
           <div className="grid gap-3">
             {recent.map((row) => (
-              <RecentQuoteRow key={row.id} row={row} />
+              <RecentQuoteRow
+                key={row.id}
+                row={row}
+                receipts={receiptsOf(row.id)}
+              />
             ))}
           </div>
         )}
@@ -253,7 +268,13 @@ function Tile({
   );
 }
 
-function RecentQuoteRow({ row }: { row: DashboardQuoteRow }) {
+function RecentQuoteRow({
+  row,
+  receipts
+}: {
+  row: DashboardQuoteRow;
+  receipts?: InvoiceReceipts;
+}) {
   const address = [
     row.project_street,
     row.project_city,
@@ -273,7 +294,11 @@ function RecentQuoteRow({ row }: { row: DashboardQuoteRow }) {
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{row.quote_id}</span>
             <StatusBadge
-              stage={lifecycleStage(normalizeStatus(row.status), row.invoice_data)}
+              stage={lifecycleStage(
+                normalizeStatus(row.status),
+                row.invoice_data,
+                receipts
+              )}
             />
           </div>
           <p className="mt-1 font-bold text-charcoal">

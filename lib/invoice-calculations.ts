@@ -1,4 +1,5 @@
 import type { InvoiceData, InvoiceKind, InvoiceRecord, LifecycleStage, QuoteStatus } from "@/lib/types";
+import type { InvoiceReceipts } from "@/lib/email-log";
 
 // All money here is integer cents, matching lib/currency.ts.
 
@@ -114,12 +115,59 @@ function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
-// Sum of amounts for invoices that are still unpaid (the outstanding balance).
-export function outstandingCents(data: InvoiceData | null): number {
+// Is this invoice "receivable" (billed and therefore owed / counted on AR)?
+//   - paid invoices are always receivable (they were collected).
+//   - when `receipts` is omitted, every invoice is receivable (the legacy
+//     behavior used by P&L, which reasons about the full contract, not the
+//     emailed state).
+//   - the initial (rough-in) invoice is receivable from setup — it's the
+//     current invoice, billed when invoicing is set up (and often handed over
+//     in person / collected as cash, not always emailed).
+//   - the finish invoice is receivable only once it has been emailed (a sent
+//     email_log row exists) — it is created at setup but not actually billed
+//     until after the sheetrock gap, so before the first email it is
+//     "scheduled", not owed.
+export function invoiceIsReceivable(
+  invoice: InvoiceRecord,
+  kind: InvoiceKind,
+  receipts?: InvoiceReceipts
+): boolean {
+  if (invoice.status === "paid") return true;
+  if (receipts === undefined) return true;
+  if (kind === "initial") return true;
+  return receipts.finish != null;
+}
+
+// The finish invoice's amount when it is still scheduled (not yet emailed and
+// not paid). Zero otherwise (it's either receivable or has no amount). Used to
+// show "Finish pending: $X" and to keep a job out of "paid in full" while a
+// positive-amount finish is still unbilled.
+export function scheduledFinishCents(
+  data: InvoiceData | null,
+  receipts?: InvoiceReceipts
+): number {
+  if (!data || receipts === undefined) return 0;
+  const finish = data.invoices.find((invoice) => invoice.kind === "finish");
+  if (!finish || finish.status === "paid") return 0;
+  if (receipts.finish != null) return 0;
+  return Math.round(finish.amountCents) || 0;
+}
+
+// Sum of amounts for invoices that are still unpaid AND receivable (the
+// outstanding balance actually owed now). When `receipts` is omitted this
+// matches the legacy behavior (all unpaid invoices, including a not-yet-billed
+// finish).
+export function outstandingCents(
+  data: InvoiceData | null,
+  receipts?: InvoiceReceipts
+): number {
   if (!data) return 0;
-  return data.invoices
-    .filter((invoice) => invoice.status === "unpaid")
-    .reduce((sum, invoice) => sum + (Math.round(invoice.amountCents) || 0), 0);
+  return data.invoices.reduce((sum, invoice) => {
+    if (invoice.status !== "unpaid") return sum;
+    const kind = invoice.kind;
+    if (!invoiceIsReceivable(invoice, kind, receipts)) return sum;
+    return sum + (Math.round(invoice.amountCents) || 0);
+  }, 0);
 }
 
 // Per-invoice outstanding: the invoice amount when still unpaid, 0 once paid.
@@ -130,6 +178,21 @@ export function invoiceOutstandingCents(invoice: InvoiceRecord): number {
     : 0;
 }
 
+// Sum of amounts for invoices that are receivable (billed). When `receipts` is
+// omitted this equals the full contract (both invoices) — the legacy behavior.
+// Used for AR's "Total Invoiced" headline + per-job totals, which should only
+// count what has actually been billed (a not-yet-emailed finish is excluded).
+export function receivableInvoicedCents(
+  data: InvoiceData | null,
+  receipts?: InvoiceReceipts
+): number {
+  if (!data) return 0;
+  return data.invoices.reduce((sum, invoice) => {
+    if (!invoiceIsReceivable(invoice, invoice.kind, receipts)) return sum;
+    return sum + (Math.round(invoice.amountCents) || 0);
+  }, 0);
+}
+
 // True when the job has real invoiced money AND nothing is outstanding. This is
 // the single definition of "paid in full" shared by the dashboard lifecycle, the
 // invoicing page, the saved-quote page, and Accounts Receivable. It keys on the
@@ -138,9 +201,20 @@ export function invoiceOutstandingCents(invoice: InvoiceRecord): number {
 // in full and does not count as Pending Payments — matching the AR table, which
 // excludes $0 jobs entirely. It also treats a job with a positive paid invoice
 // plus a $0 unpaid invoice as paid in full (nothing is owed), again matching AR.
-export function isPaidInFull(data: InvoiceData | null): boolean {
+export function isPaidInFull(data: InvoiceData | null, receipts?: InvoiceReceipts): boolean {
   if (!data) return false;
-  return computeInvoiceAmounts(data).totalInvoicedCents > 0 && outstandingCents(data) === 0;
+  if (computeInvoiceAmounts(data).totalInvoicedCents <= 0) return false;
+  if (receipts === undefined) {
+    // Legacy: every invoice counts (used by P&L's full-contract reasoning).
+    return outstandingCents(data) === 0;
+  }
+  // Receivable-aware: nothing owed on billed invoices AND no positive-amount
+  // finish still scheduled (a not-yet-billed finish keeps the job in progress,
+  // so it is NOT "paid in full" even when the rough-in is collected).
+  return (
+    outstandingCents(data, receipts) === 0 &&
+    scheduledFinishCents(data, receipts) === 0
+  );
 }
 
 // Find a single invoice record by kind, with a safe fallback.
@@ -161,7 +235,8 @@ export function invoiceReference(quoteId: string, kind: InvoiceKind): string {
 // so the dashboard always reflects reality without extra status writes.
 export function lifecycleStage(
   status: QuoteStatus,
-  invoiceData: InvoiceData | null
+  invoiceData: InvoiceData | null,
+  receipts?: InvoiceReceipts
 ): LifecycleStage {
   if (status !== "accepted") return status;
   if (!invoiceData) return "accepted";
@@ -172,5 +247,7 @@ export function lifecycleStage(
   // real invoices, nothing outstanding = paid in full, something outstanding =
   // pending.
   if (computeInvoiceAmounts(invoiceData).totalInvoicedCents <= 0) return "accepted";
-  return isPaidInFull(invoiceData) ? "paid_in_full" : "pending_payment";
+  return isPaidInFull(invoiceData, receipts)
+    ? "paid_in_full"
+    : "pending_payment";
 }

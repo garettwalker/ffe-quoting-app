@@ -105,22 +105,32 @@ export type InvoiceData = {
 
 // One invoice flattened for the Accounts Receivable view. `outstandingCents`
 // is the invoice amount when still unpaid, 0 once paid (per-invoice balance).
+// `receivable` is true when the invoice counts toward the AR totals: paid, or
+// the rough-in (always, billed at setup), or the finish once it has been emailed
+// (a not-yet-emailed finish is "scheduled" — shown but not counted as owed).
+// `receivableAt` is the date it became receivable (first sent email date, else
+// paidAt, else issuedAt) and drives the "Invoiced" date column + oldest-first
+// sort.
 export type ReceivableInvoice = {
   kind: InvoiceKind;
   reference: string;
   amountCents: number;
   status: InvoiceStatus;
   outstandingCents: number;
+  receivable: boolean;
+  receivableAt: string | null;
   issuedAt: string | null;
   paidAt: string | null;
 };
 
 // One job (quote) flattened for the Accounts Receivable view: the two invoices
-// plus job-level totals. `earliestIssuedAt` is the min issuedAt across the job's
-// invoices and is the sort key for "oldest first". The AR page partitions jobs
-// into Pending Payments (totalOutstandingCents > 0) and Historical Paid
-// (totalOutstandingCents === 0 with a real invoiced amount) directly off these
-// totals — matching lib/invoice-calculations `isPaidInFull`.
+// plus job-level totals. `earliestReceivableAt` is the min receivable date
+// across the job's receivable invoices and is the sort key for "oldest first".
+// `scheduledFinishCents` is the finish amount when it is still scheduled (not
+// yet emailed / not paid), else 0 — shown as "Finish pending" and keeps the job
+// out of Historical Paid. The AR page partitions jobs into Pending Payments
+// (receivable invoiced money and not paid in full) and Historical Paid
+// (isPaidInFull) directly off these totals — matching lib/invoice-calculations.
 export type ReceivableJob = {
   id: string;
   quoteId: string;
@@ -132,7 +142,8 @@ export type ReceivableJob = {
   totalInvoicedCents: number;
   totalPaidCents: number;
   totalOutstandingCents: number;
-  earliestIssuedAt: string | null;
+  scheduledFinishCents: number;
+  earliestReceivableAt: string | null;
 };
 
 export type PricingItem = {

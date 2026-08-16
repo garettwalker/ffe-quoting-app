@@ -3,15 +3,20 @@ import { AppShell } from "@/components/app-shell";
 import { ReceivablesTable } from "@/components/receivables-table";
 import { formatCurrency } from "@/lib/currency";
 import {
-  computeInvoiceAmounts,
+  invoiceIsReceivable,
   invoiceOutstandingCents,
   invoiceReference,
-  outstandingCents
+  isPaidInFull,
+  outstandingCents,
+  receivableInvoicedCents,
+  scheduledFinishCents
 } from "@/lib/invoice-calculations";
+import { loadInvoiceReceipts, type InvoiceReceipts } from "@/lib/email-log";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import type {
   InvoiceData,
   InvoiceKind,
+  InvoiceRecord,
   ReceivableInvoice,
   ReceivableJob
 } from "@/lib/types";
@@ -41,7 +46,14 @@ type ReceivablesRow = {
 // Flatten one quote row into a ReceivableJob. Returns null when the row has no
 // usable invoice setup (missing invoice_data, no invoice records, or a $0
 // total invoiced — e.g. an empty/unbalanced setup with nothing to collect).
-function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
+// `receipts` is the emailed-state for this quote: a finish invoice that has
+// never been emailed (and isn't paid) is "scheduled" — shown but not counted
+// toward invoiced / outstanding totals, and it keeps the job out of Historical
+// Paid (it is still in progress). See lib/invoice-calculations `invoiceIsReceivable`.
+function buildReceivableJob(
+  row: ReceivablesRow,
+  receipts: InvoiceReceipts
+): ReceivableJob | null {
   const data = row.invoice_data;
   if (!data || !Array.isArray(data.invoices) || data.invoices.length === 0) {
     return null;
@@ -50,12 +62,21 @@ function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
   const toReceivableInvoice = (kind: InvoiceKind): ReceivableInvoice | null => {
     const invoice = data.invoices.find((record) => record.kind === kind);
     if (!invoice) return null;
+    const receivable = invoiceIsReceivable(invoice, kind, receipts);
+    // Receivable date: first sent email date for this kind, else paidAt (paid
+    // without ever emailing), else issuedAt (setup). Null when scheduled.
+    const emailedAt = receipts[kind];
+    const receivableAt = receivable
+      ? (emailedAt ?? invoice.paidAt ?? invoice.issuedAt) ?? null
+      : null;
     return {
       kind,
       reference: invoiceReference(row.quote_id, kind),
       amountCents: Math.round(invoice.amountCents) || 0,
       status: invoice.status,
       outstandingCents: invoiceOutstandingCents(invoice),
+      receivable,
+      receivableAt,
       issuedAt: invoice.issuedAt ?? null,
       paidAt: invoice.paidAt ?? null
     };
@@ -64,16 +85,28 @@ function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
   const initial = toReceivableInvoice("initial");
   const finish = toReceivableInvoice("finish");
 
-  const totalInvoicedCents = computeInvoiceAmounts(data).totalInvoicedCents;
+  // Only receivable (billed) invoices count toward AR totals. A scheduled
+  // finish is excluded here; its amount is surfaced via scheduledFinishCents.
+  const totalInvoicedCents = receivableInvoicedCents(data, receipts);
   if (totalInvoicedCents <= 0) return null;
 
-  const totalOutstandingCents = outstandingCents(data);
+  const totalOutstandingCents = outstandingCents(data, receipts);
+  const jobScheduledFinish = scheduledFinishCents(data, receipts);
 
-  const issuedDates = data.invoices
-    .map((invoice) => invoice.issuedAt)
+  // Earliest receivable date across the job's receivable invoices (the
+  // "Invoiced" date column + the oldest-first sort key). A scheduled finish's
+  // date is not counted.
+  const receivableDates = data.invoices
+    .filter((invoice: InvoiceRecord) =>
+      invoiceIsReceivable(invoice, invoice.kind, receipts)
+    )
+    .map((invoice) => {
+      const emailedAt = receipts[invoice.kind];
+      return (emailedAt ?? invoice.paidAt ?? invoice.issuedAt) ?? null;
+    })
     .filter((value): value is string => Boolean(value));
-  const earliestIssuedAt = issuedDates.length > 0
-    ? issuedDates.sort()[0] ?? null
+  const earliestReceivableAt = receivableDates.length > 0
+    ? receivableDates.sort()[0] ?? null
     : null;
 
   return {
@@ -87,7 +120,8 @@ function buildReceivableJob(row: ReceivablesRow): ReceivableJob | null {
     totalInvoicedCents,
     totalPaidCents: totalInvoicedCents - totalOutstandingCents,
     totalOutstandingCents,
-    earliestIssuedAt
+    scheduledFinishCents: jobScheduledFinish,
+    earliestReceivableAt
   };
 }
 
@@ -115,12 +149,19 @@ export default async function ReceivablesPage() {
   }
 
   const rows = (data ?? []) as ReceivablesRow[];
+  // Load the emailed-state for every job's invoices in one batch. A finish
+  // invoice that has never been emailed (and isn't paid) is "scheduled" — not
+  // yet owed — and is excluded from the invoiced/outstanding totals.
+  const receiptsMap = await loadInvoiceReceipts(rows.map((row) => row.id));
   const jobs = rows
-    .map(buildReceivableJob)
+    .map((row) =>
+      buildReceivableJob(row, receiptsMap.get(row.id) ?? { initial: null, finish: null })
+    )
     .filter((job): job is ReceivableJob => Boolean(job));
 
   // Page-level totals across every job (independent of the client-side period
   // filter, which only narrows what is displayed, not the headline figures).
+  // These count only receivable (billed) invoices.
   const totalInvoiced = jobs.reduce(
     (sum, job) => sum + job.totalInvoicedCents,
     0

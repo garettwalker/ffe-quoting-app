@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { DashboardQuoteSection } from "@/components/dashboard-quote-section";
 import { lifecycleStage } from "@/lib/invoice-calculations";
+import { loadInvoiceReceipts } from "@/lib/email-log";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
 import type { DashboardQuoteRow } from "@/lib/types";
@@ -43,10 +44,20 @@ export default async function QuotesPage() {
   // unexpected value falls back to "prepared" so the row still renders. For
   // accepted quotes the stage is derived from the invoice setup: no invoices
   // yet = Client Accepted, invoices with money outstanding = Pending Payments,
-  // every invoice paid = Paid in Full.
+  // every invoice paid = Paid in Full. A not-yet-emailed finish is "scheduled"
+  // (not owed yet), so a rough-in-paid / finish-scheduled job stays in Pending
+  // Payments rather than reading as paid in full.
   const rows = (data ?? []) as DashboardQuoteRow[];
+  // One batched lookup for the emailed-state of every invoice on the loaded
+  // quotes. A finish that has never been emailed (and isn't paid) is excluded
+  // from outstanding + keeps the job out of Paid in Full.
+  const receiptsById = await loadInvoiceReceipts(rows.map((row) => row.id));
   const stageOf = (row: DashboardQuoteRow) =>
-    lifecycleStage(normalizeStatus(row.status), row.invoice_data);
+    lifecycleStage(
+      normalizeStatus(row.status),
+      row.invoice_data,
+      receiptsById.get(row.id)
+    );
 
   const drafts = rows.filter((row) => stageOf(row) === "draft");
   const prepared = rows.filter((row) => stageOf(row) === "prepared");
@@ -76,6 +87,7 @@ export default async function QuotesPage() {
         description="Quotes you are still working on. Save as a draft to keep them here."
         quotes={drafts}
         emptyCopy="No drafts yet. Start a new quote and save it as a draft to see it here."
+        receiptsById={receiptsById}
       />
 
       <DashboardQuoteSection
@@ -84,6 +96,7 @@ export default async function QuotesPage() {
         description="Ready to share with the client, or edit before sending."
         quotes={prepared}
         emptyCopy="No prepared quotes. When a draft is ready to send, mark it prepared and it appears here."
+        receiptsById={receiptsById}
       />
 
       <DashboardQuoteSection
@@ -92,6 +105,7 @@ export default async function QuotesPage() {
         description="Billing and invoicing start here."
         quotes={accepted}
         emptyCopy="No accepted quotes yet. When a client approves, mark a prepared quote accepted and it appears here. Invoicing starts from this stage."
+        receiptsById={receiptsById}
       />
 
       <DashboardQuoteSection
@@ -100,6 +114,7 @@ export default async function QuotesPage() {
         description="Accepted quotes with invoices set up. Mark each invoice paid as it comes in."
         quotes={pending}
         emptyCopy="No quotes awaiting payment. Set up invoices on an accepted quote and it moves here."
+        receiptsById={receiptsById}
       />
 
       <DashboardQuoteSection
@@ -108,6 +123,7 @@ export default async function QuotesPage() {
         description="Every invoice on this job has been paid."
         quotes={paid}
         emptyCopy="No fully paid quotes yet. When every invoice on a job is marked paid, it lands here."
+        receiptsById={receiptsById}
       />
     </AppShell>
   );

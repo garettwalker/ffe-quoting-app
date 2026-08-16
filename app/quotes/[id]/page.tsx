@@ -6,8 +6,13 @@ import { ReopenQuoteButton } from "@/components/reopen-quote-button";
 import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency, formatDate, formatPercent } from "@/lib/currency";
 import { getAdderPriceVariance } from "@/lib/calculations";
-import { getEmailHistoryForQuote } from "@/lib/email-log";
-import { isPaidInFull, lifecycleStage, outstandingCents } from "@/lib/invoice-calculations";
+import { getEmailHistoryForQuote, receiptsFromHistory } from "@/lib/email-log";
+import {
+  isPaidInFull,
+  lifecycleStage,
+  outstandingCents,
+  scheduledFinishCents
+} from "@/lib/invoice-calculations";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
 import type {
@@ -83,6 +88,11 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const quote = row.quote_data;
   const result = row.calculation_data;
   const status = normalizeStatus(row.status);
+  // Emailed-state of each invoice, derived from the email history already
+  // fetched for the history table. A finish invoice that has never been emailed
+  // (and isn't paid) is "scheduled" — not owed yet — so it is excluded from the
+  // outstanding balance and keeps the job from reading as paid in full.
+  const receipts = receiptsFromHistory(emailHistory);
   // Net effect of per-line unit-price overrides — the bridge from
   // "(before-adjustments x multiplier)" to the final quote. Zero (hidden)
   // when no adder lines are custom-priced. Computed on the fly so historical
@@ -153,7 +163,9 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            <StatusBadge stage={lifecycleStage(status, row.invoice_data)} />
+            <StatusBadge
+              stage={lifecycleStage(status, row.invoice_data, receipts)}
+            />
             <span className="text-sm font-bold text-charcoal/60">
               Saved {createdDate}
             </span>
@@ -426,11 +438,22 @@ export default async function SavedQuotePage({ params }: PageProps) {
           </div>
 
           {status === "accepted" && row.invoice_data ? (
-            <p className="mt-4 rounded-soft bg-cream px-4 py-3 text-sm font-black text-deep-pine">
-              {isPaidInFull(row.invoice_data)
-                ? "Invoices: paid in full"
-                : `Outstanding: ${formatCurrency(outstandingCents(row.invoice_data))}`}
-            </p>
+            (() => {
+              const paidInFull = isPaidInFull(row.invoice_data, receipts);
+              const owed = outstandingCents(row.invoice_data, receipts);
+              const finishPending = scheduledFinishCents(row.invoice_data, receipts);
+              return (
+                <p className="mt-4 rounded-soft bg-cream px-4 py-3 text-sm font-black text-deep-pine">
+                  {paidInFull
+                    ? "Invoices: paid in full"
+                    : owed > 0
+                      ? `Outstanding: ${formatCurrency(owed)}`
+                      : finishPending > 0
+                        ? `Finish pending: ${formatCurrency(finishPending)}`
+                        : "Invoices: paid in full"}
+                </p>
+              );
+            })()
           ) : null}
 
           <div className="mt-6">

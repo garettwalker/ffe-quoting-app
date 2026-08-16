@@ -6,7 +6,13 @@ import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { DeleteInvoicesButton } from "@/components/delete-invoices-button";
 import { formatCurrency } from "@/lib/currency";
-import { invoiceReference, outstandingCents, isPaidInFull } from "@/lib/invoice-calculations";
+import {
+  invoiceReference,
+  outstandingCents,
+  isPaidInFull,
+  scheduledFinishCents
+} from "@/lib/invoice-calculations";
+import { getEmailHistoryForQuote, receiptsFromHistory } from "@/lib/email-log";
 import { buildPayUrl } from "@/lib/pay-token";
 import { getServerUser } from "@/lib/auth";
 import { CopyPayLinkButton } from "@/components/pay/copy-pay-link-button";
@@ -38,7 +44,7 @@ type PageProps = {
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [user, { data, error }, catalog, paymentsRes, stripePaidRes] = await Promise.all([
+  const [user, { data, error }, catalog, paymentsRes, stripePaidRes, emailHistory] = await Promise.all([
     getServerUser(),
     supabase
       .from("quotes")
@@ -67,7 +73,12 @@ export default async function InvoicingPage({ params }: PageProps) {
       .select("invoice_kind")
       .eq("quote_id", params.id)
       .neq("method", "manual")
-      .eq("status", "succeeded")
+      .eq("status", "succeeded"),
+    // Emailed-state of each invoice. A finish invoice that has never been
+    // emailed (and isn't paid) is "scheduled" — not owed yet — so it is
+    // excluded from the outstanding balance and keeps the job from reading
+    // as paid in full.
+    getEmailHistoryForQuote(params.id)
   ]);
 
   if (error || !data || !data.quote_data || !data.calculation_data) {
@@ -78,6 +89,9 @@ export default async function InvoicingPage({ params }: PageProps) {
   const quote = row.quote_data;
   const result = row.calculation_data;
   const invoiceData = row.invoice_data;
+  // Emailed-state of each invoice from the email history. A finish that has
+  // never been emailed (and isn't paid) is "scheduled" and not owed yet.
+  const receipts = receiptsFromHistory(emailHistory);
 
   const fullAddress = [
     quote.projectStreet,
@@ -152,11 +166,22 @@ export default async function InvoicingPage({ params }: PageProps) {
           </p>
 
           {invoiceData ? (
-            <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
-              {isPaidInFull(invoiceData)
-                ? "Paid in full"
-                : `Outstanding: ${formatCurrency(outstandingCents(invoiceData))}`}
-            </p>
+            (() => {
+              const paidInFull = isPaidInFull(invoiceData, receipts);
+              const owed = outstandingCents(invoiceData, receipts);
+              const finishPending = scheduledFinishCents(invoiceData, receipts);
+              return (
+                <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
+                  {paidInFull
+                    ? "Paid in full"
+                    : owed > 0
+                      ? `Outstanding: ${formatCurrency(owed)}`
+                      : finishPending > 0
+                        ? `Finish pending: ${formatCurrency(finishPending)}`
+                        : "Paid in full"}
+                </p>
+              );
+            })()
           ) : null}
         </div>
 

@@ -72,22 +72,22 @@ function sortJobs(list: ReceivableJob[], sort: Sort): ReceivableJob[] {
             sensitivity: "base"
           });
       case "newest": {
-        const at = a.job.earliestIssuedAt
-          ? new Date(a.job.earliestIssuedAt).getTime()
+        const at = a.job.earliestReceivableAt
+          ? new Date(a.job.earliestReceivableAt).getTime()
           : -Infinity;
-        const bt = b.job.earliestIssuedAt
-          ? new Date(b.job.earliestIssuedAt).getTime()
+        const bt = b.job.earliestReceivableAt
+          ? new Date(b.job.earliestReceivableAt).getTime()
           : -Infinity;
         return bt - at;
       }
       case "oldest":
       default: {
-        // Oldest first; jobs with no issued date sort last (treated as far future).
-        const at = a.job.earliestIssuedAt
-          ? new Date(a.job.earliestIssuedAt).getTime()
+        // Oldest first; jobs with no receivable date sort last (treated as far future).
+        const at = a.job.earliestReceivableAt
+          ? new Date(a.job.earliestReceivableAt).getTime()
           : Infinity;
-        const bt = b.job.earliestIssuedAt
-          ? new Date(b.job.earliestIssuedAt).getTime()
+        const bt = b.job.earliestReceivableAt
+          ? new Date(b.job.earliestReceivableAt).getTime()
           : Infinity;
         if (at === bt) return a.index - b.index;
         return at - bt;
@@ -107,21 +107,28 @@ export function ReceivablesTable({ jobs }: ReceivablesTableProps) {
 
       const inPeriod = (job: ReceivableJob) => {
         if (!range) return true;
-        if (!job.earliestIssuedAt) return false;
-        const t = new Date(job.earliestIssuedAt).getTime();
+        if (!job.earliestReceivableAt) return false;
+        const t = new Date(job.earliestReceivableAt).getTime();
         return t >= range.from && t < range.to;
       };
 
       const filtered = jobs.filter(inPeriod);
 
+      // Historical Paid = nothing owed on billed invoices AND no positive
+      // finish still scheduled (a not-yet-billed finish keeps the job in
+      // Pending Payments because the work is still in progress). Pending
+      // Payments = everything else with receivable invoiced money.
       const pending = sortJobs(
-        filtered.filter((job) => job.totalOutstandingCents > 0),
+        filtered.filter(
+          (job) =>
+            job.totalOutstandingCents > 0 || job.scheduledFinishCents > 0
+        ),
         sort
       );
       const historical = sortJobs(
         filtered.filter(
           (job) =>
-            job.totalOutstandingCents === 0 && job.totalInvoicedCents > 0
+            job.totalOutstandingCents === 0 && job.scheduledFinishCents === 0
         ),
         sort
       );
@@ -317,7 +324,7 @@ function JobRow({ job }: { job: ReceivableJob }) {
       </td>
 
       <td className="py-4 pr-4 text-sm font-bold text-charcoal/70">
-        {formatDate(job.earliestIssuedAt) || "N/A"}
+        {formatDate(job.earliestReceivableAt) || "N/A"}
       </td>
 
       <td className="py-4">
@@ -341,6 +348,23 @@ function InvoiceCell({
 }) {
   if (!invoice) {
     return <span className="text-sm font-bold text-charcoal/40">N/A</span>;
+  }
+
+  // A scheduled finish (not yet emailed / not paid): show the amount but mark
+  // it as not yet billed, and do NOT show an "owed" figure (it isn't due yet).
+  if (!invoice.receivable) {
+    return (
+      <div className="min-w-[140px]">
+        <p className="font-bold text-charcoal/55">{formatCurrency(invoice.amountCents)}</p>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="rounded-full bg-cream px-2 py-0.5 text-xs font-black text-charcoal/55">
+            Scheduled
+          </span>
+          <span className="text-xs font-bold text-charcoal/45">not yet billed</span>
+        </div>
+        <p className="sr-only">{label}</p>
+      </div>
+    );
   }
 
   return (
