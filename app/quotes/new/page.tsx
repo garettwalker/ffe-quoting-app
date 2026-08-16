@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
+import { getCustomers } from "@/lib/customers";
 import { getPricingCatalog } from "@/lib/pricing";
 
 // Always read the live pricing catalog from Supabase (no caching), so a price
@@ -8,7 +9,10 @@ import { getPricingCatalog } from "@/lib/pricing";
 export const dynamic = "force-dynamic";
 
 export default async function NewQuotePage() {
-  const catalog = await getPricingCatalog();
+  const [catalog, customers] = await Promise.all([
+    getPricingCatalog(),
+    getCustomers()
+  ]);
 
   return (
     <AppShell>
@@ -34,7 +38,7 @@ export default async function NewQuotePage() {
         </p>
       </div>
 
-      <QuoteBuilder catalog={catalog} />
+      <QuoteBuilder catalog={catalog} customers={customers} />
     </AppShell>
   );
 }

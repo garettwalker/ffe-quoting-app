@@ -17,8 +17,14 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 // Authenticated browser client (singleton). Carries the logged-in user's
 // session so RLS enforces admin-only writes after the Phase C pass.
 const supabase = getSupabaseBrowser();
-import type { BaseRate, PricingCatalog, QuoteFormState } from "@/lib/types";
+import type {
+  BaseRate,
+  Customer,
+  PricingCatalog,
+  QuoteFormState
+} from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
+import { CustomerPicker } from "@/components/customer-picker";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
 
@@ -107,12 +113,17 @@ type QuoteBuilderProps = {
   // settings) fetched from Supabase by the server-component page and passed
   // down. Replaces the old static lib/seed-data.ts imports.
   catalog: PricingCatalog;
+  // The customer repository, fetched by the server page and passed down so the
+  // Builder / Customer field can smart-search existing customers and link the
+  // quote to one. Empty when none exist yet (the picker still offers create-new).
+  customers: Customer[];
 };
 
 export function QuoteBuilder({
   initialQuote,
   savedQuoteId: savedQuoteIdProp,
-  catalog
+  catalog,
+  customers
 }: QuoteBuilderProps) {
   const router = useRouter();
   // The DB is the source of truth for base-rate presets when it has rows; when
@@ -195,6 +206,50 @@ export function QuoteBuilder({
     setCompletionMessage("");
     setDraftMessage("");
     setQuote((current) => ({ ...current, ...next }));
+  }
+
+  // Customer-picker handlers. The quote keeps its own client_name / client_email
+  // snapshot; customer_id is just the link to the shared record.
+  //  - Pick existing: snapshot the name + primary email, set the link.
+  //  - Create new (picker does the insert): snapshot the name, set the link.
+  //  - Type a name different from the linked customer: unlink (name is identity)
+  //    so the dropdown re-offers matches / create-new.
+  function handleCustomerNameChange(name: string) {
+    setCompletionMessage("");
+    setDraftMessage("");
+    setQuote((current) => {
+      let customerId = current.customerId;
+      if (customerId) {
+        const linked = customers.find((c) => c.id === customerId);
+        if (linked && linked.name !== name) {
+          customerId = undefined;
+        }
+      }
+      return { ...current, clientName: name, customerId };
+    });
+  }
+
+  function handleCustomerSelect(customer: Customer) {
+    setCompletionMessage("");
+    setDraftMessage("");
+    setQuote((current) => ({
+      ...current,
+      clientName: customer.name,
+      customerId: customer.id,
+      // Prefill the contact email with the customer's primary email. Keep an
+      // email the owner already typed when the customer has none on file.
+      clientEmail: customer.emails[0]?.email ?? current.clientEmail
+    }));
+  }
+
+  function handleCustomerCreated(customer: Customer) {
+    setCompletionMessage("");
+    setDraftMessage("");
+    setQuote((current) => ({
+      ...current,
+      clientName: customer.name,
+      customerId: customer.id
+    }));
   }
 
   function handleAddLineItem(pricingItemId: string) {
@@ -358,6 +413,7 @@ export function QuoteBuilder({
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
+      customer_id: quote.customerId ?? null,
       project_name: quote.projectName || null,
       project_street: quote.projectStreet,
       project_city: quote.projectCity,
@@ -433,6 +489,13 @@ export function QuoteBuilder({
       </div>
     );
   }
+
+  // The linked customer's emails, offered as a datalist on the contact-email
+  // field so the quote contact can be the wife's email (or any second contact)
+  // with one keystroke. Empty when no customer is linked or it has no emails.
+  const linkedCustomerEmails = quote.customerId
+    ? customers.find((c) => c.id === quote.customerId)?.emails.map((e) => e.email) ?? []
+    : [];
 
   return (
     <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -510,13 +573,14 @@ export function QuoteBuilder({
             </Field>
 
             <Field label="Builder / Customer">
-              <input
+              <CustomerPicker
+                customers={customers}
                 value={quote.clientName}
-                onChange={(event) =>
-                  updateQuote("clientName", event.target.value)
-                }
-                placeholder="Who is billed (builder or direct customer)"
-                className="form-input"
+                customerId={quote.customerId}
+                clientEmail={quote.clientEmail}
+                onChange={handleCustomerNameChange}
+                onSelect={handleCustomerSelect}
+                onCreated={handleCustomerCreated}
               />
             </Field>
 
@@ -529,7 +593,19 @@ export function QuoteBuilder({
                 }
                 placeholder="client@email.com"
                 className="form-input"
+                list={
+                  linkedCustomerEmails.length > 0
+                    ? "customer-email-options"
+                    : undefined
+                }
               />
+              {linkedCustomerEmails.length > 0 ? (
+                <datalist id="customer-email-options">
+                  {linkedCustomerEmails.map((email) => (
+                    <option key={email} value={email} />
+                  ))}
+                </datalist>
+              ) : null}
             </Field>
 
             <Field label="Address">

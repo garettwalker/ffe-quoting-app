@@ -11,6 +11,10 @@ type EmailPdfButtonProps = {
   defaultSubject: string;
   defaultMessage: string;
   docTitle: string; // shown in the success message, e.g. "Detailed Quote"
+  // The linked customer's emails, offered as a <datalist> on the To field so the
+  // owner can add a second contact (a husband/wife team) with one keystroke. The
+  // To field still accepts free-text and multiple comma-separated recipients.
+  suggestedEmails?: string[];
 };
 
 type Status = "idle" | "sending" | "sent" | "error";
@@ -27,7 +31,8 @@ export function EmailPdfButton({
   defaultTo,
   defaultSubject,
   defaultMessage,
-  docTitle
+  docTitle,
+  suggestedEmails
 }: EmailPdfButtonProps) {
   const [open, setOpen] = useState(false);
   const [to, setTo] = useState(defaultTo);
@@ -37,8 +42,18 @@ export function EmailPdfButton({
   const [error, setError] = useState<string>("");
   const [sentTo, setSentTo] = useState<string>("");
 
-  const toValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to.trim());
+  // The To field accepts multiple comma-separated recipients. Each must be a
+  // valid address; a single bad address rejects the whole send so a typo is
+  // never silently dropped.
+  const recipients = to
+    .split(",")
+    .map((addr) => addr.trim())
+    .filter(Boolean);
+  const toValid =
+    recipients.length > 0 &&
+    recipients.every((addr) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr));
   const canSend = status !== "sending" && toValid && subject.trim().length > 0;
+  const hasSuggestions = (suggestedEmails ?? []).filter(Boolean).length > 0;
 
   function handleReset() {
     setOpen(false);
@@ -126,17 +141,27 @@ export function EmailPdfButton({
               To
             </label>
             <input
-              type="email"
+              type="text"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              placeholder="customer@email.com"
+              placeholder="customer@email.com (comma-separate for multiple)"
               className="w-full rounded-soft border border-pine/20 px-3 py-2 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-pine/40"
               required
-              autoComplete="email"
+              autoComplete="off"
+              list={hasSuggestions ? "email-pdf-recipients" : undefined}
             />
+            {hasSuggestions ? (
+              <datalist id="email-pdf-recipients">
+                {(suggestedEmails ?? [])
+                  .filter(Boolean)
+                  .map((email) => (
+                    <option key={email} value={email} />
+                  ))}
+              </datalist>
+            ) : null}
             {to.length > 0 && !toValid ? (
               <p className="mt-1 text-xs font-bold text-clay">
-                Enter a valid email address.
+                Enter a valid email address for each recipient (comma-separated).
               </p>
             ) : null}
           </div>

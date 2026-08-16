@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
+import { getCustomers } from "@/lib/customers";
 import { getPricingCatalog } from "@/lib/pricing";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { normalizeStatus } from "@/lib/types";
@@ -9,6 +10,7 @@ import type { InvoiceData, QuoteFormState } from "@/lib/types";
 type SavedQuoteRow = {
   id: string;
   status: string;
+  customer_id: string | null;
   quote_data: QuoteFormState;
   invoice_data: InvoiceData | null;
 };
@@ -23,16 +25,17 @@ export const dynamic = "force-dynamic";
 
 export default async function EditSavedQuotePage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [quoteResult, catalog, paymentsRes] = await Promise.all([
+  const [quoteResult, catalog, customers, paymentsRes] = await Promise.all([
     // status + invoice_data are read only to decide whether to show the
     // "this is accepted/invoiced" warning banner (see below). They are not
     // passed into QuoteBuilder.
     supabase
       .from("quotes")
-      .select("id, status, quote_data, invoice_data")
+      .select("id, status, customer_id, quote_data, invoice_data")
       .eq("id", params.id)
       .single(),
     getPricingCatalog(),
+    getCustomers(),
     // Any payment ledger row means real money is tied to this job. Counted
     // head-only so we never load payment details into the edit page.
     supabase
@@ -70,6 +73,13 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
 
   const row = data as SavedQuoteRow;
   const quote = row.quote_data;
+  // Prefer the customer_id column (source of truth, set by backfill) over the
+  // JSONB snapshot so a backfilled quote opens with its customer link intact
+  // even before it is re-saved. The picker treats the name as identity, so an
+  // unchanged name keeps the link; editing the name away unlinks.
+  if (!quote.customerId && row.customer_id) {
+    quote.customerId = row.customer_id;
+  }
   const status = normalizeStatus(row.status);
   const paymentCount = paymentsRes.count ?? 0;
   const hasInvoices = !!row.invoice_data;
@@ -132,6 +142,7 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
         initialQuote={quote}
         savedQuoteId={row.id}
         catalog={catalog}
+        customers={customers}
       />
     </AppShell>
   );

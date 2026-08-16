@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
+import { getCustomerEmailsForQuote } from "@/lib/customers";
 import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
 import { buildEmailDefaults, type InvoiceKind } from "@/lib/send-pdf-email";
 
@@ -23,6 +24,10 @@ export default async function PrintInvoicePage({ params }: PageProps) {
   if (!input) {
     return <InvoiceNotFound />;
   }
+
+  // The linked customer's emails (empty when no customer is linked) so the
+  // Email To field can offer them as suggestions for a multi-recipient send.
+  const suggestedEmails = await getCustomerEmailsForQuote(params.id);
 
   const { pdfProps } = input;
   const projectName = pdfProps.projectName || "";
@@ -57,7 +62,8 @@ export default async function PrintInvoicePage({ params }: PageProps) {
           defaultTo: pdfProps.clientEmail ?? "",
           defaultSubject: emailDefaults.subject,
           defaultMessage: emailDefaults.message,
-          docTitle: pdfProps.title
+          docTitle: pdfProps.title,
+          suggestedEmails
         }}
       />
 

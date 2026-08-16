@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
 import { formatCurrency } from "@/lib/currency";
+import { getCustomerEmailsForQuote } from "@/lib/customers";
 import { loadDetailedQuotePdfInput } from "@/lib/detailed-quote-pdf";
 import { buildEmailDefaults } from "@/lib/send-pdf-email";
 
@@ -14,6 +15,10 @@ export const dynamic = "force-dynamic";
 
 export default async function PrintQuotePage({ params }: PageProps) {
   const input = await loadDetailedQuotePdfInput(params.id);
+
+  // The linked customer's emails (empty when no customer is linked) so the
+  // Email To field can offer them as suggestions for a multi-recipient send.
+  const suggestedEmails = input ? await getCustomerEmailsForQuote(params.id) : [];
 
   if (!input) {
     return (
@@ -61,7 +66,8 @@ export default async function PrintQuotePage({ params }: PageProps) {
           defaultTo: quote.clientEmail ?? "",
           defaultSubject: emailDefaults.subject,
           defaultMessage: emailDefaults.message,
-          docTitle: "Detailed Quote"
+          docTitle: "Detailed Quote",
+          suggestedEmails
         }}
       />
 

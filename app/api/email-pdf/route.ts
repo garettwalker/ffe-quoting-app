@@ -81,9 +81,24 @@ export async function POST(request: Request) {
       );
     }
   }
-  if (!to || !isValidEmail(to)) {
+  if (!to || typeof to !== "string") {
     return NextResponse.json(
       { ok: false, error: "A valid recipient email is required." },
+      { status: 400 }
+    );
+  }
+
+  // The To field accepts multiple comma-separated recipients (so one invoice
+  // can be emailed to both halves of a husband/wife team in a single send).
+  // Split, trim, drop empties, and validate each address. Reject the whole
+  // send if any one address is invalid so a typo is never silently dropped.
+  const recipients = to
+    .split(",")
+    .map((addr) => addr.trim())
+    .filter(Boolean);
+  if (recipients.length === 0 || recipients.some((addr) => !isValidEmail(addr))) {
+    return NextResponse.json(
+      { ok: false, error: "One or more recipient emails are not valid." },
       { status: 400 }
     );
   }
@@ -131,11 +146,16 @@ export async function POST(request: Request) {
   const result = await sendPdfEmail({
     from,
     replyTo,
-    to: to.trim(),
+    // Resend accepts an array of recipients; one email is delivered to all.
+    to: recipients.length === 1 ? recipients[0] : recipients,
     subject: finalSubject,
     message: finalMessage,
     attachment
   });
+
+  // The audit row records every recipient (comma-joined) so the email-log and
+  // saved-quote history show who was on the send, not just the first address.
+  const recipientLog = recipients.join(", ");
 
   // Append an audit-log row (both sent and failed). Best-effort: a logging
   // failure never changes the send response or breaks a successful send.
@@ -145,7 +165,7 @@ export async function POST(request: Request) {
     invoiceKind: doc === "invoice" ? (invoiceKind as InvoiceKind) : undefined,
     reference: attachment.reference,
     docTitle: attachment.docTitle,
-    recipient: to.trim(),
+    recipient: recipientLog,
     subject: finalSubject,
     providerMessageId: result.ok ? result.id : null,
     status: result.ok ? "sent" : "failed",

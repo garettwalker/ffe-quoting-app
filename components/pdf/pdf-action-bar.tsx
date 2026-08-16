@@ -10,6 +10,8 @@ type EmailProps = {
   defaultSubject: string;
   defaultMessage: string;
   docTitle: string;
+  // The linked customer's emails, offered as suggestions on the To field.
+  suggestedEmails?: string[];
 };
 
 type PdfActionBarProps = {

@@ -29,6 +29,7 @@ type SavedQuoteRow = {
   quote_id: string;
   status: string;
   created_at: string;
+  customer_id: string | null;
   quote_data: QuoteFormState;
   calculation_data: QuoteCalculationResult;
   invoice_data: InvoiceData | null;
@@ -44,7 +45,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
     supabase
       .from("quotes")
       .select(
-        "id, quote_id, status, created_at, quote_data, calculation_data, invoice_data"
+        "id, quote_id, status, created_at, customer_id, quote_data, calculation_data, invoice_data"
       )
       .eq("id", params.id)
       .single(),
@@ -88,6 +89,9 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const quote = row.quote_data;
   const result = row.calculation_data;
   const status = normalizeStatus(row.status);
+  // Prefer the customer_id column (source of truth, set by backfill) over the
+  // JSONB snapshot so a backfilled quote still links to its customer record.
+  const customerId = quote.customerId ?? row.customer_id ?? undefined;
   // Emailed-state of each invoice, derived from the email history already
   // fetched for the history table. A finish invoice that has never been emailed
   // (and isn't paid) is "scheduled" — not owed yet — so it is excluded from the
@@ -354,6 +358,15 @@ export default async function SavedQuotePage({ params }: PageProps) {
             >
               Job P&amp;L (internal)
             </Link>
+
+            {customerId ? (
+              <Link
+                href={`/customers/${customerId}`}
+                className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+              >
+                Customer record
+              </Link>
+            ) : null}
 
             {status === "draft" ? (
               <>

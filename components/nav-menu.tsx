@@ -59,6 +59,14 @@ const ICONS = {
       <path d="M9 13h6M9 17h4" />
     </Icon>
   ),
+  customers: (
+    <Icon>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M3.5 19a5.5 5.5 0 0 1 11 0" />
+      <path d="M16 11a3 3 0 0 1 0-6" />
+      <path d="M17.5 19a5.5 5.5 0 0 0-2-4.3" />
+    </Icon>
+  ),
   schedule: (
     <Icon>
       <rect x="3" y="4" width="18" height="17" rx="2" />
@@ -112,6 +120,12 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
         label: "Quotes",
         description: "Drafts, prepared, accepted pipeline",
         icon: ICONS.quotes
+      },
+      {
+        href: "/customers",
+        label: "Customers",
+        description: "Builders and homeowners you quote",
+        icon: ICONS.customers
       },
       {
         href: "/schedule",

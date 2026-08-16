@@ -58,6 +58,7 @@ export default function QuoteReviewPage() {
       quote_date: quote.quoteDate,
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
+      customer_id: quote.customerId ?? null,
       project_name: quote.projectName || null,
       project_street: quote.projectStreet,
       project_city: quote.projectCity,

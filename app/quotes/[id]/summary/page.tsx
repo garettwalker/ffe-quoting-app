@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
+import { getCustomerEmailsForQuote } from "@/lib/customers";
 import { buildEmailDefaults } from "@/lib/send-pdf-email";
 import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
 
@@ -21,6 +22,10 @@ export const dynamic = "force-dynamic";
 // subtotals and the quote total.
 export default async function SummaryQuotePage({ params }: PageProps) {
   const input = await loadSummaryQuotePdfInput(params.id);
+
+  // The linked customer's emails (empty when no customer is linked) so the
+  // Email To field can offer them as suggestions for a multi-recipient send.
+  const suggestedEmails = input ? await getCustomerEmailsForQuote(params.id) : [];
 
   if (!input) {
     return (
@@ -69,7 +74,8 @@ export default async function SummaryQuotePage({ params }: PageProps) {
           defaultTo: quote.clientEmail ?? "",
           defaultSubject: emailDefaults.subject,
           defaultMessage: emailDefaults.message,
-          docTitle: "Summary Quote"
+          docTitle: "Summary Quote",
+          suggestedEmails
         }}
       />
 

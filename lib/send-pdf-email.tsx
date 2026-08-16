@@ -146,7 +146,9 @@ export function buildEmailDefaults({
 export type SendPdfEmailInput = {
   from: string;
   replyTo?: string;
-  to: string;
+  // Resend accepts a single address or an array; the /api/email-pdf route uses
+  // an array when the To field had multiple comma-separated recipients.
+  to: string | string[];
   subject: string;
   message: string;
   attachment: EmailAttachment;

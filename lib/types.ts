@@ -29,6 +29,26 @@ export type LifecycleStage =
   | "pending_payment"
   | "paid_in_full";
 
+// A re-usable customer record linked from quotes. The quote still keeps its own
+// client_name / client_email snapshot; customer_id is the link to the shared
+// record used for autofill and the repository view. A customer holds multiple
+// emails as a JSONB array (a builder can be a husband/wife team where he gets
+// the quote and she gets the invoice). The first email is the "primary" used to
+// autofill a new quote's contact email; the billing recipient is chosen at send
+// time (no per-email billing flag). Lives in the public.customers table.
+export type CustomerEmail = { email: string; label?: string };
+
+export type Customer = {
+  id: string;
+  name: string;
+  emails: CustomerEmail[];
+  phone: string | null;
+  note: string | null;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 // The columns the dashboard selects from the quotes table.
 export type DashboardQuoteRow = {
   id: string;
@@ -249,6 +269,12 @@ export type QuoteFormState = {
   quoteDate: string;
   clientName: string;
   clientEmail: string;
+  // The linked customer record id (public.customers.id). The quote keeps its
+  // own client_name / client_email snapshot; this is just the link used for
+  // autofill and the repository view. Optional: backfilled quotes carry it on
+  // the quotes.customer_id column but not in this JSONB snapshot until they
+  // are re-saved; a quote with no customer record leaves it undefined.
+  customerId?: string;
   // The residence / site name (e.g. "Fulk Residence") — the job identity shown
   // as the job name on the dashboard, pipeline, receivables, and schedule.
   // The clientName/clientEmail fields below it are the paying party, labeled
