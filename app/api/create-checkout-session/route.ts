@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { hasActivePayment, achAvailableForAmount } from "@/lib/payments";
-import { findInvoice, invoiceReference } from "@/lib/invoice-calculations";
+import { findInvoice, invoiceDisplayNumber } from "@/lib/invoice-calculations";
 import { verifyPayToken, getAppUrl } from "@/lib/pay-token";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
 
@@ -102,7 +102,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const reference = invoiceReference(data.quote_id, verified.kind);
+  // The customer-facing invoice identifier on the Stripe line item: the
+  // sequential INV-NNNN number when present, else the Q-...-R / -F reference
+  // for invoices saved before the number field existed.
+  const reference = invoiceDisplayNumber(data.quote_id, invoice);
   const clientEmail = data.quote_data?.clientEmail || undefined;
 
   // Offer ACH (US bank account) only when the invoice is at or under the account's

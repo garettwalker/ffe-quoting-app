@@ -2,7 +2,7 @@ import { formatCurrency } from "@/lib/currency";
 import {
   computeInvoiceAmounts,
   findInvoice,
-  invoiceReference
+  invoiceDisplayNumber
 } from "@/lib/invoice-calculations";
 import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
@@ -72,7 +72,11 @@ export async function loadInvoicePdfInput(
   if (!invoice) return null;
 
   const amounts = computeInvoiceAmounts(invoiceData);
-  const reference = invoiceReference(row.quote_id, kind as InvoiceKind);
+  // The customer-facing identifier: the invoice's sequential number when it
+  // has one (INV-NNNN), else the derived Q-...-R / -F reference for invoices
+  // saved before the number field existed. Flows into the PDF header, the
+  // download filename, the email subject, and the email_log reference.
+  const reference = invoiceDisplayNumber(row.quote_id, invoice);
   const invoiceDateLabel = formatInvoiceDate(invoice.issuedAt ?? invoiceData.generatedAt);
 
   const fullAddress = [

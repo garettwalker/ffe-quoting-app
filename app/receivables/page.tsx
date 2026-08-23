@@ -4,8 +4,8 @@ import { ReceivablesTable } from "@/components/receivables-table";
 import { formatCurrency } from "@/lib/currency";
 import {
   invoiceIsReceivable,
+  invoiceDisplayNumber,
   invoiceOutstandingCents,
-  invoiceReference,
   isPaidInFull,
   outstandingCents,
   receivableInvoicedCents,
@@ -71,7 +71,7 @@ function buildReceivableJob(
       : null;
     return {
       kind,
-      reference: invoiceReference(row.quote_id, kind),
+      reference: invoiceDisplayNumber(row.quote_id, invoice),
       amountCents: Math.round(invoice.amountCents) || 0,
       status: invoice.status,
       outstandingCents: invoiceOutstandingCents(invoice),

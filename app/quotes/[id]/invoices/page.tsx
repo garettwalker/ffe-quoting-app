@@ -7,7 +7,7 @@ import { InvoicePaidBadge } from "@/components/status-badge";
 import { DeleteInvoicesButton } from "@/components/delete-invoices-button";
 import { formatCurrency } from "@/lib/currency";
 import {
-  invoiceReference,
+  invoiceDisplayNumber,
   outstandingCents,
   isPaidInFull,
   scheduledFinishCents
@@ -252,7 +252,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                   quoteId={row.id}
                   invoiceData={invoiceData}
                   kind="initial"
-                  reference={invoiceReference(row.quote_id, "initial")}
+                  reference={invoiceDisplayNumber(row.quote_id, initialInvoice)}
                   title="Invoice 1: Rough-In (Initial)"
                   amountCents={initialInvoice.amountCents}
                   status={initialInvoice.status}
@@ -268,7 +268,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                   quoteId={row.id}
                   invoiceData={invoiceData}
                   kind="finish"
-                  reference={invoiceReference(row.quote_id, "finish")}
+                  reference={invoiceDisplayNumber(row.quote_id, finishInvoice)}
                   title="Invoice 2: Final"
                   amountCents={finishInvoice.amountCents}
                   status={finishInvoice.status}

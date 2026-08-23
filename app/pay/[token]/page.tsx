@@ -2,7 +2,7 @@ import Image from "next/image";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getSettings } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/currency";
-import { findInvoice, invoiceReference } from "@/lib/invoice-calculations";
+import { findInvoice, invoiceDisplayNumber } from "@/lib/invoice-calculations";
 import { ACH_LIMIT_CENTS } from "@/lib/payments";
 import { verifyPayToken } from "@/lib/pay-token";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
@@ -57,7 +57,7 @@ export default async function PayPage({ params }: PageProps) {
     return <InvalidLink />;
   }
 
-  const reference = invoiceReference(row.quote_id, verified.kind);
+  const reference = invoiceDisplayNumber(row.quote_id, invoice);
   const amountCents = Math.round(invoice.amountCents) || 0;
   const isPaid = invoice.status === "paid";
   const businessName = settings.businessName || "Freedom Family Electric";

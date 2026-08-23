@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
 import { computeInvoiceAmounts } from "@/lib/invoice-calculations";
+import { nextInvoiceNumber } from "@/lib/invoice-number";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 // Authenticated browser client (singleton). Carries the logged-in user's
@@ -208,8 +209,16 @@ export function InvoiceBuilder({
     return changes;
   }, [existing, amounts]);
 
-  function buildInvoiceRecord(kind: InvoiceKind, now: string): InvoiceRecord {
+  function buildInvoiceRecord(
+    kind: InvoiceKind,
+    now: string,
+    assignNumber?: string
+  ): InvoiceRecord {
     const prev = existing?.invoices.find((invoice) => invoice.kind === kind);
+    // Keep an already-assigned sequential number; otherwise stamp the one
+    // reserved for this save (undefined when the record already has a number,
+    // so re-saving an already-numbered setup never burns a new one).
+    const invoiceNumber = prev?.invoiceNumber ?? assignNumber;
 
     // The paid rough-in is frozen: never recompute or reset it. The finish
     // invoice absorbs all changes (see computeInvoiceAmounts), so the rough-in
@@ -221,7 +230,8 @@ export function InvoiceBuilder({
         amountCents: prev.amountCents,
         status: "paid",
         issuedAt: prev.issuedAt ?? now,
-        paidAt: prev.paidAt ?? now
+        paidAt: prev.paidAt ?? now,
+        invoiceNumber
       };
     }
 
@@ -239,7 +249,8 @@ export function InvoiceBuilder({
         amountCents,
         status: "unpaid",
         issuedAt: prev.issuedAt ?? now,
-        paidAt: null
+        paidAt: null,
+        invoiceNumber
       };
     }
 
@@ -249,7 +260,8 @@ export function InvoiceBuilder({
       // Preserve paid status and timestamps across setup edits.
       status: prev?.status ?? "unpaid",
       issuedAt: prev?.issuedAt ?? now,
-      paidAt: prev?.paidAt ?? null
+      paidAt: prev?.paidAt ?? null,
+      invoiceNumber
     };
   }
 
@@ -364,13 +376,40 @@ export function InvoiceBuilder({
     setSaveMessage("");
 
     const now = new Date().toISOString();
+
+    // Reserve sequential invoice numbers (INV-NNNN) for any record that does
+    // not already have one. A brand-new setup mints two (initial then finish);
+    // a pre-feature setup being re-saved mints numbers for its un-numbered
+    // records (lazy backfill); an already-numbered setup re-saved mints none
+    // (its numbers are kept, so no gap is burned). One RPC per un-numbered
+    // kind, awaited before the write so the numbers land with the save.
+    const kinds: InvoiceKind[] = ["initial", "finish"];
+    const assignByKind: Partial<Record<InvoiceKind, string>> = {};
+    for (const kind of kinds) {
+      const prev = existing?.invoices.find((i) => i.kind === kind);
+      if (prev?.invoiceNumber) continue;
+      try {
+        assignByKind[kind] = await nextInvoiceNumber();
+      } catch (err) {
+        setIsSaving(false);
+        setSaveError(true);
+        setSaveMessage(
+          err instanceof Error ? err.message : "Could not assign an invoice number."
+        );
+        return;
+      }
+    }
+
     const data: InvoiceData = {
       contractAmountCents: contractCents,
       roughInPercent,
       finishPercent,
       permitFeeCents: dollarsToCents(permitDollars),
       generatedAt: now,
-      invoices: [buildInvoiceRecord("initial", now), buildInvoiceRecord("finish", now)],
+      invoices: [
+        buildInvoiceRecord("initial", now, assignByKind.initial),
+        buildInvoiceRecord("finish", now, assignByKind.finish)
+      ],
       // Persist the invoice's own scope lines when there are any, so the
       // invoice is independent of the quote from this save onward. When there
       // are no lines, keep the prior scope state: a legacy invoice that never

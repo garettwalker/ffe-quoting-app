@@ -355,7 +355,8 @@ function InvoiceCell({
   if (!invoice.receivable) {
     return (
       <div className="min-w-[140px]">
-        <p className="font-bold text-charcoal/55">{formatCurrency(invoice.amountCents)}</p>
+        <p className="text-xs font-bold tabular-nums text-charcoal/45">{invoice.reference}</p>
+        <p className="mt-0.5 font-bold text-charcoal/55">{formatCurrency(invoice.amountCents)}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <span className="rounded-full bg-cream px-2 py-0.5 text-xs font-black text-charcoal/55">
             Scheduled
@@ -369,7 +370,8 @@ function InvoiceCell({
 
   return (
     <div className="min-w-[140px]">
-      <p className="font-bold text-charcoal">{formatCurrency(invoice.amountCents)}</p>
+      <p className="text-xs font-bold tabular-nums text-charcoal/45">{invoice.reference}</p>
+      <p className="mt-0.5 font-bold text-charcoal">{formatCurrency(invoice.amountCents)}</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
         <InvoicePaidBadge status={invoice.status} />
         {invoice.status === "unpaid" ? (

@@ -227,6 +227,19 @@ export function invoiceReference(quoteId: string, kind: InvoiceKind): string {
   return `${quoteId}-${kind === "initial" ? "R" : "F"}`;
 }
 
+// The preferred display identifier for an invoice: its dedicated sequential
+// number (INV-0001) when one has been assigned, falling back to the derived
+// invoiceReference (Q-...-R / -F) for invoices saved before the number field
+// existed (lazy backfill). Use this everywhere an invoice is labelled for a
+// person to read, so new invoices show INV-NNNN and old ones keep showing the
+// reference they were already sent under.
+export function invoiceDisplayNumber(
+  quoteId: string,
+  invoice: { kind: InvoiceKind; invoiceNumber?: string }
+): string {
+  return invoice.invoiceNumber || invoiceReference(quoteId, invoice.kind);
+}
+
 // Map a quote to its dashboard lifecycle stage. Accepted quotes split into
 // three sub-stages based on the invoice setup: no invoices set up yet =
 // Client Accepted, invoices with money still outstanding = Pending Payments,

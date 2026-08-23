@@ -81,6 +81,11 @@ export type InvoiceRecord = {
   issuedAt: string | null;
   // ISO timestamp of when it was marked paid, if ever.
   paidAt: string | null;
+  // Dedicated sequential invoice number (INV-0001), assigned once at invoice
+  // setup and never changed. Optional so invoice_data saved before this field
+  // existed keeps loading; those fall back to the derived invoiceReference
+  // (Q-...-R / -F) for display until the setup is next re-saved (lazy backfill).
+  invoiceNumber?: string;
 };
 
 export type InvoiceData = {
