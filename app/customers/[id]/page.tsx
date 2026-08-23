@@ -6,8 +6,10 @@ import { formatCurrency, formatDate } from "@/lib/currency";
 import { getCustomer, getCustomerQuotes } from "@/lib/customers";
 
 // Customer detail: the record's fields + an inline editor (name / emails /
-// phone / note) and the customer's quotes. Editing the record updates future
-// quotes' autofill only; existing quotes keep their own client_name /
+// phone / note), a Quoted / Invoiced / Paid summary band, and the customer's
+// jobs (each with its own Invoiced / Paid). The money figures reuse the same
+// receivable model as /receivables so they tie out. Editing the record updates
+// future quotes' autofill only; existing quotes keep their own client_name /
 // client_email snapshot. v1 is edit-only (no delete / deactivate / merge).
 
 export const dynamic = "force-dynamic";
@@ -25,6 +27,17 @@ export default async function CustomerDetailPage({ params }: PageProps) {
   if (!customer) {
     notFound();
   }
+
+  // Customer-level totals, summed from the per-job figures (which already use
+  // the receivable model), so the band matches the /customers list row.
+  const totals = quotes.reduce(
+    (acc, q) => ({
+      quotedCents: acc.quotedCents + q.clientQuoteTotalCents,
+      invoicedCents: acc.invoicedCents + q.invoicedCents,
+      paidCents: acc.paidCents + q.paidCents
+    }),
+    { quotedCents: 0, invoicedCents: 0, paidCents: 0 }
+  );
 
   return (
     <AppShell>
@@ -55,12 +68,27 @@ export default async function CustomerDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      <div className="mb-8 grid gap-3 sm:grid-cols-3">
+        <SummaryCard
+          label="Total Quoted"
+          value={formatCurrency(totals.quotedCents)}
+        />
+        <SummaryCard
+          label="Total Invoiced"
+          value={formatCurrency(totals.invoicedCents)}
+        />
+        <SummaryCard
+          label="Total Paid"
+          value={formatCurrency(totals.paidCents)}
+        />
+      </div>
+
       <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
         <CustomerEditor customer={customer} />
 
         <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
           <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
-            Quotes
+            Jobs
           </p>
 
           {quotes.length === 0 ? (
@@ -88,6 +116,12 @@ export default async function CustomerDetailPage({ params }: PageProps) {
                       <p className="font-black text-deep-pine">
                         {formatCurrency(quote.clientQuoteTotalCents)}
                       </p>
+                      <p className="text-xs font-bold text-charcoal/55">
+                        Invoiced {formatCurrency(quote.invoicedCents)}
+                      </p>
+                      <p className="text-xs font-bold text-charcoal/55">
+                        Paid {formatCurrency(quote.paidCents)}
+                      </p>
                       <span className="mt-1 inline-block rounded-full bg-pine/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-deep-pine">
                         {quote.status}
                       </span>
@@ -111,5 +145,16 @@ export default async function CustomerDetailPage({ params }: PageProps) {
         </section>
       ) : null}
     </AppShell>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-5 shadow-soft">
+      <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+        {label}
+      </p>
+      <p className="font-display text-3xl font-bold text-deep-pine">{value}</p>
+    </div>
   );
 }
