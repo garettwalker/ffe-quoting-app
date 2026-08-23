@@ -5,10 +5,10 @@ import { getSupabaseServer } from "@/lib/supabase-server";
 import { loadInvoiceReceipts } from "@/lib/email-log";
 import {
   computeProjectStages,
-  fetchScheduleForQuotes,
   normalizeProjectStatus,
   type FilterBucket
 } from "@/lib/projects";
+import { fetchScheduleForQuotes } from "@/lib/projects-server";
 import { ProjectStageStrip } from "@/components/project-stage-strip";
 import { ProjectAdvanceButton } from "@/components/project-advance-button";
 import { ProjectStageEditor } from "@/components/project-stage-editor";
