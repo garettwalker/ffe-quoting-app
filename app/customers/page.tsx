@@ -106,7 +106,7 @@ export default async function CustomersPage() {
                               : "No email on file"}
                         </p>
                       </div>
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:text-right">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:w-[36rem] lg:text-right">
                         <div>
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                             Quotes
