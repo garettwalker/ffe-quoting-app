@@ -106,12 +106,12 @@ export default async function CustomersPage() {
                               : "No email on file"}
                         </p>
                       </div>
-                      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 lg:text-right">
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4 lg:text-right">
                         <div>
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                             Quotes
                           </p>
-                          <p className="font-black text-deep-pine">
+                          <p className="font-black tabular-nums text-deep-pine">
                             {s.quoteCount}
                           </p>
                         </div>
@@ -119,7 +119,7 @@ export default async function CustomersPage() {
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                             Quoted
                           </p>
-                          <p className="font-black text-deep-pine">
+                          <p className="font-black tabular-nums text-deep-pine">
                             {formatCurrency(s.quotedCents)}
                           </p>
                         </div>
@@ -127,7 +127,7 @@ export default async function CustomersPage() {
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                             Invoiced
                           </p>
-                          <p className="font-black text-deep-pine">
+                          <p className="font-black tabular-nums text-deep-pine">
                             {formatCurrency(s.invoicedCents)}
                           </p>
                         </div>
@@ -135,7 +135,7 @@ export default async function CustomersPage() {
                           <p className="text-xs font-black uppercase tracking-[0.12em] text-clay">
                             Paid
                           </p>
-                          <p className="font-black text-deep-pine">
+                          <p className="font-black tabular-nums text-deep-pine">
                             {formatCurrency(s.paidCents)}
                           </p>
                         </div>
