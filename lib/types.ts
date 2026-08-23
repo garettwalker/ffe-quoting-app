@@ -123,6 +123,20 @@ export type InvoiceData = {
   }>;
 };
 
+// Field-stage progress for the Project Status Tracker, stored as JSONB on the
+// `quotes` row (`project_status`). Only the 4 MANUAL field-stage dates are
+// stored here; the other 4 tracker stages (Quote, Rough-in Billed, Final
+// Billed, Paid) are DERIVED from quote/invoice/email-log facts in
+// lib/projects.ts so the tracker can never disagree with /quotes or
+// /receivables. Each date is ISO YYYY-MM-DD (date-only) or null = not done.
+// A null column or all-null fields = no field progress yet (Quote stage).
+export type ProjectStatus = {
+  roughIn: string | null;
+  roughInInspection: string | null;
+  finish: string | null;
+  finalInspection: string | null;
+};
+
 // One invoice flattened for the Accounts Receivable view. `outstandingCents`
 // is the invoice amount when still unpaid, 0 once paid (per-invoice balance).
 // `receivable` is true when the invoice counts toward the AR totals: paid, or

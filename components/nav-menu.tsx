@@ -74,6 +74,13 @@ const ICONS = {
       <path d="M8 14h3v3H8z" />
     </Icon>
   ),
+  projects: (
+    <Icon>
+      <path d="M5 21V3" />
+      <path d="M5 4h12l-2.5 3L17 10H5" />
+      <path d="M9 14l2 2 4-4" />
+    </Icon>
+  ),
   receivables: (
     <Icon>
       <path d="M12 1v22" />
@@ -132,6 +139,12 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
         label: "Schedule",
         description: "Crews and assignments",
         icon: ICONS.schedule
+      },
+      {
+        href: "/projects",
+        label: "Projects",
+        description: "Field progress for accepted jobs",
+        icon: ICONS.projects
       }
     ]
   },

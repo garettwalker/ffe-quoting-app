@@ -40,6 +40,15 @@ const config: Config = {
           "sans-serif"
         ],
         display: ["Georgia", "Times New Roman", "serif"]
+      },
+      keyframes: {
+        "project-pulse": {
+          "0%": { transform: "scale(1)", opacity: "0.6" },
+          "100%": { transform: "scale(1.7)", opacity: "0" }
+        }
+      },
+      animation: {
+        "project-pulse": "project-pulse 1.8s ease-out infinite"
       }
     }
   },
