@@ -8,8 +8,10 @@ import { formatCurrency } from "@/lib/currency";
 import {
   clearActiveQuote,
   getActiveQuote,
+  type StoredCalculation,
   type StoredQuote
 } from "@/lib/quote-storage";
+import type { ServiceQuoteCalculationResult } from "@/lib/types";
 import { resolveQuoteIdForSave } from "@/lib/quote-id";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
@@ -56,6 +58,7 @@ export default function QuoteReviewPage() {
     const payload = {
       quote_id: resolvedQuoteId,
       quote_date: quote.quoteDate,
+      quote_type: quote.quoteType ?? "new_build",
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
       customer_id: quote.customerId ?? null,
@@ -165,6 +168,8 @@ export default function QuoteReviewPage() {
 
   const { quote, result, savedQuoteId } = storedQuote;
 
+  const isServiceCall = quote.quoteType === "service_call";
+
   const fullAddress = [
     quote.projectStreet,
     quote.projectCity,
@@ -235,19 +240,23 @@ export default function QuoteReviewPage() {
             />
             <ReviewField label="Project Address" value={fullAddress} />
             <ReviewField label="Project Type" value={quote.projectType} />
-            <ReviewField
-              label="Square Footage"
-              value={quote.squareFootage.toLocaleString()}
-            />
-            <ReviewField
-              label="Base Rate"
-              value={`${result.baseRateLabel} - ${formatCurrency(result.baseRateCents)}/sf`}
-            />
+            {isServiceCall ? null : (
+              <ReviewField
+                label="Square Footage"
+                value={quote.squareFootage.toLocaleString()}
+              />
+            )}
+            {isServiceCall || isServiceResult(result) ? null : (
+              <ReviewField
+                label="Base Rate"
+                value={`${result.baseRateLabel} - ${formatCurrency(result.baseRateCents)}/sf`}
+              />
+            )}
           </div>
 
           <div className="mt-8">
             <p className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              Customer-Facing Line Items
+              {isServiceCall ? "Line Items" : "Customer-Facing Line Items"}
             </p>
 
             <div className="responsive-table-wrap rounded-xl1 border border-pine/10">
@@ -256,32 +265,55 @@ export default function QuoteReviewPage() {
                   <tr>
                     <th className="p-3 font-black">Item</th>
                     <th className="p-3 font-black">Qty</th>
-                    <th className="p-3 font-black">Unit</th>
-                    <th className="p-3 font-black">Unit Price</th>
-                    <th className="p-3 font-black">Line Total</th>
+                    {isServiceCall ? (
+                      <th className="p-3 font-black">Amount</th>
+                    ) : (
+                      <>
+                        <th className="p-3 font-black">Unit</th>
+                        <th className="p-3 font-black">Unit Price</th>
+                        <th className="p-3 font-black">Line Total</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pine/10 bg-cream">
-                  {result.clientFacingLines.map((line) => (
-                    <tr key={line.pricingItemId}>
-                      <td className="p-3 font-bold text-charcoal">
-                        <div>{line.name}</div>
-                        {line.comment ? (
-                          <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
-                            {line.comment}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="p-3">{line.quantity.toLocaleString()}</td>
-                      <td className="p-3">{line.unitType}</td>
-                      <td className="p-3">
-                        {formatCurrency(line.clientUnitPriceCents)}
-                      </td>
-                      <td className="p-3 font-black text-deep-pine">
-                        {formatCurrency(line.clientLineTotalCents)}
-                      </td>
-                    </tr>
-                  ))}
+                  {isServiceResult(result)
+                    ? result.lines.map((line) => (
+                        <tr key={line.id}>
+                          <td className="p-3 font-bold text-charcoal">
+                            <div>{line.name}</div>
+                            {line.comment ? (
+                              <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
+                                {line.comment}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="p-3">{line.quantity.toLocaleString()}</td>
+                          <td className="p-3 font-black text-deep-pine">
+                            {formatCurrency(line.amountCents)}
+                          </td>
+                        </tr>
+                      ))
+                    : result.clientFacingLines.map((line) => (
+                        <tr key={line.pricingItemId}>
+                          <td className="p-3 font-bold text-charcoal">
+                            <div>{line.name}</div>
+                            {line.comment ? (
+                              <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
+                                {line.comment}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="p-3">{line.quantity.toLocaleString()}</td>
+                          <td className="p-3">{line.unitType}</td>
+                          <td className="p-3">
+                            {formatCurrency(line.clientUnitPriceCents)}
+                          </td>
+                          <td className="p-3 font-black text-deep-pine">
+                            {formatCurrency(line.clientLineTotalCents)}
+                          </td>
+                        </tr>
+                      ))}
                 </tbody>
               </table>
             </div>
@@ -382,4 +414,13 @@ function ReviewField({ label, value }: { label: string; value: string }) {
       <p className="break-words font-black text-deep-pine">{value}</p>
     </div>
   );
+}
+
+// Narrow the StoredCalculation union: a service-call snapshot carries `lines`
+// (ServiceLine[]); a new-build snapshot carries `clientFacingLines`. Used to
+// branch the review preview so each quote type renders its own line table.
+function isServiceResult(
+  result: StoredCalculation
+): result is ServiceQuoteCalculationResult {
+  return (result as ServiceQuoteCalculationResult).lines !== undefined;
 }

@@ -26,7 +26,7 @@ import {
 export const dynamic = "force-dynamic";
 
 const DOCS: EmailDocKind[] = ["detailed", "summary", "invoice"];
-const INVOICE_KINDS: InvoiceKind[] = ["initial", "finish"];
+const INVOICE_KINDS: InvoiceKind[] = ["initial", "finish", "service"];
 
 export async function POST(request: Request) {
   // Auth gate (Phase B): only an admin may send emails as the business.

@@ -5,12 +5,15 @@ import { StatusBadge } from "@/components/status-badge";
 import { formatCurrency } from "@/lib/currency";
 import {
   lifecycleStage,
-  outstandingCents
+  serviceLifecycleStage,
+  outstandingCents,
+  computeInvoiceAmounts,
+  isPaidInFull
 } from "@/lib/invoice-calculations";
 import { loadInvoiceReceipts, type InvoiceReceipts } from "@/lib/email-log";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { normalizeStatus } from "@/lib/types";
-import type { DashboardQuoteRow, InvoiceData } from "@/lib/types";
+import { normalizeQuoteType, normalizeStatus } from "@/lib/types";
+import type { DashboardQuoteRow, InvoiceData, QuoteType } from "@/lib/types";
 
 // Overview dashboard: the landing hub for the whole app. At-a-glance tiles
 // link into each tool — Quotes (the lifecycle pipeline at /quotes), Receivables
@@ -40,15 +43,17 @@ export default async function DashboardPage() {
       .in("status", ["draft", "prepared"]),
     supabase
       .from("quotes")
-      .select("id, invoice_data, created_at")
-      .eq("status", "accepted")
+      .select("id, quote_type, invoice_data, created_at")
+      // Include "scheduled" so scheduled service calls with invoice setup are
+      // counted in the money tiles (new builds never set "scheduled").
+      .in("status", ["accepted", "scheduled"])
       .not("invoice_data", "is", null)
       .order("created_at", { ascending: false })
       .limit(MONEY_LIMIT),
     supabase
       .from("quotes")
       .select(
-        "id, quote_id, quote_date, client_name, project_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
+        "id, quote_id, quote_type, quote_date, client_name, project_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
       )
       .order("created_at", { ascending: false })
       .limit(RECENT_COUNT)
@@ -74,6 +79,7 @@ export default async function DashboardPage() {
   // not counted as owed — see lib/invoice-calculations `invoiceIsReceivable`).
   const moneyRows = (moneyRes.data ?? []) as {
     id: string;
+    quote_type: QuoteType | null;
     invoice_data: InvoiceData | null;
   }[];
   const recent = (recentRes.data ?? []) as DashboardQuoteRow[];
@@ -84,15 +90,26 @@ export default async function DashboardPage() {
     ...recent.map((row) => row.id)
   ]);
   const receiptsOf = (id: string): InvoiceReceipts =>
-    receiptsMap.get(id) ?? { initial: null, finish: null };
-  const moneyStageOf = (row: { id: string; invoice_data: InvoiceData | null }) =>
-    lifecycleStage("accepted", row.invoice_data, receiptsOf(row.id));
+    receiptsMap.get(id) ?? { initial: null, finish: null, service: null };
+  // Kind-agnostic money bucket for the tiles. A money-row (status accepted or
+  // scheduled, invoice setup present) is "paid" when paid in full, "pending"
+  // when it has real invoiced money still outstanding (or scheduled-but-unbilled,
+  // matching the AR partition), and "accepted" when it has no real invoice money
+  // (e.g. a $0 service call). Works for both new builds and service calls because
+  // computeInvoiceAmounts branches on quoteType and isPaidInFull handles service.
+  const moneyBucket = (row: {
+    id: string;
+    invoice_data: InvoiceData | null;
+  }): "pending" | "paid" | "accepted" => {
+    const data = row.invoice_data;
+    if (!data) return "accepted";
+    if (computeInvoiceAmounts(data).totalInvoicedCents <= 0) return "accepted";
+    return isPaidInFull(data, receiptsOf(row.id)) ? "paid" : "pending";
+  };
   const pendingJobs = moneyRows.filter(
-    (row) => moneyStageOf(row) === "pending_payment"
+    (row) => moneyBucket(row) === "pending"
   );
-  const paidJobs = moneyRows.filter(
-    (row) => moneyStageOf(row) === "paid_in_full"
-  );
+  const paidJobs = moneyRows.filter((row) => moneyBucket(row) === "paid");
   const totalOutstanding = pendingJobs.reduce(
     (sum, row) => sum + outstandingCents(row.invoice_data, receiptsOf(row.id)),
     0
@@ -294,11 +311,19 @@ function RecentQuoteRow({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{row.quote_id}</span>
             <StatusBadge
-              stage={lifecycleStage(
-                normalizeStatus(row.status),
-                row.invoice_data,
-                receipts
-              )}
+              stage={
+                normalizeQuoteType(row.quote_type) === "service_call"
+                  ? serviceLifecycleStage(
+                      normalizeStatus(row.status),
+                      row.invoice_data,
+                      receipts
+                    )
+                  : lifecycleStage(
+                      normalizeStatus(row.status),
+                      row.invoice_data,
+                      receipts
+                    )
+              }
             />
           </div>
           <p className="mt-1 font-bold text-charcoal">

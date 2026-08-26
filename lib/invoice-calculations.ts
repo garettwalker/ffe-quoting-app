@@ -1,13 +1,41 @@
-import type { InvoiceData, InvoiceKind, InvoiceRecord, LifecycleStage, QuoteStatus } from "@/lib/types";
+import type {
+  InvoiceData,
+  InvoiceKind,
+  InvoiceRecord,
+  LifecycleStage,
+  QuoteStatus,
+  QuoteType,
+  ServiceLifecycleStage
+} from "@/lib/types";
 import type { InvoiceReceipts } from "@/lib/email-log";
 
 // All money here is integer cents, matching lib/currency.ts.
 
-// Build the default invoice setup for a freshly accepted quote: contract
-// amount equals the quote total, 50/50 split, no permit fee, both invoices
-// unpaid and not yet issued.
-export function defaultInvoiceData(quoteTotalCents: number): InvoiceData {
+// Build the default invoice setup for a freshly accepted quote.
+// New build: contract = quote total, 50/50 split, no permit fee, two invoices
+// (initial + finish) unpaid and not yet issued.
+// Service call: contract = quote total, ONE invoice (kind "service") unpaid,
+// no split, no permit. The service-invoice-builder fills in the freeform lines
+// and the invoice amount; this just lays down the empty shell.
+export function defaultInvoiceData(
+  quoteTotalCents: number,
+  quoteType: QuoteType = "new_build"
+): InvoiceData {
+  if (quoteType === "service_call") {
+    return {
+      quoteType: "service_call",
+      contractAmountCents: quoteTotalCents,
+      roughInPercent: 0,
+      finishPercent: 0,
+      permitFeeCents: 0,
+      generatedAt: new Date().toISOString(),
+      invoices: [
+        { kind: "service", amountCents: 0, status: "unpaid", issuedAt: null, paidAt: null }
+      ]
+    };
+  }
   return {
+    quoteType: "new_build",
     contractAmountCents: quoteTotalCents,
     roughInPercent: 50,
     finishPercent: 50,
@@ -46,6 +74,22 @@ export type InvoiceAmounts = {
 // the paid rough-in.
 export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
   const contract = Math.max(0, Math.round(data.contractAmountCents));
+
+  // Service call: a single invoice, no split, no permit, no paid-rough-in freeze.
+  // Early-return BEFORE the new-build freeze path so that logic never runs on a
+  // service record. The whole contract is invoiced on the one "service" record.
+  if (data.quoteType === "service_call") {
+    return {
+      roughInAmountCents: 0,
+      finishAmountCents: 0,
+      initialInvoiceAmountCents: contract,
+      finishInvoiceAmountCents: 0,
+      totalInvoicedCents: contract,
+      isBalanced: true,
+      percentTotal: 100
+    };
+  }
+
   const roughInPercent = clampPercent(data.roughInPercent);
   const finishPercent = clampPercent(data.finishPercent);
   const permitFeeCents = Math.max(0, Math.round(data.permitFeeCents));
@@ -127,6 +171,9 @@ function clampPercent(value: number): number {
 //     email_log row exists) — it is created at setup but not actually billed
 //     until after the sheetrock gap, so before the first email it is
 //     "scheduled", not owed.
+//   - the service invoice (service-call quote) follows the finish rule: it is
+//     receivable only once emailed or paid. "Due on completion" — setting it up
+//     is not the billing action; emailing it (or collecting payment) is.
 export function invoiceIsReceivable(
   invoice: InvoiceRecord,
   kind: InvoiceKind,
@@ -135,13 +182,32 @@ export function invoiceIsReceivable(
   if (invoice.status === "paid") return true;
   if (receipts === undefined) return true;
   if (kind === "initial") return true;
+  if (kind === "service") return receipts.service != null;
   return receipts.finish != null;
 }
 
-// The finish invoice's amount when it is still scheduled (not yet emailed and
-// not paid). Zero otherwise (it's either receivable or has no amount). Used to
-// show "Finish pending: $X" and to keep a job out of "paid in full" while a
-// positive-amount finish is still unbilled.
+// The amount of any invoice that is set up but not yet receivable (not emailed
+// and not paid) — i.e. "scheduled / not yet billed". For a new build that's the
+// finish invoice; for a service call that's the single service invoice. Zero
+// when `receipts` is omitted (legacy full-contract reasoning, used by P&L).
+// Used to show "Scheduled / not yet billed: $X" and to keep a job out of "paid
+// in full" while a positive-amount invoice is still unbilled. This is the
+// generalization of the old finish-only scheduledFinishCents.
+export function scheduledCents(
+  data: InvoiceData | null,
+  receipts?: InvoiceReceipts
+): number {
+  if (!data || receipts === undefined) return 0;
+  return data.invoices.reduce((sum, invoice) => {
+    if (invoice.status === "paid") return sum;
+    if (invoiceIsReceivable(invoice, invoice.kind, receipts)) return sum;
+    return sum + (Math.round(invoice.amountCents) || 0);
+  }, 0);
+}
+
+// Backward-compat alias: the finish invoice's scheduled amount specifically.
+// Kept so any external caller still importing it keeps working; new code
+// should call scheduledCents (which covers both finish and service).
 export function scheduledFinishCents(
   data: InvoiceData | null,
   receipts?: InvoiceReceipts
@@ -209,11 +275,12 @@ export function isPaidInFull(data: InvoiceData | null, receipts?: InvoiceReceipt
     return outstandingCents(data) === 0;
   }
   // Receivable-aware: nothing owed on billed invoices AND no positive-amount
-  // finish still scheduled (a not-yet-billed finish keeps the job in progress,
-  // so it is NOT "paid in full" even when the rough-in is collected).
+  // invoice still scheduled (a not-yet-billed finish — or a not-yet-billed
+  // service invoice — keeps the job in progress, so it is NOT "paid in full"
+  // even when other invoices are collected).
   return (
     outstandingCents(data, receipts) === 0 &&
-    scheduledFinishCents(data, receipts) === 0
+    scheduledCents(data, receipts) === 0
   );
 }
 
@@ -223,8 +290,10 @@ export function findInvoice(data: InvoiceData, kind: InvoiceKind) {
 }
 
 // The invoice reference shown to the customer, e.g. Q-20260619-001-R.
+// Service invoices use an -S suffix.
 export function invoiceReference(quoteId: string, kind: InvoiceKind): string {
-  return `${quoteId}-${kind === "initial" ? "R" : "F"}`;
+  const suffix = kind === "initial" ? "R" : kind === "service" ? "S" : "F";
+  return `${quoteId}-${suffix}`;
 }
 
 // The preferred display identifier for an invoice: its dedicated sequential
@@ -251,6 +320,11 @@ export function lifecycleStage(
   invoiceData: InvoiceData | null,
   receipts?: InvoiceReceipts
 ): LifecycleStage {
+  // "scheduled" is a service-call-only stage (new builds never set it). This
+  // function is for new-build lifecycle; a service call should use
+  // serviceLifecycleStage. Defensively map a stray "scheduled" to "accepted"
+  // so the new-build pipeline never renders an unknown stage.
+  if (status === "scheduled") return "accepted";
   if (status !== "accepted") return status;
   if (!invoiceData) return "accepted";
   // Match the Accounts Receivable partition exactly. Only quotes with real
@@ -263,4 +337,21 @@ export function lifecycleStage(
   return isPaidInFull(invoiceData, receipts)
     ? "paid_in_full"
     : "pending_payment";
+}
+
+// Map a SERVICE-CALL quote to its simpler 4-stage lifecycle: Quote / Accepted /
+// Scheduled / Paid. "quote" collapses draft+prepared; "scheduled" is a manual
+// status advance; "paid" is derived from the single invoice being paid in full
+// (which requires it to have been emailed or paid — see invoiceIsReceivable).
+// Derived on the fly from the row status + invoice_data + receipts, mirroring
+// lifecycleStage above so the dashboard/pipeline always reflect reality.
+export function serviceLifecycleStage(
+  status: QuoteStatus,
+  invoiceData: InvoiceData | null,
+  receipts?: InvoiceReceipts
+): ServiceLifecycleStage {
+  if (invoiceData && isPaidInFull(invoiceData, receipts)) return "paid";
+  if (status === "scheduled") return "scheduled";
+  if (status === "accepted") return "accepted";
+  return "quote";
 }

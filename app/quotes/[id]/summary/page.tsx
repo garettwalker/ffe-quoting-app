@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
 import { getCustomerEmailsForQuote } from "@/lib/customers";
+import { fetchQuoteType } from "@/lib/service-quote-pdf";
 import { buildEmailDefaults } from "@/lib/send-pdf-email";
 import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
 
@@ -21,7 +22,13 @@ export const dynamic = "force-dynamic";
 // streams it back as a file download. No unit prices are shown, only category
 // subtotals and the quote total.
 export default async function SummaryQuotePage({ params }: PageProps) {
-  const input = await loadSummaryQuotePdfInput(params.id);
+  // The Summary Quote is a new-build-only document (one subtotal per pricing
+  // category; service calls have no categories). A service-call quote has no
+  // summary, so guard here and render not-found rather than calling the
+  // new-build loader on a service row.
+  const quoteType = await fetchQuoteType(params.id);
+  const input =
+    quoteType === "service_call" ? null : await loadSummaryQuotePdfInput(params.id);
 
   // The linked customer's emails (empty when no customer is linked) so the
   // Email To field can offer them as suggestions for a multi-recipient send.
@@ -31,13 +38,15 @@ export default async function SummaryQuotePage({ params }: PageProps) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-10">
         <p className="mb-4 font-display text-3xl font-bold text-moss">
-          Quote not found.
+          {quoteType === "service_call"
+            ? "Summary quote is not available for service calls."
+            : "Quote not found."}
         </p>
         <Link
-          href="/quotes"
+          href={`/quotes/${params.id}`}
           className="inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
         >
-          Back to Quotes
+          Back to quote
         </Link>
       </div>
     );

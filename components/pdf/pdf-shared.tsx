@@ -366,3 +366,137 @@ export function PdfFooter({ children }: { children: string }) {
     </View>
   );
 }
+
+// Three-column line table for service-call quotes + invoices: Description
+// (with an optional customer-facing comment underneath), Qty, and a row
+// Amount. Service lines have NO unit price (the amount is entered directly),
+// so this is a simpler table than the new-build scope table. Used by both the
+// service quote PDF and the service invoice PDF so the line layout is
+// identical on both documents.
+const serviceLineStyles = StyleSheet.create({
+  list: {
+    borderWidth: 1,
+    borderColor: PDF_INK.borderPine,
+    borderRadius: 6
+  },
+  head: {
+    flexDirection: "row",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: PDF_COLORS.sand,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_INK.borderPine
+  },
+  headDesc: {
+    flex: 1,
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.deepPine
+  },
+  headQty: {
+    width: 56,
+    textAlign: "right",
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.deepPine
+  },
+  headAmount: {
+    width: 96,
+    textAlign: "right",
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.deepPine
+  },
+  row: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    backgroundColor: PDF_COLORS.cream,
+    borderBottomWidth: 1,
+    borderBottomColor: PDF_INK.borderPineFaint
+  },
+  desc: {
+    flex: 1,
+    paddingRight: 12
+  },
+  descName: {
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.charcoal
+  },
+  descComment: {
+    marginTop: 2,
+    fontSize: 8.5,
+    lineHeight: 1.35,
+    fontFamily: "Helvetica-Oblique",
+    color: PDF_INK.textMuted
+  },
+  qty: {
+    width: 56,
+    textAlign: "right",
+    fontSize: 9.5,
+    fontFamily: "Helvetica",
+    color: PDF_INK.textStrong
+  },
+  amount: {
+    width: 96,
+    textAlign: "right",
+    fontSize: 9.5,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.deepPine
+  }
+});
+
+export type PdfServiceLine = {
+  name: string;
+  comment: string;
+  quantityLabel: string;
+  amount: string;
+};
+
+export function PdfServiceLineTable({
+  lines,
+  emptyLabel
+}: {
+  lines: PdfServiceLine[];
+  emptyLabel?: string;
+}) {
+  return (
+    <View style={serviceLineStyles.list}>
+      <View style={serviceLineStyles.head} fixed>
+        <Text style={serviceLineStyles.headDesc}>DESCRIPTION</Text>
+        <Text style={serviceLineStyles.headQty}>QTY</Text>
+        <Text style={serviceLineStyles.headAmount}>AMOUNT</Text>
+      </View>
+      {lines.length === 0 ? (
+        <View style={listStyles.empty}>
+          <Text>{emptyLabel ?? "No line items."}</Text>
+        </View>
+      ) : (
+        lines.map((line, index) => (
+          <View
+            key={`${line.name}-${index}`}
+            wrap={false}
+            style={{
+              ...serviceLineStyles.row,
+              borderBottomWidth:
+                index === lines.length - 1
+                  ? 0
+                  : serviceLineStyles.row.borderBottomWidth
+            }}
+          >
+            <View style={serviceLineStyles.desc}>
+              <Text style={serviceLineStyles.descName}>{line.name}</Text>
+              {line.comment ? (
+                <Text style={serviceLineStyles.descComment}>{line.comment}</Text>
+              ) : null}
+            </View>
+            <Text style={serviceLineStyles.qty}>{line.quantityLabel}</Text>
+            <Text style={serviceLineStyles.amount}>{line.amount}</Text>
+          </View>
+        ))
+      )}
+    </View>
+  );
+}

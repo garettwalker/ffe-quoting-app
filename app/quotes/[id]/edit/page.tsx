@@ -1,15 +1,17 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { QuoteBuilder } from "@/components/quote-builder";
+import { ServiceQuoteBuilder } from "@/components/service-quote-builder";
 import { getCustomers } from "@/lib/customers";
 import { getPricingCatalog } from "@/lib/pricing";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { normalizeStatus } from "@/lib/types";
+import { normalizeQuoteType, normalizeStatus } from "@/lib/types";
 import type { InvoiceData, QuoteFormState } from "@/lib/types";
 
 type SavedQuoteRow = {
   id: string;
   status: string;
+  quote_type: string | null;
   customer_id: string | null;
   quote_data: QuoteFormState;
   invoice_data: InvoiceData | null;
@@ -31,7 +33,7 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
     // passed into QuoteBuilder.
     supabase
       .from("quotes")
-      .select("id, status, customer_id, quote_data, invoice_data")
+      .select("id, status, quote_type, customer_id, quote_data, invoice_data")
       .eq("id", params.id)
       .single(),
     getPricingCatalog(),
@@ -81,6 +83,8 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
     quote.customerId = row.customer_id;
   }
   const status = normalizeStatus(row.status);
+  const quoteType = normalizeQuoteType(row.quote_type);
+  const isService = quoteType === "service_call";
   const paymentCount = paymentsRes.count ?? 0;
   const hasInvoices = !!row.invoice_data;
 
@@ -90,8 +94,12 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
   // stay on the row — so an accepted or paid job would silently look like a
   // draft on the dashboard while the money is still recorded. Warn loudly when
   // the quote is past the safe-to-edit stage so this only happens on purpose.
+  // "scheduled" is a service-call stage past accepted; treat it the same.
   const showProtectedBanner =
-    status === "accepted" || hasInvoices || paymentCount > 0;
+    status === "accepted" ||
+    status === "scheduled" ||
+    hasInvoices ||
+    paymentCount > 0;
 
   return (
     <AppShell>
@@ -138,12 +146,22 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
         </section>
       ) : null}
 
-      <QuoteBuilder
-        initialQuote={quote}
-        savedQuoteId={row.id}
-        catalog={catalog}
-        customers={customers}
-      />
+      {isService ? (
+        <ServiceQuoteBuilder
+          initialQuote={quote}
+          savedQuoteId={row.id}
+          customers={customers}
+          projectTypes={catalog.projectTypes}
+          defaultQuoteNotes={catalog.settings.defaultQuoteNotes}
+        />
+      ) : (
+        <QuoteBuilder
+          initialQuote={quote}
+          savedQuoteId={row.id}
+          catalog={catalog}
+          customers={customers}
+        />
+      )}
     </AppShell>
   );
 }

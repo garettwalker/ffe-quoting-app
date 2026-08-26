@@ -2,11 +2,16 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { Resend } from "resend";
 import { DetailedQuotePdfDocument } from "@/components/pdf/detailed-quote-document";
 import { InvoicePdfDocument } from "@/components/pdf/invoice-document";
+import { ServiceInvoicePdfDocument } from "@/components/pdf/service-invoice-document";
+import { ServiceQuotePdfDocument } from "@/components/pdf/service-quote-document";
 import { SummaryQuotePdfDocument } from "@/components/pdf/summary-quote-document";
 import { buildPayUrl, paymentsConfigured } from "@/lib/pay-token";
 import { loadDetailedQuotePdfInput } from "@/lib/detailed-quote-pdf";
 import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
+import { loadServiceInvoicePdfInput } from "@/lib/service-invoice-pdf";
+import { fetchQuoteType, loadServiceQuotePdfInput } from "@/lib/service-quote-pdf";
 import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
+import type { InvoiceKind } from "@/lib/types";
 
 // Server-only email helper. The printable PDFs already render server-side to a
 // buffer (the four /pdf routes use renderToBuffer); this reuses the exact same
@@ -14,7 +19,9 @@ import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
 // the downloaded one (and the on-screen preview). No new PDF rendering here.
 
 export type EmailDocKind = "detailed" | "summary" | "invoice";
-export type InvoiceKind = "initial" | "finish";
+// Re-export so existing imports from this module (lib/email-log.ts) keep working;
+// the canonical definition lives in lib/types.ts and now includes "service".
+export type { InvoiceKind };
 
 export type EmailAttachment = {
   buffer: Buffer;
@@ -35,6 +42,27 @@ export async function renderEmailAttachment(
   invoiceKind?: InvoiceKind
 ): Promise<EmailAttachment | null> {
   if (doc === "detailed") {
+    // "detailed" is the email doc kind for both new-build AND service quotes
+    // (the service quote preview sends doc: "detailed"). Dispatch on quote_type
+    // so a service quote gets the purpose-built service PDF, not the new-build
+    // detailed quote (which would return null for a service row anyway).
+    const quoteType = await fetchQuoteType(id);
+    if (quoteType === "service_call") {
+      const input = await loadServiceQuotePdfInput(id);
+      if (!input) return null;
+      const buffer = await renderToBuffer(
+        <ServiceQuotePdfDocument {...input.pdfProps} />
+      );
+      return {
+        buffer,
+        fileName: input.fileName,
+        clientEmail: input.quote.clientEmail ?? "",
+        clientName: input.quote.clientName ?? "",
+        quoteId: input.quote.quoteId ?? "",
+        reference: input.quote.quoteId ?? "",
+        docTitle: "Service Quote"
+      };
+    }
     const input = await loadDetailedQuotePdfInput(id);
     if (!input) return null;
     const buffer = await renderToBuffer(
@@ -70,6 +98,22 @@ export async function renderEmailAttachment(
 
   // invoice
   if (!invoiceKind) return null;
+  if (invoiceKind === "service") {
+    const input = await loadServiceInvoicePdfInput(id);
+    if (!input) return null;
+    const buffer = await renderToBuffer(
+      <ServiceInvoicePdfDocument {...input.pdfProps} />
+    );
+    return {
+      buffer,
+      fileName: input.fileName,
+      clientEmail: input.pdfProps.clientEmail ?? "",
+      clientName: input.pdfProps.clientName ?? "",
+      quoteId: input.pdfProps.reference ?? "",
+      reference: input.pdfProps.reference ?? "",
+      docTitle: input.pdfProps.title
+    };
+  }
   const input = await loadInvoicePdfInput(id, invoiceKind);
   if (!input) return null;
   const buffer = await renderToBuffer(

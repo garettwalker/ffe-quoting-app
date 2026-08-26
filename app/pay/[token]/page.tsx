@@ -90,7 +90,11 @@ export default async function PayPage({ params }: PageProps) {
   }
 
   const title =
-    verified.kind === "initial" ? "Invoice 1: Rough-In (Initial)" : "Invoice 2: Finish";
+    verified.kind === "initial"
+      ? "Invoice 1: Rough-In (Initial)"
+      : verified.kind === "service"
+        ? "Service Invoice"
+        : "Invoice 2: Finish";
 
   return (
     <PayShell businessName={businessName}>

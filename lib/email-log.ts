@@ -95,36 +95,61 @@ export async function getRecentEmailLog(
 // When each invoice was first emailed, per quote. `null` means that invoice
 // kind has never been emailed (the row may still exist in invoice setup but is
 // not yet "receivable"). Used by the receivables / dashboard / lifecycle code
-// to decide whether the finish invoice is actually due yet — the finish is
-// created at invoice setup but not billed until after the sheetrock gap, so a
-// finish that has never been emailed (and isn't paid) is "scheduled", not owed.
-// The rough-in (initial) is treated as receivable from setup regardless.
+// to decide whether the finish (or service) invoice is actually due yet — the
+// finish is created at invoice setup but not billed until after the sheetrock
+// gap, and a service invoice is "due on completion" (not owed until emailed or
+// paid), so a finish/service that has never been emailed (and isn't paid) is
+// "scheduled", not owed. The rough-in (initial) is treated as receivable from
+// setup regardless.
 export type InvoiceReceipts = {
   initial: string | null;
   finish: string | null;
+  service: string | null;
 };
 
+// Every invoice kind we track emailed receipts for. Adding a kind is a one-line
+// change here + the InvoiceReceipts type; the fold/merge logic below is generic.
+const RECEIPT_KINDS = ["initial", "finish", "service"] as const;
+type ReceiptKind = (typeof RECEIPT_KINDS)[number];
+
 function emptyReceipts(): InvoiceReceipts {
-  return { initial: null, finish: null };
+  return { initial: null, finish: null, service: null };
+}
+
+// Take the earlier of two sent_at timestamps (null means "never").
+function earlierSent(a: string | null, b: string | null): string | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a < b ? a : b;
 }
 
 // Fold a set of sent-invoice-email rows into the earliest sent_at per kind.
+// Generic over all known kinds so adding a kind is one line in RECEIPT_KINDS.
 function foldReceipts(rows: { invoice_kind: string | null; sent_at: string }[]): InvoiceReceipts {
   const out = emptyReceipts();
   for (const row of rows) {
-    if (row.invoice_kind === "initial" || row.invoice_kind === "finish") {
-      const prev = out[row.invoice_kind];
-      if (prev === null || row.sent_at < prev) {
-        out[row.invoice_kind] = row.sent_at;
-      }
-    }
+    if (!row.invoice_kind) continue;
+    if (!(RECEIPT_KINDS as readonly string[]).includes(row.invoice_kind)) continue;
+    const kind = row.invoice_kind as ReceiptKind;
+    out[kind] = earlierSent(out[kind], row.sent_at);
   }
   return out;
 }
 
+// Merge a single kind's candidate sent_at into an existing receipts object.
+function mergeKind(
+  existing: InvoiceReceipts,
+  kind: string | null,
+  sentAt: string
+): InvoiceReceipts {
+  if (!kind || !(RECEIPT_KINDS as readonly string[]).includes(kind)) return existing;
+  const k = kind as ReceiptKind;
+  return { ...existing, [k]: earlierSent(existing[k], sentAt) };
+}
+
 // Batch: for a set of quote ids, the earliest sent invoice email date per
 // kind. One query, folded in memory. Empty input returns an empty map; callers
-// should treat a missing key as "never emailed" (both kinds null).
+// should treat a missing key as "never emailed" (all kinds null).
 export async function loadInvoiceReceipts(
   quoteIds: string[]
 ): Promise<Map<string, InvoiceReceipts>> {
@@ -146,21 +171,7 @@ export async function loadInvoiceReceipts(
   }[]) {
     if (!row.quote_id) continue;
     const existing = map.get(row.quote_id) ?? emptyReceipts();
-    const candidate = foldReceipts([
-      { invoice_kind: row.invoice_kind, sent_at: row.sent_at }
-    ]);
-    map.set(row.quote_id, {
-      initial:
-        candidate.initial &&
-        (existing.initial === null || candidate.initial < existing.initial)
-          ? candidate.initial
-          : existing.initial,
-      finish:
-        candidate.finish &&
-        (existing.finish === null || candidate.finish < existing.finish)
-          ? candidate.finish
-          : existing.finish
-    });
+    map.set(row.quote_id, mergeKind(existing, row.invoice_kind, row.sent_at));
   }
   return map;
 }

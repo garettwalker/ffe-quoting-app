@@ -66,7 +66,7 @@ export function verifyPayToken(
       k?: unknown;
     };
     if (typeof obj.q !== "string") return null;
-    if (obj.k !== "initial" && obj.k !== "finish") return null;
+    if (obj.k !== "initial" && obj.k !== "finish" && obj.k !== "service") return null;
     return { quoteUuid: obj.q, kind: obj.k };
   } catch {
     return null;

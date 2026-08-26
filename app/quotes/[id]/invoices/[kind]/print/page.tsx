@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
 import { getCustomerEmailsForQuote } from "@/lib/customers";
 import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
+import { loadServiceInvoicePdfInput } from "@/lib/service-invoice-pdf";
 import { buildEmailDefaults, type InvoiceKind } from "@/lib/send-pdf-email";
 
 type PageProps = {
@@ -12,22 +13,37 @@ type PageProps = {
 // Always read the live business info / payment terms from Supabase.
 export const dynamic = "force-dynamic";
 
-// Printable invoice (initial or finish). The on-screen section below is a
-// preview of the downloaded PDF; both render from the same pre-formatted props
-// built by loadInvoicePdfInput, so they can never drift apart. Clicking
-// Download PDF hits the server route /quotes/[id]/invoices/[kind]/pdf which
-// renders the react-pdf document to a buffer and streams it back as a file
-// download. kind is validated by the helper (returns null for anything other
-// than initial/finish, or when invoicing has not been set up).
+// Printable invoice (initial, finish, or service). The on-screen section
+// below is a preview of the downloaded PDF; both render from the same
+// pre-formatted props built by the loaders, so they can never drift apart.
+// Clicking Download PDF hits the server route /quotes/[id]/invoices/[kind]/pdf
+// which renders the react-pdf document to a buffer and streams it back as a
+// file download. kind is validated by the loaders (return null for anything
+// other than initial/finish/service, or when invoicing has not been set up).
 export default async function PrintInvoicePage({ params }: PageProps) {
-  const input = await loadInvoicePdfInput(params.id, params.kind);
+  if (params.kind === "service") {
+    return <ServiceInvoicePrintPage id={params.id} kind="service" />;
+  }
+  return <NewBuildInvoicePrintPage id={params.id} kind={params.kind} />;
+}
+
+// --- New build (initial / finish) -------------------------------------------
+
+async function NewBuildInvoicePrintPage({
+  id,
+  kind
+}: {
+  id: string;
+  kind: string;
+}) {
+  const input = await loadInvoicePdfInput(id, kind);
   if (!input) {
     return <InvoiceNotFound />;
   }
 
   // The linked customer's emails (empty when no customer is linked) so the
   // Email To field can offer them as suggestions for a multi-recipient send.
-  const suggestedEmails = await getCustomerEmailsForQuote(params.id);
+  const suggestedEmails = await getCustomerEmailsForQuote(id);
 
   const { pdfProps } = input;
   const projectName = pdfProps.projectName || "";
@@ -44,21 +60,21 @@ export default async function PrintInvoicePage({ params }: PageProps) {
     doc: "invoice",
     reference: pdfProps.reference,
     businessName: pdfProps.businessName,
-    quoteUuid: params.id,
-    invoiceKind: params.kind as InvoiceKind
+    quoteUuid: id,
+    invoiceKind: kind as InvoiceKind
   });
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
       <PdfActionBar
-        backHref={`/quotes/${params.id}/invoices`}
-        downloadHref={`/quotes/${params.id}/invoices/${params.kind}/pdf`}
+        backHref={`/quotes/${id}/invoices`}
+        downloadHref={`/quotes/${id}/invoices/${kind}/pdf`}
         backLabel="Back to invoices"
         downloadLabel="Download PDF"
         email={{
           doc: "invoice",
-          id: params.id,
-          invoiceKind: params.kind as InvoiceKind,
+          id,
+          invoiceKind: kind as InvoiceKind,
           defaultTo: pdfProps.clientEmail ?? "",
           defaultSubject: emailDefaults.subject,
           defaultMessage: emailDefaults.message,
@@ -164,6 +180,181 @@ export default async function PrintInvoicePage({ params }: PageProps) {
             </div>
           </div>
         ) : null}
+
+        <div className="mt-6 flex justify-end">
+          <div className="w-full max-w-xs rounded-xl1 border border-pine/15 bg-cream px-5 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-black uppercase tracking-[0.12em] text-clay">
+                Amount Due
+              </p>
+              <p className="font-display text-2xl font-bold text-deep-pine">
+                {pdfProps.amountDue}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {pdfProps.paymentTerms ? (
+          <div className="mt-6 rounded-soft bg-sand p-4 text-sm font-bold leading-6 text-charcoal/80">
+            {pdfProps.paymentTerms}
+          </div>
+        ) : null}
+
+        <div className="mt-8 border-t border-pine/10 pt-4 text-center text-xs font-bold text-charcoal/60">
+          {pdfProps.businessName} · {pdfProps.businessEmail} · Invoice{" "}
+          {pdfProps.reference}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// --- Service call -----------------------------------------------------------
+
+async function ServiceInvoicePrintPage({
+  id,
+  kind
+}: {
+  id: string;
+  kind: "service";
+}) {
+  const input = await loadServiceInvoicePdfInput(id);
+  if (!input) {
+    return <InvoiceNotFound />;
+  }
+
+  const suggestedEmails = await getCustomerEmailsForQuote(id);
+
+  const { pdfProps } = input;
+  const projectName = pdfProps.projectName || "";
+  const projectPrimary = projectName || pdfProps.fullAddress;
+  const projectSecondary = projectName
+    ? [pdfProps.fullAddress, pdfProps.projectType].filter(Boolean).join(" · ")
+    : pdfProps.projectType;
+
+  const emailDefaults = buildEmailDefaults({
+    doc: "invoice",
+    reference: pdfProps.reference,
+    businessName: pdfProps.businessName,
+    quoteUuid: id,
+    invoiceKind: "service"
+  });
+
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-8">
+      <PdfActionBar
+        backHref={`/quotes/${id}/invoices`}
+        downloadHref={`/quotes/${id}/invoices/${kind}/pdf`}
+        backLabel="Back to invoices"
+        downloadLabel="Download PDF"
+        email={{
+          doc: "invoice",
+          id,
+          invoiceKind: "service",
+          defaultTo: pdfProps.clientEmail ?? "",
+          defaultSubject: emailDefaults.subject,
+          defaultMessage: emailDefaults.message,
+          docTitle: pdfProps.title,
+          suggestedEmails
+        }}
+      />
+
+      <section className="rounded-xl2 border border-pine/10 bg-whitewarm p-8 shadow-soft">
+        <div className="flex flex-col gap-6 border-b border-pine/10 pb-6 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex items-center gap-4">
+            <Image
+              src="/ffe-logo.png"
+              alt="Freedom Family Electric logo"
+              width={64}
+              height={64}
+              priority
+              className="h-16 w-16 rounded-full object-contain"
+            />
+            <div>
+              <p className="font-display text-2xl font-bold text-deep-pine">
+                {pdfProps.businessName}
+              </p>
+              <p className="text-sm font-bold text-charcoal/70">
+                {pdfProps.businessEmail}
+              </p>
+            </div>
+          </div>
+
+          <div className="text-right">
+            <p className="font-display text-3xl font-bold tracking-[-0.03em] text-moss">
+              Invoice
+            </p>
+            <p className="mt-1 text-sm font-black text-deep-pine">{pdfProps.reference}</p>
+            <p className="text-sm text-charcoal/70">{pdfProps.invoiceDateLabel}</p>
+          </div>
+        </div>
+
+        <div className="grid gap-6 py-6 sm:grid-cols-2">
+          <div>
+            <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
+              Bill To
+            </p>
+            <p className="font-black text-deep-pine">{pdfProps.clientName}</p>
+            {pdfProps.clientEmail ? (
+              <p className="text-sm text-charcoal/70">{pdfProps.clientEmail}</p>
+            ) : null}
+          </div>
+
+          <div>
+            <p className="mb-1 text-xs font-black uppercase tracking-[0.12em] text-clay">
+              Project
+            </p>
+            <p className="font-bold text-charcoal">{projectPrimary}</p>
+            {projectSecondary ? (
+              <p className="text-sm text-charcoal/70">{projectSecondary}</p>
+            ) : null}
+          </div>
+        </div>
+
+        <p className="mb-3 text-sm font-black uppercase tracking-[0.12em] text-clay">
+          {pdfProps.title}
+        </p>
+
+        <div className="overflow-hidden rounded-xl1 border border-pine/10">
+          <table className="w-full border-collapse text-left text-sm">
+            <thead className="bg-sand text-deep-pine">
+              <tr>
+                <th className="p-3 font-black">Description</th>
+                <th className="p-3 text-right font-black">Qty</th>
+                <th className="p-3 text-right font-black">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-pine/10 bg-cream">
+              {pdfProps.lines.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={3}
+                    className="p-3 text-sm font-bold text-charcoal/60"
+                  >
+                    No charges on this invoice.
+                  </td>
+                </tr>
+              ) : (
+                pdfProps.lines.map((line, index) => (
+                  <tr key={`${line.name}-${index}`}>
+                    <td className="p-3 font-bold text-charcoal">
+                      <div>{line.name}</div>
+                      {line.comment ? (
+                        <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
+                          {line.comment}
+                        </div>
+                      ) : null}
+                    </td>
+                    <td className="p-3 text-right">{line.quantityLabel}</td>
+                    <td className="p-3 text-right font-black text-deep-pine">
+                      {line.amount}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
         <div className="mt-6 flex justify-end">
           <div className="w-full max-w-xs rounded-xl1 border border-pine/15 bg-cream px-5 py-4">

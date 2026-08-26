@@ -34,6 +34,7 @@ function createDraftQuote(): QuoteFormState {
   return {
     quoteId: "",
     quoteDate: today,
+    quoteType: "new_build",
     clientName: "",
     clientEmail: "",
     projectName: "",
@@ -53,7 +54,10 @@ function createDraftQuote(): QuoteFormState {
     pricingLevelId: "standard-custom",
     contingencyId: "contingency-0",
     internalNotes: "",
-    lineItems: []
+    lineItems: [],
+    // Unused on new builds (service calls carry freeform lines here). Kept
+    // empty so the QuoteFormState shape is always complete.
+    serviceLines: []
   };
 }
 
@@ -156,7 +160,11 @@ export function QuoteBuilder({
 
     const storedQuote = getActiveQuote();
 
-    if (storedQuote) {
+    // Only resume a stored draft that is NOT a service-call draft. A service
+    // call draft in localStorage is left alone (the owner is starting a new
+    // build explicitly); this builder starts fresh instead of clobbering it,
+    // and the service draft remains resumable from the chooser.
+    if (storedQuote && storedQuote.quote.quoteType !== "service_call") {
       setQuote(
         adoptBaseRatePreset(
           normalizeLegacyQuote(storedQuote.quote),
@@ -411,6 +419,7 @@ export function QuoteBuilder({
     const payload = {
       quote_id: resolvedQuoteId,
       quote_date: quote.quoteDate,
+      quote_type: quote.quoteType ?? "new_build",
       client_name: quote.clientName,
       client_email: quote.clientEmail || null,
       customer_id: quote.customerId ?? null,

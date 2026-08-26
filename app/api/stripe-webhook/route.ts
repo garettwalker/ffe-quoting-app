@@ -86,7 +86,12 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
       const session = event.data.object as Stripe.Checkout.Session;
       const quoteUuid = session.metadata?.quote_uuid;
       const kind = session.metadata?.invoice_kind as InvoiceKind | undefined;
-      if (!quoteUuid || (kind !== "initial" && kind !== "finish")) return;
+      if (
+        !quoteUuid ||
+        (kind !== "initial" && kind !== "finish" && kind !== "service")
+      ) {
+        return;
+      }
 
       const intentId =
         typeof session.payment_intent === "string"

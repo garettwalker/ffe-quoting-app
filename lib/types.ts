@@ -3,7 +3,17 @@ export type UnitType = "per_sqft" | "per_unit" | "flat" | "per_hour";
 export type BasePricingMode = "auto" | "builder" | "manual";
 
 // Row-level quote lifecycle. Lives on the Supabase `quotes` row, not on QuoteFormState.
-export type QuoteStatus = "draft" | "prepared" | "accepted";
+// "scheduled" is a service-call-only stage between accepted and paid (a manual
+// "Mark scheduled" button writes it; new-build quotes never use it).
+export type QuoteStatus = "draft" | "prepared" | "accepted" | "scheduled";
+
+// Which kind of quote this is. New build = the full catalog-driven quoting tool
+// (per-sqft base rate, pricing level, contingency, two-invoice rough-in/finish
+// model). Service call = freeform manual line items, single invoice, simpler
+// 4-stage lifecycle. Lives on the `quotes.quote_type` column (default 'new_build'
+// so every existing quote stays a new build). Old invoice_data blobs that predate
+// the field are treated as new_build.
+export type QuoteType = "new_build" | "service_call";
 
 // Coerce a raw `quotes.status` value (typed as unknown/string from Supabase)
 // into the QuoteStatus union. Anything unexpected — including the legacy
@@ -11,10 +21,25 @@ export type QuoteStatus = "draft" | "prepared" | "accepted";
 // sensible action set. The SQL migration moves completed rows to prepared
 // before deploy; this is the runtime backstop for any straggler.
 export function normalizeStatus(value: unknown): QuoteStatus {
-  if (value === "draft" || value === "prepared" || value === "accepted") {
+  if (
+    value === "draft" ||
+    value === "prepared" ||
+    value === "accepted" ||
+    value === "scheduled"
+  ) {
     return value;
   }
   return "prepared";
+}
+
+// Coerce a raw `quotes.quote_type` value into the QuoteType union. Anything
+// unexpected (including null/undefined on old rows before the column existed)
+// falls back to "new_build" so the existing flow is the default.
+export function normalizeQuoteType(value: unknown): QuoteType {
+  if (value === "new_build" || value === "service_call") {
+    return value;
+  }
+  return "new_build";
 }
 
 // The full customer lifecycle shown on the dashboard. The first three come
@@ -28,6 +53,16 @@ export type LifecycleStage =
   | "accepted"
   | "pending_payment"
   | "paid_in_full";
+
+// The simpler 4-stage lifecycle for service-call quotes (vs the 5-stage new-build
+// LifecycleStage above). "quote" collapses draft+prepared; "scheduled" is a manual
+// status advance; "paid" is derived from the single invoice being paid in full.
+// Computed in lib/invoice-calculations.ts (serviceLifecycleStage).
+export type ServiceLifecycleStage =
+  | "quote"
+  | "accepted"
+  | "scheduled"
+  | "paid";
 
 // A re-usable customer record linked from quotes. The quote still keeps its own
 // client_name / client_email snapshot; customer_id is the link to the shared
@@ -61,6 +96,7 @@ export type DashboardQuoteRow = {
   project_state: string;
   project_zip: string;
   project_type: string;
+  quote_type: QuoteType | null;
   client_quote_total_cents: number;
   status: QuoteStatus;
   invoice_data: InvoiceData | null;
@@ -69,7 +105,9 @@ export type DashboardQuoteRow = {
 
 // Invoicing (built on top of accepted quotes). Stored as JSONB in the
 // `invoice_data` column on the quotes row, null until the owner sets it up.
-export type InvoiceKind = "initial" | "finish";
+// "service" is the single invoice for a service-call quote (no rough-in/finish
+// split, no permit). New builds use "initial" + "finish".
+export type InvoiceKind = "initial" | "finish" | "service";
 export type InvoiceStatus = "unpaid" | "paid";
 
 export type InvoiceRecord = {
@@ -89,16 +127,24 @@ export type InvoiceRecord = {
 };
 
 export type InvoiceData = {
-  // The agreed contract amount. Defaults to the accepted quote total.
+  // Which quote type this invoice setup belongs to. Optional only for backward
+  // compat with old blobs; service-call setups MUST set this to "service_call"
+  // so the calc functions take the single-invoice path. Absent = new_build.
+  quoteType?: QuoteType;
+  // The agreed contract amount. Defaults to the accepted quote total. For a
+  // service call this is the sum of serviceLines[].amountCents.
   contractAmountCents: number;
-  // Rough-in and finish percentages of the contract. Default 50/50.
+  // Rough-in and finish percentages of the contract. Default 50/50. Unused for
+  // service calls (single invoice, no split).
   roughInPercent: number;
   finishPercent: number;
-  // Permit fee shown as its own line on the initial invoice.
+  // Permit fee shown as its own line on the initial invoice. Unused for
+  // service calls.
   permitFeeCents: number;
   // ISO timestamp the setup was last saved.
   generatedAt: string;
-  // Exactly two records: initial then finish.
+  // New build: exactly two records, initial then finish. Service call: exactly
+  // one record, kind "service".
   invoices: InvoiceRecord[];
   // Scope-of-work line items shown on both invoices. Each line is a real
   // priced item: a catalog pricing item (or the base-package pseudo-item),
@@ -125,6 +171,21 @@ export type InvoiceData = {
     quantity: number;
     unitPriceCents: number;
     comment: string;
+  }>;
+  // Service-call freeform line items. Used only when quoteType === "service_call"
+  // (a single invoice with no split/permit). Each line is a free-text
+  // description, a quantity, and a row amount in cents (NO unit price — the
+  // amount is entered directly so there is no rounding drift). The contract
+  // amount is the SUM of amountCents across these lines. Seeded from the quote's
+  // serviceLines when invoicing is first set up, then lives on the invoice and is
+  // edited independently of the quote (mirrors the new-build scopeLines pattern).
+  // Optional so new-build invoice_data (which never has this field) still loads.
+  serviceLines?: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    amountCents: number;
+    comment?: string;
   }>;
 };
 
@@ -165,14 +226,18 @@ export type ReceivableInvoice = {
 // One job (quote) flattened for the Accounts Receivable view: the two invoices
 // plus job-level totals. `earliestReceivableAt` is the min receivable date
 // across the job's receivable invoices and is the sort key for "oldest first".
-// `scheduledFinishCents` is the finish amount when it is still scheduled (not
-// yet emailed / not paid), else 0 — shown as "Finish pending" and keeps the job
-// out of Historical Paid. The AR page partitions jobs into Pending Payments
-// (receivable invoiced money and not paid in full) and Historical Paid
-// (isPaidInFull) directly off these totals — matching lib/invoice-calculations.
+// `scheduledCents` is the amount of any invoice that is set up but not yet
+// receivable (not emailed / not paid) — for a new build that's the finish, for a
+// service call that's the single invoice. Shown as "Scheduled / not yet billed"
+// and keeps the job out of Historical Paid. The AR page partitions jobs into
+// Pending Payments (receivable invoiced money and not paid in full) and
+// Historical Paid (isPaidInFull) directly off these totals — matching
+// lib/invoice-calculations. For a service call, `finish` is null and the single
+// invoice lives in `initial` (the table renders one "Service" cell).
 export type ReceivableJob = {
   id: string;
   quoteId: string;
+  quoteType: QuoteType;
   clientName: string;
   projectName: string;
   projectType: string;
@@ -181,7 +246,7 @@ export type ReceivableJob = {
   totalInvoicedCents: number;
   totalPaidCents: number;
   totalOutstandingCents: number;
-  scheduledFinishCents: number;
+  scheduledCents: number;
   earliestReceivableAt: string | null;
 };
 
@@ -283,9 +348,27 @@ export type QuoteLineInput = {
   unitPriceCents?: number;
 };
 
+// A freeform manual line on a service-call quote. No catalog item, no pricing
+// levers — just a description, a quantity, and a row amount in cents (the
+// amount is entered directly, so there is no unit price and no rounding drift).
+// Optional customer-facing comment. Stored in quote_data.serviceLines (JSONB).
+// The quote total is the SUM of amountCents across these lines.
+export type ServiceLine = {
+  id: string;
+  name: string;
+  quantity: number;
+  amountCents: number;
+  comment?: string;
+};
+
 export type QuoteFormState = {
   quoteId: string;
   quoteDate: string;
+  // Which quote type this is. Defaults to "new_build" (old quotes predate the
+  // field and resolve as new builds). For "service_call", the pricing levers
+  // below (baseRate/pricingLevel/contingency/squareFootage/lineItems) are unused
+  // and `serviceLines` carries the freeform line items instead.
+  quoteType: QuoteType;
   clientName: string;
   clientEmail: string;
   // The linked customer record id (public.customers.id). The quote keeps its
@@ -324,6 +407,10 @@ export type QuoteFormState = {
   contingencyId: string;
   internalNotes: string;
   lineItems: QuoteLineInput[];
+  // Service-call freeform line items. Used only when quoteType === "service_call"
+  // (the pricing levers above are unused for service calls). Empty/ignored for
+  // new builds. Old quotes predate the field and resolve to empty.
+  serviceLines: ServiceLine[];
 };
 
 export type CalculatedLineItem = {
@@ -366,4 +453,14 @@ export type QuoteCalculationResult = {
   // math breakdown so the scope of each lever is explicit.
   overriddenAdderLineCount: number;
   clientFacingLines: CalculatedLineItem[];
+};
+
+// The calculation snapshot for a service-call quote. Much simpler than the
+// new-build QuoteCalculationResult: the total is just the sum of the freeform
+// line amounts (no base package, no multipliers, no variance). Stored as
+// `calculation_data` JSONB on the quotes row for service-call quotes; the
+// service quote PDF/preview reads serviceLines off quote_data directly.
+export type ServiceQuoteCalculationResult = {
+  clientQuoteTotalCents: number;
+  lines: ServiceLine[];
 };

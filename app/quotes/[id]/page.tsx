@@ -11,14 +11,17 @@ import {
   isPaidInFull,
   lifecycleStage,
   outstandingCents,
-  scheduledFinishCents
+  scheduledCents,
+  serviceLifecycleStage
 } from "@/lib/invoice-calculations";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { normalizeStatus } from "@/lib/types";
+import { normalizeQuoteType, normalizeStatus } from "@/lib/types";
 import type {
   InvoiceData,
   QuoteCalculationResult,
-  QuoteFormState
+  QuoteFormState,
+  QuoteType,
+  ServiceQuoteCalculationResult
 } from "@/lib/types";
 
 // Always read the live quote row + invoice data from Supabase (no caching).
@@ -27,13 +30,21 @@ export const dynamic = "force-dynamic";
 type SavedQuoteRow = {
   id: string;
   quote_id: string;
+  quote_type: string | null;
   status: string;
   created_at: string;
   customer_id: string | null;
   quote_data: QuoteFormState;
-  calculation_data: QuoteCalculationResult;
+  calculation_data: QuoteCalculationResult | ServiceQuoteCalculationResult;
   invoice_data: InvoiceData | null;
 };
+
+// Narrow the calculation snapshot union: a service-call snapshot has `lines`.
+function isServiceResult(
+  result: QuoteCalculationResult | ServiceQuoteCalculationResult
+): result is ServiceQuoteCalculationResult {
+  return (result as ServiceQuoteCalculationResult).lines !== undefined;
+}
 
 type PageProps = {
   params: { id: string };
@@ -45,7 +56,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
     supabase
       .from("quotes")
       .select(
-        "id, quote_id, status, created_at, customer_id, quote_data, calculation_data, invoice_data"
+        "id, quote_id, quote_type, status, created_at, customer_id, quote_data, calculation_data, invoice_data"
       )
       .eq("id", params.id)
       .single(),
@@ -89,19 +100,23 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const quote = row.quote_data;
   const result = row.calculation_data;
   const status = normalizeStatus(row.status);
+  const quoteType: QuoteType = normalizeQuoteType(row.quote_type);
+  const isService = quoteType === "service_call";
+  const newBuildResult = !isServiceResult(result) ? result : null;
   // Prefer the customer_id column (source of truth, set by backfill) over the
   // JSONB snapshot so a backfilled quote still links to its customer record.
   const customerId = quote.customerId ?? row.customer_id ?? undefined;
   // Emailed-state of each invoice, derived from the email history already
-  // fetched for the history table. A finish invoice that has never been emailed
-  // (and isn't paid) is "scheduled" — not owed yet — so it is excluded from the
-  // outstanding balance and keeps the job from reading as paid in full.
+  // fetched for the history table. A finish/service invoice that has never been
+  // emailed (and isn't paid) is "scheduled" — not owed yet — so it is excluded
+  // from the outstanding balance and keeps the job from reading as paid in full.
   const receipts = receiptsFromHistory(emailHistory);
   // Net effect of per-line unit-price overrides — the bridge from
   // "(before-adjustments x multiplier)" to the final quote. Zero (hidden)
   // when no adder lines are custom-priced. Computed on the fly so historical
-  // quotes saved before the field existed reconcile too.
-  const varianceCents = getAdderPriceVariance(result);
+  // quotes saved before the field existed reconcile too. New-build only;
+  // service calls have no multipliers / overrides.
+  const varianceCents = newBuildResult ? getAdderPriceVariance(newBuildResult) : 0;
   const varianceTotal =
     varianceCents >= 0
       ? `+${formatCurrency(varianceCents)}`
@@ -168,7 +183,11 @@ export default async function SavedQuotePage({ params }: PageProps) {
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <StatusBadge
-              stage={lifecycleStage(status, row.invoice_data, receipts)}
+              stage={
+                isService
+                  ? serviceLifecycleStage(status, row.invoice_data, receipts)
+                  : lifecycleStage(status, row.invoice_data, receipts)
+              }
             />
             <span className="text-sm font-bold text-charcoal/60">
               Saved {createdDate}
@@ -206,19 +225,23 @@ export default async function SavedQuotePage({ params }: PageProps) {
             />
             <ReviewField label="Project Address" value={fullAddress} />
             <ReviewField label="Project Type" value={quote.projectType} />
-            <ReviewField
-              label="Square Footage"
-              value={quote.squareFootage.toLocaleString()}
-            />
-            <ReviewField
-              label="Base Rate"
-              value={`${result.baseRateLabel ?? "Base rate"} - ${formatCurrency(result.baseRateCents)}/sf`}
-            />
+            {isService ? null : (
+              <ReviewField
+                label="Square Footage"
+                value={quote.squareFootage.toLocaleString()}
+              />
+            )}
+            {isService || !newBuildResult ? null : (
+              <ReviewField
+                label="Base Rate"
+                value={`${newBuildResult.baseRateLabel ?? "Base rate"} - ${formatCurrency(newBuildResult.baseRateCents)}/sf`}
+              />
+            )}
           </div>
 
           <div className="mt-8">
             <p className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              Customer-Facing Line Items
+              {isService ? "Line Items" : "Customer-Facing Line Items"}
             </p>
 
             <div className="responsive-table-wrap rounded-xl1 border border-pine/10">
@@ -227,116 +250,141 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   <tr>
                     <th className="p-3 font-black">Item</th>
                     <th className="p-3 font-black">Qty</th>
-                    <th className="p-3 font-black">Unit</th>
-                    <th className="p-3 font-black">Unit Price</th>
-                    <th className="p-3 font-black">Line Total</th>
+                    {isService ? (
+                      <th className="p-3 font-black">Amount</th>
+                    ) : (
+                      <>
+                        <th className="p-3 font-black">Unit</th>
+                        <th className="p-3 font-black">Unit Price</th>
+                        <th className="p-3 font-black">Line Total</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pine/10 bg-cream">
-                  {result.clientFacingLines.map((line) => (
-                    <tr key={line.pricingItemId}>
-                      <td className="p-3 font-bold text-charcoal">
-                        <div>{line.name}</div>
-                        {line.comment ? (
-                          <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
-                            {line.comment}
-                          </div>
-                        ) : null}
-                      </td>
-                      <td className="p-3">{line.quantity.toLocaleString()}</td>
-                      <td className="p-3">{line.unitType}</td>
-                      <td className="p-3">
-                        {formatCurrency(line.clientUnitPriceCents)}
-                      </td>
-                      <td className="p-3 font-black text-deep-pine">
-                        {formatCurrency(line.clientLineTotalCents)}
-                      </td>
-                    </tr>
-                  ))}
+                  {isService
+                    ? quote.serviceLines.map((line) => (
+                        <tr key={line.id}>
+                          <td className="p-3 font-bold text-charcoal">
+                            <div>{line.name}</div>
+                            {line.comment ? (
+                              <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
+                                {line.comment}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="p-3">{line.quantity.toLocaleString()}</td>
+                          <td className="p-3 font-black text-deep-pine">
+                            {formatCurrency(line.amountCents)}
+                          </td>
+                        </tr>
+                      ))
+                    : newBuildResult?.clientFacingLines.map((line) => (
+                        <tr key={line.pricingItemId}>
+                          <td className="p-3 font-bold text-charcoal">
+                            <div>{line.name}</div>
+                            {line.comment ? (
+                              <div className="mt-1 break-words text-xs font-medium italic leading-5 text-charcoal/60">
+                                {line.comment}
+                              </div>
+                            ) : null}
+                          </td>
+                          <td className="p-3">{line.quantity.toLocaleString()}</td>
+                          <td className="p-3">{line.unitType}</td>
+                          <td className="p-3">
+                            {formatCurrency(line.clientUnitPriceCents)}
+                          </td>
+                          <td className="p-3 font-black text-deep-pine">
+                            {formatCurrency(line.clientLineTotalCents)}
+                          </td>
+                        </tr>
+                      ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          <div className="mt-8">
-            <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              Internal Math Breakdown
-            </p>
-            <p className="mb-4 text-xs font-medium leading-5 text-charcoal/55">
-              Not shown to the customer. Each lever is tagged with what it moves:
-              the Base Package only, the adders only, or both.
-            </p>
+          {!isService && newBuildResult ? (
+            <div className="mt-8">
+              <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+                Internal Math Breakdown
+              </p>
+              <p className="mb-4 text-xs font-medium leading-5 text-charcoal/55">
+                Not shown to the customer. Each lever is tagged with what it moves:
+                the Base Package only, the adders only, or both.
+              </p>
 
-            <div className="space-y-2 rounded-xl1 border border-pine/10 bg-cream p-4">
-              <BreakdownRow
-                label={`Base rate (${result.baseRateLabel ?? "Base rate"})`}
-                value={`${formatCurrency(result.baseRateCents)}/sf x ${quote.squareFootage.toLocaleString()} sf`}
-                total={formatCurrency(result.basePackageBaseTotalCents)}
-                scope="Base pkg only"
-              />
-              <BreakdownRow
-                label="Selected adders (catalog base prices)"
-                value={
-                  (result.overriddenAdderLineCount ?? 0) > 0
-                    ? `${result.overriddenAdderLineCount} custom-priced line${
-                        (result.overriddenAdderLineCount ?? 0) === 1 ? "" : "s"
-                      } skip the multipliers`
-                    : "pre-multiplier adder totals"
-                }
-                total={formatCurrency(result.selectedAddersBaseTotalCents)}
-                scope="Adders only"
-              />
-              <BreakdownRow
-                label="Before adjustments"
-                value="base pkg + adders"
-                total={formatCurrency(result.totalBeforeClientMultiplierCents)}
-              />
-              <BreakdownRow
-                label={`Pricing level: ${result.pricingLevelName ?? "Standard"}`}
-                value={formatPercent(result.pricingLevelMultiplier)}
-                scope="Base + adders"
-              />
-              <BreakdownRow
-                label={`Contingency: ${result.contingencyName ?? "0%"}`}
-                value={formatPercent(result.contingencyMultiplier)}
-                scope="Base + adders"
-              />
-              <BreakdownRow
-                label="Combined multiplier"
-                value={formatPercent(result.combinedClientMultiplier)}
-                scope="Base + adders"
-              />
-              {varianceCents !== 0 ? (
+              <div className="space-y-2 rounded-xl1 border border-pine/10 bg-cream p-4">
                 <BreakdownRow
-                  label="Adder price variance (vs price list)"
-                  value="custom-priced lines vs catalog base"
-                  total={varianceTotal}
+                  label={`Base rate (${newBuildResult.baseRateLabel ?? "Base rate"})`}
+                  value={`${formatCurrency(newBuildResult.baseRateCents)}/sf x ${quote.squareFootage.toLocaleString()} sf`}
+                  total={formatCurrency(newBuildResult.basePackageBaseTotalCents)}
+                  scope="Base pkg only"
+                />
+                <BreakdownRow
+                  label="Selected adders (catalog base prices)"
+                  value={
+                    (newBuildResult.overriddenAdderLineCount ?? 0) > 0
+                      ? `${newBuildResult.overriddenAdderLineCount} custom-priced line${
+                          (newBuildResult.overriddenAdderLineCount ?? 0) === 1 ? "" : "s"
+                        } skip the multipliers`
+                      : "pre-multiplier adder totals"
+                  }
+                  total={formatCurrency(newBuildResult.selectedAddersBaseTotalCents)}
                   scope="Adders only"
                 />
-              ) : null}
-              <div className="flex items-center justify-between gap-4 border-t border-pine/15 pt-3">
-                <span className="text-sm font-black text-deep-pine">
-                  Final Quote
-                </span>
-                <span className="text-sm font-black text-deep-pine">
-                  {formatCurrency(result.clientQuoteTotalCents)}
-                </span>
-              </div>
-              <p className="text-xs font-bold leading-5 text-charcoal/55">
-                {formatCurrency(result.totalBeforeClientMultiplierCents)} ×{" "}
-                {formatPercent(result.combinedClientMultiplier)}
-                {varianceCents !== 0 ? ` + ${varianceTotal}` : ""} ={" "}
-                {formatCurrency(result.clientQuoteTotalCents)}
-              </p>
-              {(result.overriddenAdderLineCount ?? 0) > 0 ? (
-                <p className="text-xs font-bold leading-4 text-charcoal/55">
-                  Includes {result.overriddenAdderLineCount} custom-priced adder
-                  line{(result.overriddenAdderLineCount ?? 0) === 1 ? "" : "s"}{" "}
-                  added at their set price (multipliers skipped).
+                <BreakdownRow
+                  label="Before adjustments"
+                  value="base pkg + adders"
+                  total={formatCurrency(newBuildResult.totalBeforeClientMultiplierCents)}
+                />
+                <BreakdownRow
+                  label={`Pricing level: ${newBuildResult.pricingLevelName ?? "Standard"}`}
+                  value={formatPercent(newBuildResult.pricingLevelMultiplier)}
+                  scope="Base + adders"
+                />
+                <BreakdownRow
+                  label={`Contingency: ${newBuildResult.contingencyName ?? "0%"}`}
+                  value={formatPercent(newBuildResult.contingencyMultiplier)}
+                  scope="Base + adders"
+                />
+                <BreakdownRow
+                  label="Combined multiplier"
+                  value={formatPercent(newBuildResult.combinedClientMultiplier)}
+                  scope="Base + adders"
+                />
+                {varianceCents !== 0 ? (
+                  <BreakdownRow
+                    label="Adder price variance (vs price list)"
+                    value="custom-priced lines vs catalog base"
+                    total={varianceTotal}
+                    scope="Adders only"
+                  />
+                ) : null}
+                <div className="flex items-center justify-between gap-4 border-t border-pine/15 pt-3">
+                  <span className="text-sm font-black text-deep-pine">
+                    Final Quote
+                  </span>
+                  <span className="text-sm font-black text-deep-pine">
+                    {formatCurrency(newBuildResult.clientQuoteTotalCents)}
+                  </span>
+                </div>
+                <p className="text-xs font-bold leading-5 text-charcoal/55">
+                  {formatCurrency(newBuildResult.totalBeforeClientMultiplierCents)} ×{" "}
+                  {formatPercent(newBuildResult.combinedClientMultiplier)}
+                  {varianceCents !== 0 ? ` + ${varianceTotal}` : ""} ={" "}
+                  {formatCurrency(newBuildResult.clientQuoteTotalCents)}
                 </p>
-              ) : null}
+                {(newBuildResult.overriddenAdderLineCount ?? 0) > 0 ? (
+                  <p className="text-xs font-bold leading-4 text-charcoal/55">
+                    Includes {newBuildResult.overriddenAdderLineCount} custom-priced adder
+                    line{(newBuildResult.overriddenAdderLineCount ?? 0) === 1 ? "" : "s"}{" "}
+                    added at their set price (multipliers skipped).
+                  </p>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : null}
         </section>
 
         <aside className="rounded-xl2 border border-pine/10 bg-whitewarm/80 p-6 shadow-soft lg:sticky lg:top-28">
@@ -403,14 +451,16 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   href={`/quotes/${row.id}/print`}
                   className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
                 >
-                  Detailed Quote PDF
+                  {isService ? "Quote PDF" : "Detailed Quote PDF"}
                 </Link>
-                <Link
-                  href={`/quotes/${row.id}/summary`}
-                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-                >
-                  Summary Quote PDF
-                </Link>
+                {isService ? null : (
+                  <Link
+                    href={`/quotes/${row.id}/summary`}
+                    className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                  >
+                    Summary Quote PDF
+                  </Link>
+                )}
                 <QuoteStatusButton
                   quoteId={row.id}
                   newStatus="draft"
@@ -426,20 +476,53 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   href={`/quotes/${row.id}/print`}
                   className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
                 >
-                  Detailed Quote PDF
+                  {isService ? "Quote PDF" : "Detailed Quote PDF"}
                 </Link>
-                <Link
-                  href={`/quotes/${row.id}/summary`}
-                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-                >
-                  Summary Quote PDF
-                </Link>
+                {isService ? null : (
+                  <Link
+                    href={`/quotes/${row.id}/summary`}
+                    className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                  >
+                    Summary Quote PDF
+                  </Link>
+                )}
                 <Link
                   href={`/quotes/${row.id}/invoices`}
                   className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
                 >
                   Invoicing
                 </Link>
+                {isService ? (
+                  <QuoteStatusButton
+                    quoteId={row.id}
+                    newStatus="scheduled"
+                    label="Mark scheduled"
+                    variant="primary"
+                  />
+                ) : null}
+                <ReopenQuoteButton
+                  quoteId={row.id}
+                  hasInvoices={hasInvoices}
+                  hasPaidInvoice={hasPaidInvoice}
+                  paymentCount={paymentCount}
+                />
+              </>
+            ) : null}
+
+            {status === "scheduled" ? (
+              <>
+                <Link
+                  href={`/quotes/${row.id}/invoices`}
+                  className="rounded-full bg-pine px-5 py-3 text-center font-black text-whitewarm shadow-card hover:bg-deep-pine"
+                >
+                  Invoicing
+                </Link>
+                <QuoteStatusButton
+                  quoteId={row.id}
+                  newStatus="accepted"
+                  label="Move back to accepted"
+                  variant="secondary"
+                />
                 <ReopenQuoteButton
                   quoteId={row.id}
                   hasInvoices={hasInvoices}
@@ -450,19 +533,19 @@ export default async function SavedQuotePage({ params }: PageProps) {
             ) : null}
           </div>
 
-          {status === "accepted" && row.invoice_data ? (
+          {(status === "accepted" || status === "scheduled") && row.invoice_data ? (
             (() => {
               const paidInFull = isPaidInFull(row.invoice_data, receipts);
               const owed = outstandingCents(row.invoice_data, receipts);
-              const finishPending = scheduledFinishCents(row.invoice_data, receipts);
+              const scheduled = scheduledCents(row.invoice_data, receipts);
               return (
                 <p className="mt-4 rounded-soft bg-cream px-4 py-3 text-sm font-black text-deep-pine">
                   {paidInFull
                     ? "Invoices: paid in full"
                     : owed > 0
                       ? `Outstanding: ${formatCurrency(owed)}`
-                      : finishPending > 0
-                        ? `Finish pending: ${formatCurrency(finishPending)}`
+                      : scheduled > 0
+                        ? `Scheduled / not yet billed: ${formatCurrency(scheduled)}`
                         : "Invoices: paid in full"}
                 </p>
               );

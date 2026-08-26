@@ -9,7 +9,7 @@ import {
   isPaidInFull,
   outstandingCents,
   receivableInvoicedCents,
-  scheduledFinishCents
+  scheduledCents
 } from "@/lib/invoice-calculations";
 import { loadInvoiceReceipts, type InvoiceReceipts } from "@/lib/email-log";
 import { getSupabaseServer } from "@/lib/supabase-server";
@@ -17,9 +17,11 @@ import type {
   InvoiceData,
   InvoiceKind,
   InvoiceRecord,
+  QuoteType,
   ReceivableInvoice,
   ReceivableJob
 } from "@/lib/types";
+import { normalizeQuoteType } from "@/lib/types";
 
 // Accounts Receivable: a read-only collections view over every accepted quote
 // that has invoice setup. Reads live from Supabase (no caching) so freshly
@@ -35,6 +37,7 @@ const RECEIVABLES_LIMIT = 500;
 type ReceivablesRow = {
   id: string;
   quote_id: string;
+  quote_type: string | null;
   client_name: string;
   project_name: string | null;
   project_type: string;
@@ -59,6 +62,8 @@ function buildReceivableJob(
     return null;
   }
 
+  const quoteType: QuoteType = normalizeQuoteType(row.quote_type);
+
   const toReceivableInvoice = (kind: InvoiceKind): ReceivableInvoice | null => {
     const invoice = data.invoices.find((record) => record.kind === kind);
     if (!invoice) return null;
@@ -82,16 +87,22 @@ function buildReceivableJob(
     };
   };
 
-  const initial = toReceivableInvoice("initial");
-  const finish = toReceivableInvoice("finish");
+  // A service call has a single "service" invoice. Render it in the primary
+  // (initial) column slot with finish = null; the table relabels the column
+  // inline for service rows. A new build uses the initial + finish pair.
+  const initial = toReceivableInvoice(
+    quoteType === "service_call" ? "service" : "initial"
+  );
+  const finish = quoteType === "service_call" ? null : toReceivableInvoice("finish");
 
   // Only receivable (billed) invoices count toward AR totals. A scheduled
-  // finish is excluded here; its amount is surfaced via scheduledFinishCents.
+  // finish (new build) or a scheduled service invoice (service call) is
+  // excluded here; its amount is surfaced via scheduledCents.
   const totalInvoicedCents = receivableInvoicedCents(data, receipts);
   if (totalInvoicedCents <= 0) return null;
 
   const totalOutstandingCents = outstandingCents(data, receipts);
-  const jobScheduledFinish = scheduledFinishCents(data, receipts);
+  const jobScheduled = scheduledCents(data, receipts);
 
   // Earliest receivable date across the job's receivable invoices (the
   // "Invoiced" date column + the oldest-first sort key). A scheduled finish's
@@ -112,6 +123,7 @@ function buildReceivableJob(
   return {
     id: row.id,
     quoteId: row.quote_id,
+    quoteType,
     clientName: row.client_name || "Unnamed Client",
     projectName: row.project_name || "",
     projectType: row.project_type || "",
@@ -120,7 +132,7 @@ function buildReceivableJob(
     totalInvoicedCents,
     totalPaidCents: totalInvoicedCents - totalOutstandingCents,
     totalOutstandingCents,
-    scheduledFinishCents: jobScheduledFinish,
+    scheduledCents: jobScheduled,
     earliestReceivableAt
   };
 }
@@ -130,9 +142,9 @@ export default async function ReceivablesPage() {
   const { data, error } = await supabase
     .from("quotes")
     .select(
-      "id, quote_id, client_name, project_name, project_type, status, invoice_data, created_at"
+      "id, quote_id, quote_type, client_name, project_name, project_type, status, invoice_data, created_at"
     )
-    .eq("status", "accepted")
+    .in("status", ["accepted", "scheduled"])
     .not("invoice_data", "is", null)
     .order("created_at", { ascending: false })
     .limit(RECEIVABLES_LIMIT);
@@ -155,7 +167,7 @@ export default async function ReceivablesPage() {
   const receiptsMap = await loadInvoiceReceipts(rows.map((row) => row.id));
   const jobs = rows
     .map((row) =>
-      buildReceivableJob(row, receiptsMap.get(row.id) ?? { initial: null, finish: null })
+      buildReceivableJob(row, receiptsMap.get(row.id) ?? { initial: null, finish: null, service: null })
     )
     .filter((job): job is ReceivableJob => Boolean(job));
 

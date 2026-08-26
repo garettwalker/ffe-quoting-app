@@ -1,7 +1,12 @@
 import { formatDate } from "@/lib/currency";
 import { isPaidInFull } from "@/lib/invoice-calculations";
 import type { InvoiceReceipts } from "@/lib/email-log";
-import type { InvoiceData, InvoiceRecord, ProjectStatus } from "@/lib/types";
+import type {
+  InvoiceData,
+  InvoiceRecord,
+  ProjectStatus,
+  QuoteStatus
+} from "@/lib/types";
 export type { ProjectStatus };
 
 // Client-safe data layer for the Project Status Tracker (/projects). Each
@@ -220,4 +225,126 @@ export function todayDateOnly(): string {
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+// ---------------------------------------------------------------------------
+// Service-call tracker
+//
+// Service calls get a SIMPLER 5-stage strip (Quote / Accepted / Scheduled /
+// Billed / Paid) instead of the 8-stage new-build strip. Only "Scheduled" is a
+// manual action (a status write to "scheduled"); the rest are derived from
+// quote status + the single service invoice + its email-log receipt, so this
+// view can never disagree with /quotes or /receivables. "Billed" = the service
+// invoice was emailed (a sent email_log row) OR collected (marked paid), the
+// same rule as the new-build billed stages.
+
+export type ServiceStageId =
+  | "quote"
+  | "accepted"
+  | "scheduled"
+  | "billed"
+  | "paid";
+
+export type ServiceStageState = {
+  id: ServiceStageId;
+  label: string;
+  done: boolean;
+  date: string | null;
+  manual: boolean;
+};
+
+export type ServiceProjectStages = {
+  stages: ServiceStageState[];
+  activeStageId: ServiceStageId | null;
+  filterBucket: FilterBucket;
+};
+
+type ServiceComputeArgs = {
+  createdAt: string;
+  status: QuoteStatus;
+  invoiceData: InvoiceData | null;
+  receipts: InvoiceReceipts;
+};
+
+function findServiceInvoice(data: InvoiceData): InvoiceRecord | null {
+  return data.invoices.find((inv) => inv.kind === "service") ?? null;
+}
+
+export function computeServiceCallStages(
+  args: ServiceComputeArgs
+): ServiceProjectStages {
+  const { createdAt, status, invoiceData, receipts } = args;
+
+  const serviceInvoice = invoiceData ? findServiceInvoice(invoiceData) : null;
+  const emailedAt = receipts.service;
+  const servicePaid = serviceInvoice?.status === "paid";
+
+  // Billed = service invoice emailed OR paid. Date prefers the emailed
+  // timestamp, falling back to the paid timestamp.
+  const billedDone = Boolean(emailedAt) || servicePaid;
+  const billedDate = emailedAt ?? (servicePaid ? serviceInvoice?.paidAt ?? null : null);
+
+  const paidDone = isPaidInFull(invoiceData, receipts);
+  const paidDate = serviceInvoice?.paidAt ?? null;
+
+  // Accepted/Scheduled are status-derived. Paid is NOT a stored status (it is
+  // derived from the invoice being paid in full below), so a paid service call
+  // keeps status "scheduled" (or "accepted" if never marked scheduled) and the
+  // billed/paid stages light up from the invoice + receipt facts.
+  const acceptedDone = status === "accepted" || status === "scheduled";
+  const scheduledDone = status === "scheduled";
+
+  const stages: ServiceStageState[] = [
+    {
+      id: "quote",
+      label: "Quote",
+      done: true,
+      date: createdAt,
+      manual: false
+    },
+    {
+      id: "accepted",
+      label: "Accepted",
+      done: acceptedDone,
+      date: null,
+      manual: false
+    },
+    {
+      id: "scheduled",
+      label: "Scheduled",
+      done: scheduledDone,
+      date: null,
+      // The one manual action on a service call: writing status "scheduled".
+      manual: true
+    },
+    {
+      id: "billed",
+      label: "Billed",
+      done: billedDone,
+      date: billedDate,
+      manual: false
+    },
+    {
+      id: "paid",
+      label: "Paid",
+      done: paidDone,
+      date: paidDate,
+      manual: false
+    }
+  ];
+
+  const activeStageId = stages.find((s) => !s.done)?.id ?? null;
+
+  let filterBucket: FilterBucket;
+  if (activeStageId === null) {
+    filterBucket = "completed";
+  } else if (activeStageId === "paid") {
+    // Billed but not yet paid: invoice sent, waiting for payment.
+    filterBucket = "awaiting_payment";
+  } else {
+    // quote / accepted / scheduled / billed (not yet billed) = work in progress.
+    filterBucket = "in_field";
+  }
+
+  return { stages, activeStageId, filterBucket };
 }

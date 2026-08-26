@@ -1,8 +1,18 @@
-import type { QuoteCalculationResult, QuoteFormState } from "@/lib/types";
+import type {
+  QuoteCalculationResult,
+  QuoteFormState,
+  ServiceQuoteCalculationResult
+} from "@/lib/types";
+
+// The calculation snapshot. A new-build quote stores a QuoteCalculationResult;
+// a service-call quote stores a ServiceQuoteCalculationResult. The union keeps
+// the same localStorage slot working for both — callers branch on quote.quoteType
+// to read type-specific fields (baseRate / clientFacingLines are new-build only).
+export type StoredCalculation = QuoteCalculationResult | ServiceQuoteCalculationResult;
 
 export type StoredQuote = {
   quote: QuoteFormState;
-  result: QuoteCalculationResult;
+  result: StoredCalculation;
   savedAt: string;
   // When set, this active quote is tied to an existing Supabase quote row,
   // so saving should update that row instead of inserting a new one.
@@ -13,7 +23,7 @@ const ACTIVE_QUOTE_KEY = "ffe-active-quote";
 
 export function saveActiveQuote(
   quote: QuoteFormState,
-  result: QuoteCalculationResult,
+  result: StoredCalculation,
   savedQuoteId?: string | null
 ) {
   if (typeof window === "undefined") return;

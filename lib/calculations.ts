@@ -4,7 +4,8 @@ import type {
   PricingItem,
   PricingLevel,
   QuoteCalculationResult,
-  QuoteFormState
+  QuoteFormState,
+  ServiceQuoteCalculationResult
 } from "@/lib/types";
 
 const BUILDER_SPEC_RATE_CENTS = 500;
@@ -336,4 +337,29 @@ function sanitizeMoneyCents(value: number): number {
   }
 
   return Math.round(value);
+}
+
+// Compute a service-call quote: the total is simply the sum of the freeform
+// line amounts (no base package, no multipliers, no variance). Each line's
+// amount is entered directly in cents, so there is no unit price and no
+// rounding drift. The lines are echoed back (sanitized) so the preview/PDF
+// and the saved calculation_data snapshot all agree. Pure computation, no
+// Supabase access — safe to call from a client component.
+export function calculateServiceQuote(
+  quote: QuoteFormState
+): ServiceQuoteCalculationResult {
+  const lines = (quote.serviceLines ?? []).map((line) => ({
+    id: line.id,
+    name: line.name.trim(),
+    quantity: sanitizeQuantity(line.quantity),
+    amountCents: sanitizeMoneyCents(line.amountCents),
+    comment: line.comment?.trim() || undefined
+  }));
+
+  const clientQuoteTotalCents = lines.reduce(
+    (sum, line) => sum + line.amountCents,
+    0
+  );
+
+  return { clientQuoteTotalCents, lines };
 }

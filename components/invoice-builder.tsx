@@ -56,9 +56,13 @@ type InvoiceBuilderProps = {
   seedScopeLines: ScopeLine[];
 };
 
+// Service invoices have their own builder (ServiceInvoiceBuilder) and never
+// use this label map, but Record<InvoiceKind, string> requires all three keys,
+// so service is present here for type completeness.
 const KIND_LABEL: Record<InvoiceKind, string> = {
   initial: "Rough-In (Invoice 1)",
-  finish: "Final (Invoice 2)"
+  finish: "Final (Invoice 2)",
+  service: "Service"
 };
 
 export function InvoiceBuilder({

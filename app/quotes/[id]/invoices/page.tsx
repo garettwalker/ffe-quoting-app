@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { InvoiceBuilder } from "@/components/invoice-builder";
+import { ServiceInvoiceBuilder } from "@/components/service-invoice-builder";
 import { InvoicePaidButton } from "@/components/invoice-paid-button";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { DeleteInvoicesButton } from "@/components/delete-invoices-button";
@@ -10,7 +11,7 @@ import {
   invoiceDisplayNumber,
   outstandingCents,
   isPaidInFull,
-  scheduledFinishCents
+  scheduledCents
 } from "@/lib/invoice-calculations";
 import { getEmailHistoryForQuote, receiptsFromHistory } from "@/lib/email-log";
 import { buildPayUrl } from "@/lib/pay-token";
@@ -18,12 +19,14 @@ import { getServerUser } from "@/lib/auth";
 import { CopyPayLinkButton } from "@/components/pay/copy-pay-link-button";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getPricingCatalog } from "@/lib/pricing";
+import { normalizeQuoteType } from "@/lib/types";
 import type {
   InvoiceData,
   InvoiceKind,
   PricingItem,
   QuoteCalculationResult,
-  QuoteFormState
+  QuoteFormState,
+  ServiceQuoteCalculationResult
 } from "@/lib/types";
 
 // Always read the live quote row + invoice data from Supabase (no caching).
@@ -33,14 +36,23 @@ type InvoicePageRow = {
   id: string;
   quote_id: string;
   status: string;
+  quote_type: string | null;
   quote_data: QuoteFormState;
-  calculation_data: QuoteCalculationResult;
+  calculation_data: QuoteCalculationResult | ServiceQuoteCalculationResult;
   invoice_data: InvoiceData | null;
 };
 
 type PageProps = {
   params: { id: string };
 };
+
+// Type guard narrowing the calculation snapshot union. A service-call result
+// carries `lines`; a new-build result carries `clientFacingLines`.
+function isServiceResult(
+  result: QuoteCalculationResult | ServiceQuoteCalculationResult
+): result is ServiceQuoteCalculationResult {
+  return (result as ServiceQuoteCalculationResult).lines !== undefined;
+}
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
@@ -49,7 +61,7 @@ export default async function InvoicingPage({ params }: PageProps) {
     supabase
       .from("quotes")
       .select(
-        "id, quote_id, status, quote_data, calculation_data, invoice_data"
+        "id, quote_id, status, quote_type, quote_data, calculation_data, invoice_data"
       )
       .eq("id", params.id)
       .single(),
@@ -74,8 +86,8 @@ export default async function InvoicingPage({ params }: PageProps) {
       .eq("quote_id", params.id)
       .neq("method", "manual")
       .eq("status", "succeeded"),
-    // Emailed-state of each invoice. A finish invoice that has never been
-    // emailed (and isn't paid) is "scheduled" — not owed yet — so it is
+    // Emailed-state of each invoice. A finish/service invoice that has never
+    // been emailed (and isn't paid) is "scheduled" — not owed yet — so it is
     // excluded from the outstanding balance and keeps the job from reading
     // as paid in full.
     getEmailHistoryForQuote(params.id)
@@ -89,8 +101,14 @@ export default async function InvoicingPage({ params }: PageProps) {
   const quote = row.quote_data;
   const result = row.calculation_data;
   const invoiceData = row.invoice_data;
-  // Emailed-state of each invoice from the email history. A finish that has
-  // never been emailed (and isn't paid) is "scheduled" and not owed yet.
+  const quoteType = normalizeQuoteType(row.quote_type);
+  const isService = quoteType === "service_call";
+  const serviceResult = isService ? (result as ServiceQuoteCalculationResult) : null;
+  const newBuildResult = !isService ? (result as QuoteCalculationResult) : null;
+
+  // Emailed-state of each invoice from the email history. A finish/service
+  // invoice that has never been emailed (and isn't paid) is "scheduled" and
+  // not owed yet.
   const receipts = receiptsFromHistory(emailHistory);
 
   const fullAddress = [
@@ -106,15 +124,20 @@ export default async function InvoicingPage({ params }: PageProps) {
     invoiceData?.invoices.find((invoice) => invoice.kind === "initial") ?? null;
   const finishInvoice =
     invoiceData?.invoices.find((invoice) => invoice.kind === "finish") ?? null;
+  const serviceInvoice =
+    invoiceData?.invoices.find((invoice) => invoice.kind === "service") ?? null;
 
   // Once the rough-in (initial) invoice is paid, it is frozen and edits flow
   // only to the finish invoice (see computeInvoiceAmounts). Used to tailor the
-  // header hint, the aside note, and the invoice-card copy below.
+  // header hint, the aside note, and the invoice-card copy below. New builds
+  // only; service calls have a single invoice.
   const roughInPaid = initialInvoice?.status === "paid";
 
   const contractTotalCents = invoiceData
     ? invoiceData.contractAmountCents
-    : result.clientQuoteTotalCents;
+    : isService
+      ? (serviceResult?.clientQuoteTotalCents ?? 0)
+      : (newBuildResult?.clientQuoteTotalCents ?? 0);
 
   // Guard for "Delete invoices": block when a payment has been recorded (ledger
   // row) or any invoice is flagged paid. Either means real money is tied to
@@ -151,7 +174,7 @@ export default async function InvoicingPage({ params }: PageProps) {
           </Link>
 
           <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
-            Invoicing
+            {isService ? "Service Invoice" : "Invoicing"}
           </p>
           <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
             {quote.projectName || quote.clientName || "Unnamed Client"}
@@ -169,15 +192,15 @@ export default async function InvoicingPage({ params }: PageProps) {
             (() => {
               const paidInFull = isPaidInFull(invoiceData, receipts);
               const owed = outstandingCents(invoiceData, receipts);
-              const finishPending = scheduledFinishCents(invoiceData, receipts);
+              const pending = scheduledCents(invoiceData, receipts);
               return (
                 <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
                   {paidInFull
                     ? "Paid in full"
                     : owed > 0
                       ? `Outstanding: ${formatCurrency(owed)}`
-                      : finishPending > 0
-                        ? `Finish pending: ${formatCurrency(finishPending)}`
+                      : pending > 0
+                        ? `${isService ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
                         : "Paid in full"}
                 </p>
               );
@@ -187,7 +210,7 @@ export default async function InvoicingPage({ params }: PageProps) {
 
         <div className="rounded-xl1 border border-pine/10 bg-whitewarm/75 px-5 py-4 shadow-card">
           <p className="text-xs font-black uppercase tracking-[0.14em] text-clay">
-            {invoiceData ? "Contract Total" : "Quote Total"}
+            {invoiceData ? "Invoice Total" : "Quote Total"}
           </p>
           <p className="font-display text-4xl font-bold tracking-[-0.04em] text-deep-pine">
             {formatCurrency(contractTotalCents)}
@@ -205,79 +228,109 @@ export default async function InvoicingPage({ params }: PageProps) {
       </div>
 
       {/* How invoicing works — full-width note at the top of the page. Lives
-          above the builder so it reads first and no longer eats the side
-          column; the dynamic copy flips when the rough-in is paid and locked. */}
+          above the builder so it reads first. The copy flips for service
+          calls (single invoice, no split) vs new builds. */}
       <div className="mb-8 rounded-xl1 border border-pine/10 bg-whitewarm/80 p-4 shadow-soft">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:gap-4">
           <p className="shrink-0 text-sm font-black uppercase tracking-[0.16em] text-clay">
             How invoicing works
           </p>
           <p className="text-sm font-bold leading-6 text-charcoal/75">
-            {roughInPaid
-              ? "The contract is the sum of the line items. The rough-in invoice is paid and locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Mark the final invoice paid when it is collected."
-              : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Mark each invoice paid as it is collected."}
+            {isService
+              ? "The invoice amount is the sum of the freeform line items. A service call has a single invoice (no rough-in/finish split, no permit fee). Mark it paid when it is collected."
+              : roughInPaid
+                ? "The contract is the sum of the line items. The rough-in invoice is paid and locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Mark the final invoice paid when it is collected."
+                : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Mark each invoice paid as it is collected."}
           </p>
         </div>
       </div>
 
       <div className="min-w-0 space-y-6">
-        <InvoiceBuilder
-          quoteId={row.id}
-          initialInvoiceData={invoiceData}
-          quoteTotalCents={result.clientQuoteTotalCents}
-          pricingItems={catalog.items}
-          // Default unit price for a line added on the invoice = catalog base
-          // price x the quote's pricing-level/contingency multiplier, so an
-          // added line matches the job's pricing level (still editable).
-          clientMultiplier={result.combinedClientMultiplier}
-          seedScopeLines={result.clientFacingLines.map((line) => ({
-            pricingItemId: line.pricingItemId,
-            name: line.name,
-            unitType: line.unitType,
-            quantity: line.quantity,
-            unitPriceCents: line.clientUnitPriceCents,
-            comment: line.comment
-          }))}
-        />
+        {isService ? (
+          <ServiceInvoiceBuilder
+            quoteId={row.id}
+            initialInvoiceData={invoiceData}
+            seedServiceLines={serviceResult?.lines ?? []}
+          />
+        ) : (
+          <InvoiceBuilder
+            quoteId={row.id}
+            initialInvoiceData={invoiceData}
+            quoteTotalCents={newBuildResult?.clientQuoteTotalCents ?? 0}
+            pricingItems={catalog.items}
+            // Default unit price for a line added on the invoice = catalog base
+            // price x the quote's pricing-level/contingency multiplier, so an
+            // added line matches the job's pricing level (still editable).
+            clientMultiplier={newBuildResult?.combinedClientMultiplier ?? 1}
+            seedScopeLines={(newBuildResult?.clientFacingLines ?? []).map((line) => ({
+              pricingItemId: line.pricingItemId,
+              name: line.name,
+              unitType: line.unitType,
+              quantity: line.quantity,
+              unitPriceCents: line.clientUnitPriceCents,
+              comment: line.comment
+            }))}
+          />
+        )}
 
         {invoiceData ? (
           <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
             <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              Current invoices
+              {isService ? "Current invoice" : "Current invoices"}
             </p>
 
             <div className="grid gap-4">
-              {initialInvoice ? (
-                <InvoiceCard
-                  quoteId={row.id}
-                  invoiceData={invoiceData}
-                  kind="initial"
-                  reference={invoiceDisplayNumber(row.quote_id, initialInvoice)}
-                  title="Invoice 1: Rough-In (Initial)"
-                  amountCents={initialInvoice.amountCents}
-                  status={initialInvoice.status}
-                  recordedBy={user?.email ?? ""}
-                  payUrl={buildPayUrl(row.id, "initial")}
-                  markUnpaidBlocked={stripePaidKinds.has("initial")}
-                  markUnpaidBlockedReason={markUnpaidBlockedReason}
-                />
-              ) : null}
+              {isService ? (
+                serviceInvoice ? (
+                  <InvoiceCard
+                    quoteId={row.id}
+                    invoiceData={invoiceData}
+                    kind="service"
+                    reference={invoiceDisplayNumber(row.quote_id, serviceInvoice)}
+                    title="Service Invoice"
+                    amountCents={serviceInvoice.amountCents}
+                    status={serviceInvoice.status}
+                    recordedBy={user?.email ?? ""}
+                    payUrl={buildPayUrl(row.id, "service")}
+                    markUnpaidBlocked={stripePaidKinds.has("service")}
+                    markUnpaidBlockedReason={markUnpaidBlockedReason}
+                  />
+                ) : null
+              ) : (
+                <>
+                  {initialInvoice ? (
+                    <InvoiceCard
+                      quoteId={row.id}
+                      invoiceData={invoiceData}
+                      kind="initial"
+                      reference={invoiceDisplayNumber(row.quote_id, initialInvoice)}
+                      title="Invoice 1: Rough-In (Initial)"
+                      amountCents={initialInvoice.amountCents}
+                      status={initialInvoice.status}
+                      recordedBy={user?.email ?? ""}
+                      payUrl={buildPayUrl(row.id, "initial")}
+                      markUnpaidBlocked={stripePaidKinds.has("initial")}
+                      markUnpaidBlockedReason={markUnpaidBlockedReason}
+                    />
+                  ) : null}
 
-              {finishInvoice ? (
-                <InvoiceCard
-                  quoteId={row.id}
-                  invoiceData={invoiceData}
-                  kind="finish"
-                  reference={invoiceDisplayNumber(row.quote_id, finishInvoice)}
-                  title="Invoice 2: Final"
-                  amountCents={finishInvoice.amountCents}
-                  status={finishInvoice.status}
-                  recordedBy={user?.email ?? ""}
-                  payUrl={buildPayUrl(row.id, "finish")}
-                  markUnpaidBlocked={stripePaidKinds.has("finish")}
-                  markUnpaidBlockedReason={markUnpaidBlockedReason}
-                />
-              ) : null}
+                  {finishInvoice ? (
+                    <InvoiceCard
+                      quoteId={row.id}
+                      invoiceData={invoiceData}
+                      kind="finish"
+                      reference={invoiceDisplayNumber(row.quote_id, finishInvoice)}
+                      title="Invoice 2: Final"
+                      amountCents={finishInvoice.amountCents}
+                      status={finishInvoice.status}
+                      recordedBy={user?.email ?? ""}
+                      payUrl={buildPayUrl(row.id, "finish")}
+                      markUnpaidBlocked={stripePaidKinds.has("finish")}
+                      markUnpaidBlockedReason={markUnpaidBlockedReason}
+                    />
+                  ) : null}
+                </>
+              )}
             </div>
 
             <div className="mt-6 border-t border-pine/10 pt-5">
@@ -290,8 +343,9 @@ export default async function InvoicingPage({ params }: PageProps) {
           </section>
         ) : (
           <section className="rounded-xl2 border border-pine/10 bg-cream p-6 text-sm font-bold text-charcoal/70">
-            No invoices yet. Set up the line items, split, and permit fee
-            above, then click Save Invoices.
+            {isService
+              ? "No invoice yet. Set up the line items above, then click Save Invoice."
+              : "No invoices yet. Set up the line items, split, and permit fee above, then click Save Invoices."}
           </section>
         )}
       </div>

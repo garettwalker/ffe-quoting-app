@@ -5,8 +5,10 @@ import {
   isPaidInFull,
   lifecycleStage,
   outstandingCents,
-  scheduledFinishCents
+  scheduledCents,
+  serviceLifecycleStage
 } from "@/lib/invoice-calculations";
+import { normalizeQuoteType } from "@/lib/types";
 import type { DashboardQuoteRow } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
 import { QuoteStatusButton } from "@/components/quote-status-button";
@@ -24,9 +26,9 @@ export function DashboardQuoteSection({
   description?: string;
   quotes: DashboardQuoteRow[];
   emptyCopy: string;
-  // Per-quote emailed-state of invoices: a not-yet-emailed finish is "scheduled"
-  // (not owed yet). Omitted or a missing id = no emailed finish (legacy). Drives
-  // the card's lifecycle stage and outstanding/pending copy.
+  // Per-quote emailed-state of invoices: a not-yet-emailed finish/service is
+  // "scheduled" (not owed yet). Omitted or a missing id = no emailed invoice
+  // (legacy). Drives the card's lifecycle stage and outstanding/pending copy.
   receiptsById?: Map<string, InvoiceReceipts>;
 }) {
   const receiptsOf = (id: string): InvoiceReceipts | undefined =>
@@ -88,9 +90,22 @@ function QuoteCard({
     .filter(Boolean)
     .join(", ");
 
+  const isService = normalizeQuoteType(quote.quote_type) === "service_call";
+  const stage = isService
+    ? serviceLifecycleStage(quote.status, quote.invoice_data, receipts)
+    : lifecycleStage(quote.status, quote.invoice_data, receipts);
+
   const paidInFull = isPaidInFull(quote.invoice_data, receipts);
   const owed = outstandingCents(quote.invoice_data, receipts);
-  const finishPending = scheduledFinishCents(quote.invoice_data, receipts);
+  const pending = scheduledCents(quote.invoice_data, receipts);
+
+  // The accepted-stage money summary reads on both new-build accepted and
+  // service accepted/scheduled (the single invoice may be set up but not yet
+  // emailed = "scheduled" / not owed).
+  const showMoneySummary =
+    isService
+      ? quote.status === "accepted" || quote.status === "scheduled"
+      : quote.status === "accepted";
 
   return (
     <div className="rounded-xl1 border border-pine/10 bg-cream p-4">
@@ -98,9 +113,7 @@ function QuoteCard({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{quote.quote_id}</span>
-            <StatusBadge
-              stage={lifecycleStage(quote.status, quote.invoice_data, receipts)}
-            />
+            <StatusBadge stage={stage} />
           </div>
           <p className="mt-1 font-bold text-charcoal">
             {quote.project_name || quote.client_name}
@@ -110,19 +123,19 @@ function QuoteCard({
           ) : null}
           <p className="text-sm text-charcoal/70">{address}</p>
 
-          {quote.status === "accepted" && quote.invoice_data ? (
+          {showMoneySummary && quote.invoice_data ? (
             <p
               className={`mt-1 text-sm font-black ${
                 paidInFull ? "text-deep-pine" : "text-clay"
               }`}
             >
               {paidInFull
-                ? "Invoices paid in full"
+                ? "Invoice paid in full"
                 : owed > 0
                   ? `Outstanding: ${formatCurrency(owed)}`
-                  : finishPending > 0
-                    ? `Finish pending: ${formatCurrency(finishPending)}`
-                    : "Invoices paid in full"}
+                  : pending > 0
+                    ? `${isService ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
+                    : "Invoice paid in full"}
             </p>
           ) : null}
         </div>
@@ -133,13 +146,19 @@ function QuoteCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <CardActions quote={quote} />
+        <CardActions quote={quote} isService={isService} />
       </div>
     </div>
   );
 }
 
-function CardActions({ quote }: { quote: DashboardQuoteRow }) {
+function CardActions({
+  quote,
+  isService
+}: {
+  quote: DashboardQuoteRow;
+  isService: boolean;
+}) {
   const openLink = (
     <Link
       href={`/quotes/${quote.id}`}
@@ -158,7 +177,9 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
     </Link>
   );
 
-  const summaryLink = (
+  // Summary quote is new-build-only (category subtotals). Service calls have no
+  // categories, so the link is hidden and the route guards against them too.
+  const summaryLink = isService ? null : (
     <Link
       href={`/quotes/${quote.id}/summary`}
       className="rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
@@ -173,6 +194,15 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
       className="rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
     >
       Continue
+    </Link>
+  );
+
+  const invoicingLink = (
+    <Link
+      href={`/quotes/${quote.id}/invoices`}
+      className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
+    >
+      Invoicing
     </Link>
   );
 
@@ -209,17 +239,13 @@ function CardActions({ quote }: { quote: DashboardQuoteRow }) {
     );
   }
 
+  // accepted / scheduled (service) / paid-in-full
   return (
     <>
       {openLink}
       {printLink}
       {summaryLink}
-      <Link
-        href={`/quotes/${quote.id}/invoices`}
-        className="rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card hover:bg-deep-pine"
-      >
-        Invoicing
-      </Link>
+      {invoicingLink}
     </>
   );
 }

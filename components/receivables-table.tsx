@@ -121,14 +121,14 @@ export function ReceivablesTable({ jobs }: ReceivablesTableProps) {
       const pending = sortJobs(
         filtered.filter(
           (job) =>
-            job.totalOutstandingCents > 0 || job.scheduledFinishCents > 0
+            job.totalOutstandingCents > 0 || job.scheduledCents > 0
         ),
         sort
       );
       const historical = sortJobs(
         filtered.filter(
           (job) =>
-            job.totalOutstandingCents === 0 && job.scheduledFinishCents === 0
+            job.totalOutstandingCents === 0 && job.scheduledCents === 0
         ),
         sort
       );
@@ -285,6 +285,7 @@ function ReceivablesSection({
 }
 
 function JobRow({ job }: { job: ReceivableJob }) {
+  const isService = job.quoteType === "service_call";
   return (
     <tr className="border-b border-pine/10 align-top">
       <td className="py-4 pr-4">
@@ -301,14 +302,27 @@ function JobRow({ job }: { job: ReceivableJob }) {
         {job.projectType ? (
           <p className="text-xs font-bold text-charcoal/50">{job.projectType}</p>
         ) : null}
+        {isService ? (
+          <span className="mt-1 inline-block rounded-full bg-moss/12 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-moss">
+            Service call
+          </span>
+        ) : null}
       </td>
 
       <td className="py-4 pr-4">
-        <InvoiceCell invoice={job.initial} label="Rough-in" />
+        <InvoiceCell
+          invoice={job.initial}
+          label={isService ? "Service" : "Rough-in"}
+          caption={isService ? "Service" : undefined}
+        />
       </td>
 
       <td className="py-4 pr-4">
-        <InvoiceCell invoice={job.finish} label="Finish" />
+        {isService ? (
+          <span className="text-sm font-bold text-charcoal/40">N/A</span>
+        ) : (
+          <InvoiceCell invoice={job.finish} label="Finish" />
+        )}
       </td>
 
       <td className="py-4 pr-4">
@@ -341,20 +355,27 @@ function JobRow({ job }: { job: ReceivableJob }) {
 
 function InvoiceCell({
   invoice,
-  label
+  label,
+  caption
 }: {
   invoice: ReceivableJob["initial"];
   label: string;
+  caption?: string;
 }) {
   if (!invoice) {
     return <span className="text-sm font-bold text-charcoal/40">N/A</span>;
   }
 
-  // A scheduled finish (not yet emailed / not paid): show the amount but mark
-  // it as not yet billed, and do NOT show an "owed" figure (it isn't due yet).
+  // A scheduled finish/service (not yet emailed / not paid): show the amount but
+  // mark it as not yet billed, and do NOT show an "owed" figure (it isn't due).
   if (!invoice.receivable) {
     return (
       <div className="min-w-[140px]">
+        {caption ? (
+          <p className="text-[10px] font-black uppercase tracking-[0.08em] text-clay">
+            {caption}
+          </p>
+        ) : null}
         <p className="text-xs font-bold tabular-nums text-charcoal/45">{invoice.reference}</p>
         <p className="mt-0.5 font-bold text-charcoal/55">{formatCurrency(invoice.amountCents)}</p>
         <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -370,6 +391,11 @@ function InvoiceCell({
 
   return (
     <div className="min-w-[140px]">
+      {caption ? (
+        <p className="text-[10px] font-black uppercase tracking-[0.08em] text-clay">
+          {caption}
+        </p>
+      ) : null}
       <p className="text-xs font-bold tabular-nums text-charcoal/45">{invoice.reference}</p>
       <p className="mt-0.5 font-bold text-charcoal">{formatCurrency(invoice.amountCents)}</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">

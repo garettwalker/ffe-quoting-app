@@ -163,7 +163,7 @@ export async function getCustomerQuotes(
   // emailed finish is "scheduled" (excluded from Invoiced/Paid) exactly as in AR.
   const receiptsMap = await loadInvoiceReceipts(rows.map((row) => row.id));
   return rows.map((row) => {
-    const receipts = receiptsMap.get(row.id) ?? { initial: null, finish: null };
+    const receipts = receiptsMap.get(row.id) ?? { initial: null, finish: null, service: null };
     const money = computeQuoteMoney(
       row.client_quote_total_cents,
       row.invoice_data,
@@ -246,7 +246,7 @@ export async function getCustomerMoney(): Promise<{
   const receiptsMap = await loadInvoiceReceipts(rows.map((row) => row.id));
   for (const row of rows) {
     if (!row.customer_id) continue;
-    const receipts = receiptsMap.get(row.id) ?? { initial: null, finish: null };
+    const receipts = receiptsMap.get(row.id) ?? { initial: null, finish: null, service: null };
     const money = computeQuoteMoney(
       row.client_quote_total_cents,
       row.invoice_data,
