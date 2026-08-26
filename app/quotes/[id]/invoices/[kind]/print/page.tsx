@@ -122,6 +122,9 @@ async function NewBuildInvoicePrintPage({
             {pdfProps.clientEmail ? (
               <p className="text-sm text-charcoal/70">{pdfProps.clientEmail}</p>
             ) : null}
+            {pdfProps.clientPhone ? (
+              <p className="text-sm text-charcoal/70">{pdfProps.clientPhone}</p>
+            ) : null}
           </div>
 
           <div>
@@ -297,6 +300,9 @@ async function ServiceInvoicePrintPage({
             <p className="font-black text-deep-pine">{pdfProps.clientName}</p>
             {pdfProps.clientEmail ? (
               <p className="text-sm text-charcoal/70">{pdfProps.clientEmail}</p>
+            ) : null}
+            {pdfProps.clientPhone ? (
+              <p className="text-sm text-charcoal/70">{pdfProps.clientPhone}</p>
             ) : null}
           </div>
 

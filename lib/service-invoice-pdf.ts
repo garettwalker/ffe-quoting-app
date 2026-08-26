@@ -112,6 +112,7 @@ export async function loadServiceInvoicePdfInput(
     title: "Service Invoice",
     clientName: quote.clientName,
     clientEmail: quote.clientEmail,
+    clientPhone: quote.clientPhone ?? "",
     projectName: quote.projectName ?? "",
     fullAddress,
     projectType: quote.projectType,

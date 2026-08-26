@@ -38,6 +38,7 @@ function createDraftServiceQuote(): QuoteFormState {
     quoteType: "service_call",
     clientName: "",
     clientEmail: "",
+    clientPhone: "",
     projectName: "",
     projectStreet: "",
     projectCity: "",
@@ -155,7 +156,8 @@ export function ServiceQuoteBuilder({
       ...current,
       clientName: customer.name,
       customerId: customer.id,
-      clientEmail: customer.emails[0]?.email ?? current.clientEmail
+      clientEmail: customer.emails[0]?.email ?? current.clientEmail,
+      clientPhone: customer.phone ?? current.clientPhone
     }));
   }
 
@@ -165,7 +167,8 @@ export function ServiceQuoteBuilder({
     setQuote((current) => ({
       ...current,
       clientName: customer.name,
-      customerId: customer.id
+      customerId: customer.id,
+      clientPhone: customer.phone ?? current.clientPhone
     }));
   }
 
@@ -480,6 +483,18 @@ export function ServiceQuoteBuilder({
                   ))}
                 </datalist>
               ) : null}
+            </Field>
+
+            <Field label="Builder / Customer Phone">
+              <input
+                type="tel"
+                value={quote.clientPhone ?? ""}
+                onChange={(event) =>
+                  updateQuote("clientPhone", event.target.value)
+                }
+                placeholder="Optional phone number"
+                className="form-input"
+              />
             </Field>
 
             <Field label="Address">

@@ -371,6 +371,11 @@ export type QuoteFormState = {
   quoteType: QuoteType;
   clientName: string;
   clientEmail: string;
+  // The paying party's phone number. A point-in-time snapshot like clientName
+  // / clientEmail — autofilled from the linked customer's `phone` when one is
+  // picked, editable on the form. Optional: old quotes predate the field and
+  // leave it blank (every surface renders it only when present, like email).
+  clientPhone?: string;
   // The linked customer record id (public.customers.id). The quote keeps its
   // own client_name / client_email snapshot; this is just the link used for
   // autofill and the repository view. Optional: backfilled quotes carry it on

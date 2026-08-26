@@ -70,6 +70,7 @@ export async function loadDetailedQuotePdfInput(
     quoteDateLabel,
     clientName: quote.clientName,
     clientEmail: quote.clientEmail,
+    clientPhone: quote.clientPhone ?? "",
     projectName: quote.projectName ?? "",
     fullAddress,
     projectType: quote.projectType,

@@ -301,6 +301,7 @@ type InfoGridProps = {
   leftLabel: string;
   leftPrimary: string;
   leftSecondary?: string;
+  leftTertiary?: string;
   rightLabel: string;
   rightPrimary: string;
   rightSecondary?: string;
@@ -310,6 +311,7 @@ export function PdfInfoGrid({
   leftLabel,
   leftPrimary,
   leftSecondary,
+  leftTertiary,
   rightLabel,
   rightPrimary,
   rightSecondary
@@ -320,6 +322,7 @@ export function PdfInfoGrid({
         <Text style={styles.label}>{leftLabel}</Text>
         <Text style={styles.infoPrimary}>{leftPrimary}</Text>
         {leftSecondary ? <Text style={styles.infoSecondary}>{leftSecondary}</Text> : null}
+        {leftTertiary ? <Text style={styles.infoSecondary}>{leftTertiary}</Text> : null}
       </View>
       <View style={styles.infoColRight}>
         <Text style={styles.label}>{rightLabel}</Text>

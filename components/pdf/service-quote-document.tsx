@@ -26,6 +26,7 @@ export type ServiceQuotePdfProps = {
   quoteDateLabel: string;
   clientName: string;
   clientEmail: string;
+  clientPhone: string;
   projectName: string;
   fullAddress: string;
   projectType: string;
@@ -43,6 +44,7 @@ export function ServiceQuotePdfDocument(props: ServiceQuotePdfProps) {
     quoteDateLabel,
     clientName,
     clientEmail,
+    clientPhone,
     projectName,
     fullAddress,
     projectType,
@@ -70,6 +72,7 @@ export function ServiceQuotePdfDocument(props: ServiceQuotePdfProps) {
           leftLabel="PREPARED FOR"
           leftPrimary={clientName}
           leftSecondary={clientEmail || undefined}
+          leftTertiary={clientPhone || undefined}
           rightLabel="PROJECT"
           rightPrimary={projectName || fullAddress}
           rightSecondary={

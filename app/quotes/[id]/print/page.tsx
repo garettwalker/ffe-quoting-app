@@ -115,6 +115,9 @@ async function NewBuildQuotePrintPage({ id }: { id: string }) {
             {quote.clientEmail ? (
               <p className="text-sm text-charcoal/70">{quote.clientEmail}</p>
             ) : null}
+            {quote.clientPhone ? (
+              <p className="text-sm text-charcoal/70">{quote.clientPhone}</p>
+            ) : null}
           </div>
 
           <div>
@@ -285,6 +288,9 @@ async function ServiceQuotePrintPage({ id }: { id: string }) {
             <p className="font-black text-deep-pine">{quote.clientName}</p>
             {quote.clientEmail ? (
               <p className="text-sm text-charcoal/70">{quote.clientEmail}</p>
+            ) : null}
+            {quote.clientPhone ? (
+              <p className="text-sm text-charcoal/70">{quote.clientPhone}</p>
             ) : null}
           </div>
 

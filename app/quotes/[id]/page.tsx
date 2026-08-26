@@ -223,6 +223,10 @@ export default async function SavedQuotePage({ params }: PageProps) {
               label="Builder / Customer Email"
               value={quote.clientEmail || "Not entered"}
             />
+            <ReviewField
+              label="Builder / Customer Phone"
+              value={quote.clientPhone || "Not entered"}
+            />
             <ReviewField label="Project Address" value={fullAddress} />
             <ReviewField label="Project Type" value={quote.projectType} />
             {isService ? null : (

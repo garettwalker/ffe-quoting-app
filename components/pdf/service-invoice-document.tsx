@@ -29,6 +29,7 @@ export type ServiceInvoicePdfProps = {
   title: string; // "Service Invoice"
   clientName: string;
   clientEmail: string;
+  clientPhone: string;
   projectName: string; // residence / site name, "" when not set
   fullAddress: string;
   projectType: string;
@@ -47,6 +48,7 @@ export function ServiceInvoicePdfDocument(props: ServiceInvoicePdfProps) {
     title,
     clientName,
     clientEmail,
+    clientPhone,
     projectName,
     fullAddress,
     projectType,
@@ -74,6 +76,7 @@ export function ServiceInvoicePdfDocument(props: ServiceInvoicePdfProps) {
           leftLabel="BILL TO"
           leftPrimary={clientName}
           leftSecondary={clientEmail || undefined}
+          leftTertiary={clientPhone || undefined}
           rightLabel="PROJECT"
           rightPrimary={projectName || fullAddress}
           rightSecondary={

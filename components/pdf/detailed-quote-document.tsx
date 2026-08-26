@@ -15,6 +15,7 @@ export type DetailedQuotePdfProps = {
   quoteDateLabel: string; // long form, e.g. "June 18, 2026"
   clientName: string;
   clientEmail: string;
+  clientPhone: string;
   projectName: string; // residence / site name, "" when not set
   fullAddress: string; // pre-joined street/city/state/zip
   projectType: string;
@@ -255,6 +256,7 @@ export function DetailedQuotePdfDocument(props: DetailedQuotePdfProps) {
     quoteDateLabel,
     clientName,
     clientEmail,
+    clientPhone,
     projectName,
     fullAddress,
     projectType,
@@ -295,6 +297,7 @@ export function DetailedQuotePdfDocument(props: DetailedQuotePdfProps) {
             <Text style={styles.label}>PREPARED FOR</Text>
             <Text style={styles.infoPrimary}>{clientName}</Text>
             {clientEmail ? <Text style={styles.infoSecondary}>{clientEmail}</Text> : null}
+            {clientPhone ? <Text style={styles.infoSecondary}>{clientPhone}</Text> : null}
           </View>
           <View style={styles.infoColRight}>
             <Text style={styles.label}>PROJECT</Text>

@@ -37,6 +37,7 @@ function createDraftQuote(): QuoteFormState {
     quoteType: "new_build",
     clientName: "",
     clientEmail: "",
+    clientPhone: "",
     projectName: "",
     projectStreet: "",
     projectCity: "",
@@ -246,7 +247,10 @@ export function QuoteBuilder({
       customerId: customer.id,
       // Prefill the contact email with the customer's primary email. Keep an
       // email the owner already typed when the customer has none on file.
-      clientEmail: customer.emails[0]?.email ?? current.clientEmail
+      clientEmail: customer.emails[0]?.email ?? current.clientEmail,
+      // Prefill the phone from the linked customer record (same snapshot rule
+      // as email; keep an owner-typed value when the customer has none).
+      clientPhone: customer.phone ?? current.clientPhone
     }));
   }
 
@@ -256,7 +260,8 @@ export function QuoteBuilder({
     setQuote((current) => ({
       ...current,
       clientName: customer.name,
-      customerId: customer.id
+      customerId: customer.id,
+      clientPhone: customer.phone ?? current.clientPhone
     }));
   }
 
@@ -615,6 +620,18 @@ export function QuoteBuilder({
                   ))}
                 </datalist>
               ) : null}
+            </Field>
+
+            <Field label="Builder / Customer Phone">
+              <input
+                type="tel"
+                value={quote.clientPhone ?? ""}
+                onChange={(event) =>
+                  updateQuote("clientPhone", event.target.value)
+                }
+                placeholder="Optional phone number"
+                className="form-input"
+              />
             </Field>
 
             <Field label="Address">
