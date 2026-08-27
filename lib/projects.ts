@@ -233,10 +233,14 @@ export function todayDateOnly(): string {
 // Service calls get a SIMPLER 5-stage strip (Quote / Accepted / Scheduled /
 // Billed / Paid) instead of the 8-stage new-build strip. Only "Scheduled" is a
 // manual action (a status write to "scheduled"); the rest are derived from
-// quote status + the single service invoice + its email-log receipt, so this
-// view can never disagree with /quotes or /receivables. "Billed" = the service
-// invoice was emailed (a sent email_log row) OR collected (marked paid), the
-// same rule as the new-build billed stages.
+// quote status + the invoice records + their email-log receipts, so this view
+// can never disagree with /quotes or /receivables. A service call is either
+// UNSPLIT (a single "service" invoice) or SPLIT (a "initial" deposit + a
+// "finish" final); "Billed" lights up when ANY invoice is emailed (a sent
+// email_log row for its kind) OR collected (marked paid), and "Paid" lights up
+// when the job is paid in full (every invoice paid, none still scheduled) —
+// the same rules as the new-build billed stages, generalized over the invoice
+// list so both shapes share one path.
 
 export type ServiceStageId =
   | "quote"
@@ -266,26 +270,43 @@ type ServiceComputeArgs = {
   receipts: InvoiceReceipts;
 };
 
-function findServiceInvoice(data: InvoiceData): InvoiceRecord | null {
-  return data.invoices.find((inv) => inv.kind === "service") ?? null;
-}
-
 export function computeServiceCallStages(
   args: ServiceComputeArgs
 ): ServiceProjectStages {
   const { createdAt, status, invoiceData, receipts } = args;
 
-  const serviceInvoice = invoiceData ? findServiceInvoice(invoiceData) : null;
-  const emailedAt = receipts.service;
-  const servicePaid = serviceInvoice?.status === "paid";
+  const invoices = invoiceData?.invoices ?? [];
 
-  // Billed = service invoice emailed OR paid. Date prefers the emailed
-  // timestamp, falling back to the paid timestamp.
-  const billedDone = Boolean(emailedAt) || servicePaid;
-  const billedDate = emailedAt ?? (servicePaid ? serviceInvoice?.paidAt ?? null : null);
+  // Per-invoice billed facts: an invoice is "billed" when it has been emailed
+  // (a sent email_log row for its kind) OR collected (marked paid). The billed
+  // stage is done when ANY invoice is billed; its date is the earliest billed
+  // date across all invoices (emailed timestamp preferred, else paid timestamp).
+  const billedFacts = invoices.map((inv) => {
+    const emailedAt = receipts[inv.kind];
+    const paid = inv.status === "paid";
+    return {
+      done: Boolean(emailedAt) || paid,
+      date: emailedAt ?? (paid ? inv.paidAt ?? null : null)
+    };
+  });
+  const billedDone = billedFacts.some((f) => f.done);
+  const billedDate =
+    billedFacts
+      .filter((f) => f.done && f.date)
+      .map((f) => f.date as string)
+      .sort()[0] ?? null;
 
   const paidDone = isPaidInFull(invoiceData, receipts);
-  const paidDate = serviceInvoice?.paidAt ?? null;
+  // Paid date = the latest paidAt across paid invoices. An unsplit service call
+  // has one, so this is its paidAt; a split service call is paid in full only
+  // when both deposit and final are paid, and the latest paidAt is when that
+  // completed.
+  const paidDate =
+    invoices
+      .filter((inv) => inv.status === "paid" && inv.paidAt)
+      .map((inv) => inv.paidAt as string)
+      .sort()
+      .reverse()[0] ?? null;
 
   // Accepted/Scheduled are status-derived. Paid is NOT a stored status (it is
   // derived from the invoice being paid in full below), so a paid service call

@@ -5,6 +5,7 @@ import { formatCurrency } from "@/lib/currency";
 import { findInvoice, invoiceDisplayNumber } from "@/lib/invoice-calculations";
 import { ACH_LIMIT_CENTS } from "@/lib/payments";
 import { verifyPayToken } from "@/lib/pay-token";
+import { normalizeQuoteType } from "@/lib/types";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
 import { PayButton } from "@/components/pay/pay-button";
 
@@ -18,6 +19,7 @@ import { PayButton } from "@/components/pay/pay-button";
 type QuoteRow = {
   id: string;
   quote_id: string;
+  quote_type: string | null;
   quote_data: QuoteFormState;
   invoice_data: InvoiceData | null;
 };
@@ -39,7 +41,7 @@ export default async function PayPage({ params }: PageProps) {
   const [quoteResult, settings] = await Promise.all([
     supabase
       .from("quotes")
-      .select("id, quote_id, quote_data, invoice_data")
+      .select("id, quote_id, quote_type, quote_data, invoice_data")
       .eq("id", verified.quoteUuid)
       .single(),
     getSettings()
@@ -89,8 +91,17 @@ export default async function PayPage({ params }: PageProps) {
     );
   }
 
-  const title =
-    verified.kind === "initial"
+  // Title for the invoice line. A service call relabels the kinds to its
+  // deposit/final/service vocabulary; a new build keeps the rough-in/finish
+  // labels.
+  const isService = normalizeQuoteType(row.quote_type) === "service_call";
+  const title = isService
+    ? verified.kind === "initial"
+      ? "Deposit Invoice"
+      : verified.kind === "service"
+        ? "Service Invoice"
+        : "Final Invoice"
+    : verified.kind === "initial"
       ? "Invoice 1: Rough-In (Initial)"
       : verified.kind === "service"
         ? "Service Invoice"

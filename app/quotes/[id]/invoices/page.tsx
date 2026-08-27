@@ -9,6 +9,7 @@ import { DeleteInvoicesButton } from "@/components/delete-invoices-button";
 import { formatCurrency } from "@/lib/currency";
 import {
   invoiceDisplayNumber,
+  isUnsplitServiceCall,
   outstandingCents,
   isPaidInFull,
   scheduledCents
@@ -103,6 +104,11 @@ export default async function InvoicingPage({ params }: PageProps) {
   const invoiceData = row.invoice_data;
   const quoteType = normalizeQuoteType(row.quote_type);
   const isService = quoteType === "service_call";
+  // A service call is either UNSPLIT (single kind "service" invoice, the
+  // original model) or SPLIT (kind "initial" deposit + kind "finish" final,
+  // reusing the new-build two-invoice machinery). The split renders two invoice
+  // cards (Deposit / Final) like a new build; the unsplit renders one.
+  const unsplitService = isService && isUnsplitServiceCall(invoiceData);
   const serviceResult = isService ? (result as ServiceQuoteCalculationResult) : null;
   const newBuildResult = !isService ? (result as QuoteCalculationResult) : null;
 
@@ -127,10 +133,11 @@ export default async function InvoicingPage({ params }: PageProps) {
   const serviceInvoice =
     invoiceData?.invoices.find((invoice) => invoice.kind === "service") ?? null;
 
-  // Once the rough-in (initial) invoice is paid, it is frozen and edits flow
-  // only to the finish invoice (see computeInvoiceAmounts). Used to tailor the
-  // header hint, the aside note, and the invoice-card copy below. New builds
-  // only; service calls have a single invoice.
+  // Once the initial invoice (rough-in for a new build, deposit for a split
+  // service call) is paid, it is frozen and edits flow only to the finish
+  // invoice (see computeInvoiceAmounts). Used to tailor the header hint, the
+  // aside note, and the invoice-card copy below. An unsplit service call has no
+  // initial invoice, so this is false for it.
   const roughInPaid = initialInvoice?.status === "paid";
 
   const contractTotalCents = invoiceData
@@ -220,8 +227,9 @@ export default async function InvoicingPage({ params }: PageProps) {
           </p>
           {roughInPaid ? (
             <p className="mt-2 text-xs font-bold leading-5 text-clay">
-              Rough-in is paid. Changes to line items apply to the final invoice
-              only.
+              {isService
+                ? "Deposit is paid. Changes to line items apply to the final invoice only."
+                : "Rough-in is paid. Changes to line items apply to the final invoice only."}
             </p>
           ) : null}
         </div>
@@ -237,7 +245,11 @@ export default async function InvoicingPage({ params }: PageProps) {
           </p>
           <p className="text-sm font-bold leading-6 text-charcoal/75">
             {isService
-              ? "The invoice amount is the sum of the freeform line items. A service call has a single invoice (no rough-in/finish split, no permit fee). Mark it paid when it is collected."
+              ? unsplitService
+                ? "The invoice amount is the sum of the freeform line items. A service call has a single invoice (no rough-in/finish split, no permit fee). Mark it paid when it is collected."
+                : roughInPaid
+                  ? "The contract is the sum of the freeform line items. The deposit invoice is paid and locked, so any change to the line items adjusts the final invoice only. Mark the final invoice paid when it is collected."
+                  : "The contract is the sum of the freeform line items. The deposit invoice is the deposit percent of that contract; the final invoice is the remainder. Mark each invoice paid as it is collected."
               : roughInPaid
                 ? "The contract is the sum of the line items. The rough-in invoice is paid and locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Mark the final invoice paid when it is collected."
                 : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Mark each invoice paid as it is collected."}
@@ -276,11 +288,11 @@ export default async function InvoicingPage({ params }: PageProps) {
         {invoiceData ? (
           <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
             <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              {isService ? "Current invoice" : "Current invoices"}
+              {isService && unsplitService ? "Current invoice" : "Current invoices"}
             </p>
 
             <div className="grid gap-4">
-              {isService ? (
+              {isService && unsplitService ? (
                 serviceInvoice ? (
                   <InvoiceCard
                     quoteId={row.id}
@@ -304,7 +316,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                       invoiceData={invoiceData}
                       kind="initial"
                       reference={invoiceDisplayNumber(row.quote_id, initialInvoice)}
-                      title="Invoice 1: Rough-In (Initial)"
+                      title={isService ? "Deposit Invoice" : "Invoice 1: Rough-In (Initial)"}
                       amountCents={initialInvoice.amountCents}
                       status={initialInvoice.status}
                       recordedBy={user?.email ?? ""}
@@ -320,7 +332,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                       invoiceData={invoiceData}
                       kind="finish"
                       reference={invoiceDisplayNumber(row.quote_id, finishInvoice)}
-                      title="Invoice 2: Final"
+                      title={isService ? "Final Invoice" : "Invoice 2: Final"}
                       amountCents={finishInvoice.amountCents}
                       status={finishInvoice.status}
                       recordedBy={user?.email ?? ""}
@@ -344,7 +356,7 @@ export default async function InvoicingPage({ params }: PageProps) {
         ) : (
           <section className="rounded-xl2 border border-pine/10 bg-cream p-6 text-sm font-bold text-charcoal/70">
             {isService
-              ? "No invoice yet. Set up the line items above, then click Save Invoice."
+              ? "No invoice yet. Set up the line items above (and toggle the deposit/final split if you want two invoices), then click Save."
               : "No invoices yet. Set up the line items, split, and permit fee above, then click Save Invoices."}
           </section>
         )}

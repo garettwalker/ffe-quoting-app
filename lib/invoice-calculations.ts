@@ -11,12 +11,33 @@ import type { InvoiceReceipts } from "@/lib/email-log";
 
 // All money here is integer cents, matching lib/currency.ts.
 
+// A service-call invoice setup comes in two shapes, detected by which invoice
+// kinds are present (not by quoteType alone, since a split service call reuses
+// the new-build initial/finish kinds):
+//   - UNSPLIT: a single kind "service" invoice (due on completion). The
+//     original service-call model, preserved for quick jobs (troubleshoot, a
+//     small repair) and for every service quote saved before the split option
+//     existed.
+//   - SPLIT: kind "initial" (deposit) + kind "finish" (final), reusing the
+//     new-build two-invoice machinery (a % split of the contract, no permit,
+//     paid-deposit freeze). Lets Chad bill 50% up front / 50% at finish on a
+//     remodel sized like a service call.
+export function isUnsplitServiceCall(data: InvoiceData | null): boolean {
+  return (
+    data?.quoteType === "service_call" &&
+    Array.isArray(data.invoices) &&
+    data.invoices.some((invoice) => invoice.kind === "service")
+  );
+}
+
 // Build the default invoice setup for a freshly accepted quote.
 // New build: contract = quote total, 50/50 split, no permit fee, two invoices
 // (initial + finish) unpaid and not yet issued.
 // Service call: contract = quote total, ONE invoice (kind "service") unpaid,
 // no split, no permit. The service-invoice-builder fills in the freeform lines
-// and the invoice amount; this just lays down the empty shell.
+// and the invoice amount; this just lays down the empty shell. (A split service
+// call is NOT built here — the owner toggles it in the builder, which then
+// writes initial + finish records instead of this single service shell.)
 export function defaultInvoiceData(
   quoteTotalCents: number,
   quoteType: QuoteType = "new_build"
@@ -75,10 +96,15 @@ export type InvoiceAmounts = {
 export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
   const contract = Math.max(0, Math.round(data.contractAmountCents));
 
-  // Service call: a single invoice, no split, no permit, no paid-rough-in freeze.
-  // Early-return BEFORE the new-build freeze path so that logic never runs on a
-  // service record. The whole contract is invoiced on the one "service" record.
-  if (data.quoteType === "service_call") {
+  // UNSPLIT service call: a single kind "service" invoice, no split, no
+  // permit, no paid-deposit freeze. Early-return BEFORE the new-build freeze
+  // path so that logic never runs on an unsplit service record. The whole
+  // contract is invoiced on the one "service" record.
+  // (A SPLIT service call — kind "initial" + "finish" — intentionally does NOT
+  // early-return here; it falls through to the existing two-invoice split path
+  // below, with permit 0 and the paid-deposit freeze, reusing the new-build
+  // machinery for deposit/final billing.)
+  if (isUnsplitServiceCall(data)) {
     return {
       roughInAmountCents: 0,
       finishAmountCents: 0,

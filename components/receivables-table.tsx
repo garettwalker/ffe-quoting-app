@@ -286,6 +286,9 @@ function ReceivablesSection({
 
 function JobRow({ job }: { job: ReceivableJob }) {
   const isService = job.quoteType === "service_call";
+  // A split service call (deposit + final) fills both columns like a new
+  // build; an unsplit service call fills only the primary column (Finish = N/A).
+  const isSplitService = isService && job.finish != null;
   return (
     <tr className="border-b border-pine/10 align-top">
       <td className="py-4 pr-4">
@@ -312,16 +315,20 @@ function JobRow({ job }: { job: ReceivableJob }) {
       <td className="py-4 pr-4">
         <InvoiceCell
           invoice={job.initial}
-          label={isService ? "Service" : "Rough-in"}
-          caption={isService ? "Service" : undefined}
+          label={isSplitService ? "Deposit" : isService ? "Service" : "Rough-in"}
+          caption={isService ? (isSplitService ? "Deposit" : "Service") : undefined}
         />
       </td>
 
       <td className="py-4 pr-4">
-        {isService ? (
+        {isService && !isSplitService ? (
           <span className="text-sm font-bold text-charcoal/40">N/A</span>
         ) : (
-          <InvoiceCell invoice={job.finish} label="Finish" />
+          <InvoiceCell
+            invoice={job.finish}
+            label={isSplitService ? "Final" : "Finish"}
+            caption={isSplitService ? "Final" : undefined}
+          />
         )}
       </td>
 

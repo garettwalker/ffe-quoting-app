@@ -7,6 +7,7 @@ import {
   invoiceDisplayNumber,
   invoiceOutstandingCents,
   isPaidInFull,
+  isUnsplitServiceCall,
   outstandingCents,
   receivableInvoicedCents,
   scheduledCents
@@ -87,13 +88,14 @@ function buildReceivableJob(
     };
   };
 
-  // A service call has a single "service" invoice. Render it in the primary
-  // (initial) column slot with finish = null; the table relabels the column
-  // inline for service rows. A new build uses the initial + finish pair.
-  const initial = toReceivableInvoice(
-    quoteType === "service_call" ? "service" : "initial"
-  );
-  const finish = quoteType === "service_call" ? null : toReceivableInvoice("finish");
+  // A service call is either UNSPLIT (a single "service" invoice, rendered in
+  // the primary column slot with finish = null) or SPLIT (a deposit "initial" +
+  // a final "finish", rendered like a new build in both columns). A new build
+  // always uses the initial + finish pair. The table relabels the columns
+  // inline for service rows.
+  const unsplit = quoteType === "service_call" && isUnsplitServiceCall(data);
+  const initial = toReceivableInvoice(unsplit ? "service" : "initial");
+  const finish = unsplit ? null : toReceivableInvoice("finish");
 
   // Only receivable (billed) invoices count toward AR totals. A scheduled
   // finish (new build) or a scheduled service invoice (service call) is

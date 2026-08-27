@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PdfActionBar } from "@/components/pdf/pdf-action-bar";
 import { getCustomerEmailsForQuote } from "@/lib/customers";
 import { loadInvoicePdfInput } from "@/lib/invoice-pdf";
+import { fetchQuoteType } from "@/lib/service-quote-pdf";
 import { loadServiceInvoicePdfInput } from "@/lib/service-invoice-pdf";
 import { buildEmailDefaults, type InvoiceKind } from "@/lib/send-pdf-email";
 
@@ -13,16 +14,25 @@ type PageProps = {
 // Always read the live business info / payment terms from Supabase.
 export const dynamic = "force-dynamic";
 
-// Printable invoice (initial, finish, or service). The on-screen section
-// below is a preview of the downloaded PDF; both render from the same
-// pre-formatted props built by the loaders, so they can never drift apart.
-// Clicking Download PDF hits the server route /quotes/[id]/invoices/[kind]/pdf
-// which renders the react-pdf document to a buffer and streams it back as a
-// file download. kind is validated by the loaders (return null for anything
-// other than initial/finish/service, or when invoicing has not been set up).
+// Printable invoice. Dispatch is by QUOTE TYPE, not kind: a service call may be
+// unsplit (kind "service") or split (kind "initial" deposit + "finish" final),
+// so a service-call quote routes ALL of its invoice kinds to the service print
+// page; a new build routes initial/finish to the new-build print page. The
+// on-screen section below is a preview of the downloaded PDF; both render from
+// the same pre-formatted props built by the loaders, so they can never drift
+// apart. Clicking Download PDF hits /quotes/[id]/invoices/[kind]/pdf which
+// renders the react-pdf document to a buffer and streams it back. kind is
+// validated by the loaders (return null for an unknown kind or when invoicing
+// has not been set up).
 export default async function PrintInvoicePage({ params }: PageProps) {
-  if (params.kind === "service") {
-    return <ServiceInvoicePrintPage id={params.id} kind="service" />;
+  const quoteType = await fetchQuoteType(params.id);
+  if (quoteType === "service_call") {
+    return (
+      <ServiceInvoicePrintPage
+        id={params.id}
+        kind={params.kind as "service" | "initial" | "finish"}
+      />
+    );
   }
   return <NewBuildInvoicePrintPage id={params.id} kind={params.kind} />;
 }
@@ -219,9 +229,9 @@ async function ServiceInvoicePrintPage({
   kind
 }: {
   id: string;
-  kind: "service";
+  kind: "service" | "initial" | "finish";
 }) {
-  const input = await loadServiceInvoicePdfInput(id);
+  const input = await loadServiceInvoicePdfInput(id, kind);
   if (!input) {
     return <InvoiceNotFound />;
   }
@@ -240,7 +250,7 @@ async function ServiceInvoicePrintPage({
     reference: pdfProps.reference,
     businessName: pdfProps.businessName,
     quoteUuid: id,
-    invoiceKind: "service"
+    invoiceKind: kind
   });
 
   return (
@@ -253,7 +263,7 @@ async function ServiceInvoicePrintPage({
         email={{
           doc: "invoice",
           id,
-          invoiceKind: "service",
+          invoiceKind: kind,
           defaultTo: pdfProps.clientEmail ?? "",
           defaultSubject: emailDefaults.subject,
           defaultMessage: emailDefaults.message,
@@ -361,6 +371,19 @@ async function ServiceInvoicePrintPage({
             </tbody>
           </table>
         </div>
+
+        {pdfProps.previouslyInvoiced ? (
+          <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
+            <div className="flex items-center justify-between gap-4">
+              <span>Previously invoiced (Deposit)</span>
+              <span>{pdfProps.previouslyInvoiced.previouslyInvoicedAmount}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-4">
+              <span>Contract total</span>
+              <span>{pdfProps.previouslyInvoiced.contractTotal}</span>
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-6 flex justify-end">
           <div className="w-full max-w-xs rounded-xl1 border border-pine/15 bg-cream px-5 py-4">

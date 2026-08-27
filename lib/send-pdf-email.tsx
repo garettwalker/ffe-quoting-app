@@ -98,8 +98,15 @@ export async function renderEmailAttachment(
 
   // invoice
   if (!invoiceKind) return null;
-  if (invoiceKind === "service") {
-    const input = await loadServiceInvoicePdfInput(id);
+  // Dispatch by QUOTE TYPE, not kind: a service call may be unsplit (kind
+  // "service") or split (kind "initial" deposit + "finish" final), and ALL of
+  // its invoice kinds render through the purpose-built service invoice
+  // document. A new build renders initial/finish through the new-build invoice
+  // document. docTitle flows from each loader's pdfProps.title ("Service
+  // Invoice" / "Deposit Invoice" / "Final Invoice" for service calls).
+  const quoteType = await fetchQuoteType(id);
+  if (quoteType === "service_call") {
+    const input = await loadServiceInvoicePdfInput(id, invoiceKind);
     if (!input) return null;
     const buffer = await renderToBuffer(
       <ServiceInvoicePdfDocument {...input.pdfProps} />
