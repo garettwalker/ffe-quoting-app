@@ -613,7 +613,7 @@ export function InvoiceBuilder({
                             }
                             aria-label="Which invoice does this adjustment affect?"
                             title="Which invoice does this adjustment affect?"
-                            className="form-input w-auto"
+                            className="form-input w-44"
                           >
                             <option value="both">Both invoices</option>
                             <option value="rough_in">Rough-in only</option>
