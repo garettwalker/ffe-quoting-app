@@ -171,6 +171,18 @@ export type InvoiceData = {
     quantity: number;
     unitPriceCents: number;
     comment: string;
+    // True for a "Pricing adjustment" line: a single negative (or positive)
+    // amount that reduces the contract. Stored as quantity 1 x a signed
+    // unitPriceCents so the existing "sum of qty x unit price" contract math
+    // is unchanged. Rendered without a qty/unit-price breakdown (just the
+    // amount) on the invoice. Optional so invoices saved before this field
+    // existed still load.
+    isAdjustment?: boolean;
+    // Which invoice(s) a pricing-adjustment line reduces: "both" (the default,
+    // split by the rough-in/finish percentages), "rough_in" (only the rough-in
+    // invoice), or "finish" (only the finish invoice). Optional so adjustments
+    // saved before this field existed default to "both".
+    adjustmentTarget?: "both" | "rough_in" | "finish";
   }>;
   // Service-call freeform line items. Used only when quoteType === "service_call"
   // (a single invoice with no split/permit). Each line is a free-text

@@ -147,15 +147,35 @@ export async function loadInvoicePdfInput(
   // line items. The backfill is display-only (it does not change the stored
   // contractAmountCents, which legacy invoices keep as the hand-entered value).
   const scopeLines = Array.isArray(invoiceData.scopeLines)
-    ? invoiceData.scopeLines.map((line) => {
-        const totalCents = line.quantity * line.unitPriceCents;
-        return {
-          name: line.name,
-          comment: line.comment,
-          detail: `${line.quantity} × ${formatCurrency(line.unitPriceCents)}`,
-          total: formatCurrency(totalCents)
-        };
-      })
+    ? invoiceData.scopeLines
+        .filter((line) => {
+          // A targeted adjustment (rough-in only / finish only) belongs on just
+          // that invoice's scope; "both" adjustments and normal lines appear on
+          // both invoices.
+          if (!line.isAdjustment) return true;
+          const target = line.adjustmentTarget ?? "both";
+          if (target === "both") return true;
+          return kind === "initial" ? target === "rough_in" : target === "finish";
+        })
+        .map((line) => {
+          const totalCents = line.quantity * line.unitPriceCents;
+          // A pricing-adjustment line is a single signed amount, not a
+          // "qty x unit price" line, so it prints just the amount (no detail).
+          if (line.isAdjustment) {
+            return {
+              name: line.name,
+              comment: line.comment,
+              detail: "",
+              total: formatCurrency(totalCents)
+            };
+          }
+          return {
+            name: line.name,
+            comment: line.comment,
+            detail: `${line.quantity} × ${formatCurrency(line.unitPriceCents)}`,
+            total: formatCurrency(totalCents)
+          };
+        })
     : row.calculation_data.clientFacingLines.map((line) => {
         const totalCents = line.quantity * line.clientUnitPriceCents;
         return {

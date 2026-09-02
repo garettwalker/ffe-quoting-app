@@ -122,6 +122,14 @@ export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
   const percentTotal = roughInPercent + finishPercent;
   const totalCollectible = contract + permitFeeCents;
 
+  // The stored contract is the sum of ALL lines (including targeted
+  // adjustments). Pull the rough-in/finish-only ones back out so the % split
+  // applies to the base contract, then re-apply them to their invoice below.
+  const { roughInAdjustmentCents, finishAdjustmentCents } = sumAdjustments(
+    data.scopeLines
+  );
+  const baseContract = contract - roughInAdjustmentCents - finishAdjustmentCents;
+
   const roughInInvoice =
     data.invoices.find((invoice) => invoice.kind === "initial") ?? null;
 
@@ -153,15 +161,17 @@ export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
     };
   }
 
-  const roughInAmountCents = Math.round((contract * roughInPercent) / 100);
+  const roughInBaseCents = Math.round((baseContract * roughInPercent) / 100);
+  const roughInAmountCents = roughInBaseCents + roughInAdjustmentCents;
 
   let finishAmountCents: number;
   let isBalanced: boolean;
   if (percentTotal === 100) {
-    finishAmountCents = contract - roughInAmountCents;
+    finishAmountCents = baseContract - roughInBaseCents + finishAdjustmentCents;
     isBalanced = true;
   } else {
-    finishAmountCents = Math.round((contract * finishPercent) / 100);
+    finishAmountCents =
+      Math.round((baseContract * finishPercent) / 100) + finishAdjustmentCents;
     isBalanced = false;
   }
 
@@ -183,6 +193,28 @@ export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
 function clampPercent(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, Math.min(100, value));
+}
+
+// Sum the pricing-adjustment lines by target. "both" (or a missing target)
+// adjustments stay folded into the contract and are split by the percentages;
+// "rough_in" and "finish" adjustments are pulled out of the contract and applied
+// directly to their invoice so they move only that invoice.
+function sumAdjustments(scopeLines: InvoiceData["scopeLines"]): {
+  roughInAdjustmentCents: number;
+  finishAdjustmentCents: number;
+} {
+  let roughInAdjustmentCents = 0;
+  let finishAdjustmentCents = 0;
+  if (!Array.isArray(scopeLines)) {
+    return { roughInAdjustmentCents, finishAdjustmentCents };
+  }
+  for (const line of scopeLines) {
+    if (!line.isAdjustment) continue;
+    const cents = Math.round(line.quantity * line.unitPriceCents);
+    if (line.adjustmentTarget === "rough_in") roughInAdjustmentCents += cents;
+    else if (line.adjustmentTarget === "finish") finishAdjustmentCents += cents;
+  }
+  return { roughInAdjustmentCents, finishAdjustmentCents };
 }
 
 // Is this invoice "receivable" (billed and therefore owed / counted on AR)?

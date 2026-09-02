@@ -31,6 +31,14 @@ type ScopeLine = {
   quantity: number;
   unitPriceCents: number;
   comment: string;
+  // True for a "Pricing adjustment" line: a single signed amount (stored as
+  // quantity 1 x a signed unitPriceCents) that reduces the contract. Rendered
+  // with a single amount field instead of qty + unit price.
+  isAdjustment?: boolean;
+  // Which invoice(s) the adjustment reduces: "both" (split by the rough-in /
+  // finish percentages), "rough_in" (only the rough-in invoice), or "finish"
+  // (only the finish invoice). Defaults to "both".
+  adjustmentTarget?: "both" | "rough_in" | "finish";
 };
 
 type InvoiceBuilderProps = {
@@ -106,7 +114,9 @@ export function InvoiceBuilder({
         unitType: line.unitType ?? "",
         quantity: line.quantity,
         unitPriceCents: line.unitPriceCents,
-        comment: line.comment
+        comment: line.comment,
+        isAdjustment: line.isAdjustment,
+        adjustmentTarget: line.adjustmentTarget
       }));
     }
     // Legacy invoice (existing contract but no scopeLines): keep it on the
@@ -323,6 +333,17 @@ export function InvoiceBuilder({
     );
   }
 
+  function updateAdjustmentTarget(
+    index: number,
+    target: "both" | "rough_in" | "finish"
+  ) {
+    setScopeLines((prev) =>
+      prev.map((line, i) =>
+        i === index ? { ...line, adjustmentTarget: target } : line
+      )
+    );
+  }
+
   function removeScopeLine(index: number) {
     setScopeLines((prev) => {
       const next = prev.filter((_, i) => i !== index);
@@ -349,6 +370,28 @@ export function InvoiceBuilder({
         quantity: 1,
         unitPriceCents: Math.round(item.basePriceCents * clientMultiplier),
         comment: ""
+      }
+    ]);
+  }
+
+  // Add a "Pricing adjustment" line: a single signed amount (negative to
+  // reduce the contract) that is not a catalog item. Stored as quantity 1 x a
+  // signed unitPriceCents so the existing contract sum (qty x unit price) is
+  // unchanged; the line just renders with a single amount field instead of a
+  // qty + unit price. The owner picks which invoice(s) it reduces via the
+  // target dropdown (default "both").
+  function addAdjustmentLine() {
+    setScopeLines((prev) => [
+      ...prev,
+      {
+        pricingItemId: "",
+        name: "Pricing adjustment",
+        unitType: "adjustment",
+        quantity: 1,
+        unitPriceCents: 0,
+        comment: "",
+        isAdjustment: true,
+        adjustmentTarget: "both"
       }
     ]);
   }
@@ -428,7 +471,13 @@ export function InvoiceBuilder({
               unitType: line.unitType,
               quantity: line.quantity,
               unitPriceCents: line.unitPriceCents,
-              comment: line.comment.trim()
+              comment: line.comment.trim(),
+              ...(line.isAdjustment
+                ? {
+                    isAdjustment: true,
+                    adjustmentTarget: line.adjustmentTarget ?? "both"
+                  }
+                : {})
             }))
           }
         : Array.isArray(existing?.scopeLines)
@@ -529,27 +578,50 @@ export function InvoiceBuilder({
                         <p className="break-words font-black text-deep-pine">{name}</p>
                       </td>
                       <td className="p-3 align-top">
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={line.quantity === 0 ? "" : line.quantity}
-                            onChange={(event) =>
-                              updateScopeQuantity(
-                                index,
-                                event.target.value === "" ? 0 : Number(event.target.value)
-                              )
-                            }
-                            placeholder="1"
-                            aria-label="Quantity"
-                            className="form-input w-20"
-                          />
-                          <span className="text-xs font-bold text-charcoal/55">qty</span>
-                        </div>
+                        {line.isAdjustment ? (
+                          <span className="text-charcoal/55">—</span>
+                        ) : (
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={line.quantity === 0 ? "" : line.quantity}
+                              onChange={(event) =>
+                                updateScopeQuantity(
+                                  index,
+                                  event.target.value === "" ? 0 : Number(event.target.value)
+                                )
+                              }
+                              placeholder="1"
+                              aria-label="Quantity"
+                              className="form-input w-20"
+                            />
+                            <span className="text-xs font-bold text-charcoal/55">qty</span>
+                          </div>
+                        )}
                       </td>
                       <td className="whitespace-nowrap p-3 align-top text-charcoal/70">
-                        {line.unitType}
+                        {line.isAdjustment ? (
+                          <select
+                            value={line.adjustmentTarget ?? "both"}
+                            onChange={(event) =>
+                              updateAdjustmentTarget(
+                                index,
+                                event.target.value as "both" | "rough_in" | "finish"
+                              )
+                            }
+                            aria-label="Which invoice does this adjustment affect?"
+                            title="Which invoice does this adjustment affect?"
+                            className="form-input w-auto"
+                          >
+                            <option value="both">Both invoices</option>
+                            <option value="rough_in">Rough-in only</option>
+                            <option value="finish">Finish only</option>
+                          </select>
+                        ) : (
+                          line.unitType
+                        )}
                       </td>
                       <td className="p-3 align-top">
                         <div className="flex items-center gap-1.5">
@@ -559,9 +631,14 @@ export function InvoiceBuilder({
                             onChange={(dollars) => updateScopeUnitPrice(index, dollars)}
                             onBlur={() => confirmScopeUnitPrice(index)}
                             allowDecimal
-                            min={0}
+                            allowNegative={line.isAdjustment}
+                            min={line.isAdjustment ? undefined : 0}
                             placeholder="0"
-                            aria-label="Unit price in dollars"
+                            aria-label={
+                              line.isAdjustment
+                                ? "Adjustment amount in dollars"
+                                : "Unit price in dollars"
+                            }
                             className="form-input w-24"
                           />
                         </div>
@@ -619,20 +696,29 @@ export function InvoiceBuilder({
         </table>
       </div>
 
-      {availableItems.length > 0 ? (
-        <div className="mt-3">
-          <CatalogPicker
-            items={availableItems}
-            onPick={addScopeLine}
-            label="Add a line item"
-            emptyLabel="All catalog adders are already on this invoice."
-          />
+      <div className="mt-3 flex flex-wrap items-end gap-3">
+        <div className="min-w-0 flex-1">
+          {availableItems.length > 0 ? (
+            <CatalogPicker
+              items={availableItems}
+              onPick={addScopeLine}
+              label="Add a line item"
+              emptyLabel="All catalog adders are already on this invoice."
+            />
+          ) : (
+            <p className="text-sm font-bold text-charcoal/55">
+              All catalog adders are already on this invoice.
+            </p>
+          )}
         </div>
-      ) : (
-        <p className="mt-3 text-sm font-bold text-charcoal/55">
-          All catalog adders are already on this invoice.
-        </p>
-      )}
+        <button
+          type="button"
+          onClick={addAdjustmentLine}
+          className="rounded-full border border-pine/20 bg-whitewarm px-5 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+        >
+          + Add pricing adjustment
+        </button>
+      </div>
 
       {/* Split + permit. The contract is the sum of the line items above; when
           there are no line items, a manual contract amount is used instead.

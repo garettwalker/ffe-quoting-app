@@ -216,7 +216,9 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
                   </View>
                   <View style={scopeStyles.right}>
                     <Text style={scopeStyles.total}>{line.total}</Text>
-                    <Text style={scopeStyles.detail}>{line.detail}</Text>
+                    {line.detail ? (
+                      <Text style={scopeStyles.detail}>{line.detail}</Text>
+                    ) : null}
                   </View>
                 </View>
               ))}

@@ -445,7 +445,7 @@ function InvoiceScopeLine({
       </div>
       <div className="shrink-0 text-right">
         <p className="font-black text-charcoal">{total}</p>
-        <p className="text-xs text-charcoal/55">{detail}</p>
+        {detail ? <p className="text-xs text-charcoal/55">{detail}</p> : null}
       </div>
     </div>
   );

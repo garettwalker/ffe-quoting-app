@@ -12,6 +12,7 @@ export function FormattedNumberInput({
   placeholder,
   className,
   allowDecimal = false,
+  allowNegative = false,
   min,
   max,
   onBlur
@@ -21,6 +22,10 @@ export function FormattedNumberInput({
   placeholder?: string;
   className?: string;
   allowDecimal?: boolean;
+  // Allow a leading minus sign so the field can hold a negative value (used
+  // for the invoice "Pricing adjustment" line). The caller should also omit
+  // `min` (or pass a negative min) so the value is not clamped back to 0.
+  allowNegative?: boolean;
   min?: number;
   max?: number;
   onBlur?: () => void;
@@ -30,8 +35,8 @@ export function FormattedNumberInput({
 
   function handleChange(raw: string) {
     const cleaned = allowDecimal
-      ? raw.replace(/[^0-9.]/g, "")
-      : raw.replace(/[^0-9]/g, "");
+      ? raw.replace(allowNegative ? /[^0-9.-]/g : /[^0-9.]/g, "")
+      : raw.replace(allowNegative ? /[^0-9-]/g : /[^0-9]/g, "");
 
     setDraft(cleaned);
 
