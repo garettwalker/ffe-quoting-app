@@ -48,7 +48,7 @@ export function WeekSummary({ jobs }: { jobs: Job[] }) {
             <StatusBadge status={job.status} />
           </div>
         ))}
-      </div}
+      </div>
     </div>
   );
 }
