@@ -45,7 +45,7 @@ export function WeekSummary({ jobs }: { jobs: Job[] }) {
                 </p>
               </div>
             </div>
-            <StatusBadge status={job.status} />
+            <StatusBadge stage={job.status as any} />
           </div>
         ))}
       </div>
