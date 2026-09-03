@@ -69,7 +69,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
 
       if (quote.invoice_data?.scopeLines?.length || computeInvoiceAmounts(quote.invoice_data!).totalInvoicedCents > 0) {
         // Check initial invoice (rough-in) - receivable on setup
-        if (quote.invoice_data.generatedAt) {
+        if (quote.invoice_data?.generatedAt) {
           const genDate = new Date(quote.invoice_data.generatedAt);
           if (!earliestDate || genDate < earliestDate) earliestDate = genDate;
         }
