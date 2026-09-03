@@ -1,123 +1,16 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { DashboardResumeActiveQuote } from "@/components/dashboard-active-quote";
-import { StatusBadge } from "@/components/status-badge";
-import { formatCurrency } from "@/lib/currency";
-import {
-  lifecycleStage,
-  serviceLifecycleStage,
-  outstandingCents,
-  computeInvoiceAmounts,
-  isPaidInFull
-} from "@/lib/invoice-calculations";
-import { loadInvoiceReceipts, type InvoiceReceipts } from "@/lib/email-log";
-import { getSupabaseServer } from "@/lib/supabase-server";
-import { normalizeQuoteType, normalizeStatus } from "@/lib/types";
-import type { DashboardQuoteRow, InvoiceData, QuoteType } from "@/lib/types";
+import { getDashboardStats } from "@/lib/dashboard-stats";
+import { MoneyHero } from "@/components/dashboard/MoneyHero";
+import { PipelineFunnel } from "@/components/dashboard/PipelineFunnel";
+import { WeekSummary } from "@/components/dashboard/WeekSummary";
 
-// Overview dashboard: the landing hub for the whole app. At-a-glance tiles
-// link into each tool — Quotes (the lifecycle pipeline at /quotes), Receivables
-// (collections), and Pricing admin — plus quick actions and the most recent
-// quotes. Reads live from Supabase so totals track the latest invoice state.
+// Overview dashboard: the landing hub for the whole app.
 export const dynamic = "force-dynamic";
 
-const RECENT_COUNT = 5;
-// Ceiling on the money-tiles query (accepted quotes with invoice setup). High
-// enough that it won't bite for a long time; if it's ever reached the tiles
-// would undercount, so a warning renders when the result hits this cap.
-const MONEY_LIMIT = 500;
-
 export default async function DashboardPage() {
-  const supabase = getSupabaseServer();
-  // Three queries so the tiles are accurate at any volume instead of being
-  // derived from the most-recent rows:
-  //   1. Active quotes = exact count of draft + prepared (head-only).
-  //   2. Money tiles = accepted quotes with invoice setup, newest first. Only
-  //      accepted quotes can be Pending Payments or Paid in Full, and these
-  //      are the only rows the money math needs.
-  //   3. Recent list = the latest few quotes (full columns for the cards).
-  const [activeCountRes, moneyRes, recentRes] = await Promise.all([
-    supabase
-      .from("quotes")
-      .select("id", { count: "exact", head: true })
-      .in("status", ["draft", "prepared"]),
-    supabase
-      .from("quotes")
-      .select("id, quote_type, invoice_data, created_at")
-      // Include "scheduled" so scheduled service calls with invoice setup are
-      // counted in the money tiles (new builds never set "scheduled").
-      .in("status", ["accepted", "scheduled"])
-      .not("invoice_data", "is", null)
-      .order("created_at", { ascending: false })
-      .limit(MONEY_LIMIT),
-    supabase
-      .from("quotes")
-      .select(
-        "id, quote_id, quote_type, quote_date, client_name, project_name, project_street, project_city, project_state, project_zip, project_type, client_quote_total_cents, status, invoice_data, created_at"
-      )
-      .order("created_at", { ascending: false })
-      .limit(RECENT_COUNT)
-  ]);
-
-  const firstError = activeCountRes.error || moneyRes.error || recentRes.error;
-  if (firstError) {
-    return (
-      <AppShell>
-        <DashboardHeader />
-        <p className="rounded-xl2 border border-clay/30 bg-cream p-5 font-bold text-clay">
-          Could not load quotes from the database. {firstError.message}
-        </p>
-      </AppShell>
-    );
-  }
-
-  const activeQuotes = activeCountRes.count ?? 0;
-
-  // Money tiles from the accepted+invoiced rows. All of these are status
-  // "accepted", so the stage is derived purely from the invoice setup, plus the
-  // emailed-state of each invoice (a not-yet-emailed finish is "scheduled" and
-  // not counted as owed — see lib/invoice-calculations `invoiceIsReceivable`).
-  const moneyRows = (moneyRes.data ?? []) as {
-    id: string;
-    quote_type: QuoteType | null;
-    invoice_data: InvoiceData | null;
-  }[];
-  const recent = (recentRes.data ?? []) as DashboardQuoteRow[];
-  // One batched lookup for the emailed-state of every invoice on the money +
-  // recent rows. Missing entries default to "never emailed".
-  const receiptsMap = await loadInvoiceReceipts([
-    ...moneyRows.map((row) => row.id),
-    ...recent.map((row) => row.id)
-  ]);
-  const receiptsOf = (id: string): InvoiceReceipts =>
-    receiptsMap.get(id) ?? { initial: null, finish: null, service: null };
-  // Kind-agnostic money bucket for the tiles. A money-row (status accepted or
-  // scheduled, invoice setup present) is "paid" when paid in full, "pending"
-  // when it has real invoiced money still outstanding (or scheduled-but-unbilled,
-  // matching the AR partition), and "accepted" when it has no real invoice money
-  // (e.g. a $0 service call). Works for both new builds and service calls because
-  // computeInvoiceAmounts branches on quoteType and isPaidInFull handles service.
-  const moneyBucket = (row: {
-    id: string;
-    invoice_data: InvoiceData | null;
-  }): "pending" | "paid" | "accepted" => {
-    const data = row.invoice_data;
-    if (!data) return "accepted";
-    if (computeInvoiceAmounts(data).totalInvoicedCents <= 0) return "accepted";
-    return isPaidInFull(data, receiptsOf(row.id)) ? "paid" : "pending";
-  };
-  const pendingJobs = moneyRows.filter(
-    (row) => moneyBucket(row) === "pending"
-  );
-  const paidJobs = moneyRows.filter((row) => moneyBucket(row) === "paid");
-  const totalOutstanding = pendingJobs.reduce(
-    (sum, row) => sum + outstandingCents(row.invoice_data, receiptsOf(row.id)),
-    0
-  );
-  // If the money query hit its cap, the tiles may undercount (there could be
-  // more accepted+invoiced jobs beyond the cap). Surface a warning so the owner
-  // knows to raise MONEY_LIMIT.
-  const moneyCapped = moneyRows.length >= MONEY_LIMIT;
+  const stats = await getDashboardStats();
 
   return (
     <AppShell>
@@ -146,53 +39,32 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Tile
-          href="/quotes"
-          eyebrow="Quoting"
-          title="Active quotes"
-          value={String(activeQuotes)}
-          sub="Drafts and prepared, ready to work"
-        />
-        <Tile
-          href="/receivables"
-          eyebrow="Collections"
-          title="Awaiting payment"
-          value={formatCurrency(totalOutstanding)}
-          sub={`${pendingJobs.length} job${pendingJobs.length === 1 ? "" : "s"} outstanding`}
-          emphasize={totalOutstanding > 0}
-        />
-        <Tile
-          href="/receivables"
-          eyebrow="Collections"
-          title="Paid in full"
-          value={String(paidJobs.length)}
-          sub="Jobs fully collected"
-        />
-        <Tile
-          href="/pricing-admin"
-          eyebrow="Config"
-          title="Manage pricing"
-          value="Open"
-          sub="Items, levels, business info"
-        />
+      <div className="space-y-8">
+        <MoneyHero stats={stats.money} />
+        <PipelineFunnel counts={stats.funnel} />
+        <WeekSummary jobs={stats.week} />
       </div>
+    </AppShell>
+  );
+}
 
-      {moneyCapped ? (
-        <p className="mb-8 rounded-soft border border-clay/30 bg-clay/10 px-4 py-3 text-sm font-bold text-clay">
-          The collections tiles reached their internal cap ({MONEY_LIMIT} accepted
-          invoiced jobs), so these totals may be undercounting. Raise the cap in
-          app/page.tsx to fix the count.
-        </p>
-      ) : null}
-
-      <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
-        <div className="mb-4 flex items-baseline justify-between gap-3">
-          <div>
-            <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              Recent
-            </p>
-            <h2 className="font-display text-2xl font-bold tracking-[-0.03em] text-moss">
+function DashboardHeader() {
+  return (
+    <div className="mb-8">
+      <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
+        Dashboard
+      </p>
+      <h2 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
+        Freedom Family Electric
+      </h2>
+      <p className="mt-3 max-w-2xl text-base leading-7 text-charcoal/70">
+        Your quoting, pricing, and receivables in one place. Start a quote,
+        check who owes you, or manage your prices.
+      </p>
+    </div>
+  );
+}
+03em] text-moss">
               Latest quotes
             </h2>
           </div>

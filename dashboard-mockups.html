@@ -1,0 +1,351 @@
+<title>Dashboard mockups</title>
+<style>
+  :root {
+    --pine: #344236;
+    --deep-pine: #243027;
+    --moss: #6e7751;
+    --sage: #a8ae91;
+    --clay: #a56543;
+    --clay-dark: #8a4a2e;
+    --sand: #e8ddca;
+    --cream: #f7f1e7;
+    --stone: #c9c0ae;
+    --charcoal: #1d211d;
+    --whitewarm: #fffdf8;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(circle at 12% 18%, rgba(168, 174, 145, 0.28), transparent 26%),
+      radial-gradient(circle at 88% 12%, rgba(165, 101, 67, 0.12), transparent 28%),
+      linear-gradient(180deg, var(--cream) 0%, #efe4d2 100%);
+    color: var(--charcoal);
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: 40px 20px 80px;
+  }
+  .wrap { width: min(1080px, 100%); margin-inline: auto; }
+
+  /* Intro */
+  .intro { margin-bottom: 28px; }
+  .eyebrow {
+    font-size: 12px; font-weight: 900; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--clay); margin: 0 0 8px;
+  }
+  .intro h1 {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 40px; font-weight: 700; letter-spacing: -0.03em;
+    color: var(--moss); margin: 0 0 10px;
+  }
+  .lede { font-size: 15px; line-height: 1.6; color: rgba(29,33,29,0.72); max-width: 640px; margin: 0; font-weight: 600; }
+
+  /* Tabs */
+  .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
+  .tab {
+    border: 1px solid rgba(52,66,54,0.2); background: var(--whitewarm);
+    color: var(--deep-pine); font-weight: 900; font-size: 14px;
+    padding: 10px 18px; border-radius: 999px; cursor: pointer;
+    transition: all .15s ease;
+  }
+  .tab:hover { background: rgba(52,66,54,0.08); }
+  .tab.active { background: var(--pine); color: var(--whitewarm); border-color: var(--pine); box-shadow: 0 18px 50px rgba(29,33,29,0.08); }
+
+  .mockup { display: none; }
+  .mockup.active { display: block; }
+  .mockup-caption {
+    font-size: 13px; font-weight: 700; color: rgba(29,33,29,0.6);
+    margin: 0 0 16px; padding: 10px 16px; border-radius: 12px;
+    background: rgba(255,253,248,0.6); border: 1px solid rgba(52,66,54,0.1);
+  }
+
+  /* App frame */
+  .app {
+    background: rgba(255,253,248,0.72);
+    border: 1px solid rgba(52,66,54,0.1);
+    border-radius: 28px;
+    box-shadow: 0 24px 70px rgba(29,33,29,0.16);
+    overflow: hidden;
+  }
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 22px 28px; border-bottom: 1px solid rgba(52,66,54,0.08);
+    flex-wrap: wrap;
+  }
+  .brand { font-family: Georgia, serif; font-size: 24px; font-weight: 700; color: var(--moss); letter-spacing: -0.02em; }
+  .brand small { display: block; font-family: Inter, sans-serif; font-size: 12px; font-weight: 700; color: rgba(29,33,29,0.5); letter-spacing: 0; margin-top: 2px; }
+  .topbar-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn {
+    border-radius: 999px; padding: 10px 18px; font-weight: 900; font-size: 13px;
+    cursor: pointer; border: 1px solid transparent;
+  }
+  .btn-primary { background: var(--pine); color: var(--whitewarm); box-shadow: 0 18px 50px rgba(29,33,29,0.08); }
+  .btn-ghost { background: transparent; color: var(--deep-pine); border-color: rgba(52,66,54,0.2); }
+
+  .body { padding: 24px 28px 30px; display: flex; flex-direction: column; gap: 24px; }
+
+  .section-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .section-title h2 { font-family: Georgia, serif; font-size: 22px; font-weight: 700; color: var(--moss); letter-spacing: -0.02em; margin: 0; }
+  .section-title .count { font-size: 12px; font-weight: 900; color: var(--deep-pine); background: var(--sand); border-radius: 999px; padding: 3px 10px; }
+
+  .card {
+    background: var(--whitewarm);
+    border: 1px solid rgba(52,66,54,0.1);
+    border-radius: 18px;
+    padding: 18px;
+  }
+
+  /* Attention groups */
+  .attention-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .attention-grid { grid-template-columns: 1fr; } }
+  .att-group h3 { font-size: 12px; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 10px; }
+  .att-group.overdue h3 { color: var(--clay); }
+  .att-group.waiting h3 { color: var(--moss); }
+  .att-group.stuck h3 { color: var(--deep-pine); }
+  .att-item { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(52,66,54,0.08); }
+  .att-item:first-of-type { border-top: none; }
+  .att-item .name { font-weight: 700; font-size: 14px; }
+  .att-item .sub { font-size: 12px; color: rgba(29,33,29,0.55); font-weight: 600; margin-top: 1px; }
+  .pill { font-size: 11px; font-weight: 900; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+  .pill.clay { background: rgba(165,101,67,0.14); color: var(--clay-dark); }
+  .pill.moss { background: rgba(110,119,81,0.14); color: var(--moss); }
+  .pill.pine { background: rgba(52,66,54,0.12); color: var(--deep-pine); }
+
+  /* Money tiles */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  @media (max-width: 760px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  .tile { background: var(--whitewarm); border: 1px solid rgba(52,66,54,0.1); border-radius: 18px; padding: 18px; }
+  .tile .label { font-size: 12px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); margin-bottom: 8px; }
+  .tile .value { font-family: Georgia, serif; font-size: 30px; font-weight: 700; color: var(--deep-pine); letter-spacing: -0.02em; }
+  .tile .sub { font-size: 12px; font-weight: 700; color: rgba(29,33,29,0.55); margin-top: 4px; }
+  .tile.emphasize { background: rgba(165,101,67,0.1); border-color: rgba(165,101,67,0.3); }
+  .tile.emphasize .value { color: var(--clay-dark); }
+
+  /* Money hero (mockup B) */
+  .money-hero { display: grid; grid-template-columns: 1.4fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .money-hero { grid-template-columns: 1fr; } }
+  .money-big { background: var(--whitewarm); border: 1px solid rgba(52,66,54,0.1); border-radius: 18px; padding: 24px; }
+  .money-big .label { font-size: 12px; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); }
+  .money-big .value { font-family: Georgia, serif; font-size: 56px; font-weight: 700; color: var(--deep-pine); letter-spacing: -0.03em; margin: 6px 0 18px; }
+  .aging { display: flex; height: 14px; border-radius: 999px; overflow: hidden; margin-bottom: 12px; }
+  .aging span { display: block; height: 100%; }
+  .aging-legend { display: flex; flex-wrap: wrap; gap: 14px; }
+  .aging-legend .lg { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: rgba(29,33,29,0.7); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .money-side { display: flex; flex-direction: column; gap: 14px; }
+
+  /* Pipeline funnel */
+  .funnel { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  @media (max-width: 760px) { .funnel { grid-template-columns: repeat(2, 1fr); } }
+  .stage { background: var(--whitewarm); border: 1px solid rgba(52,66,54,0.1); border-radius: 18px; padding: 18px; text-align: center; }
+  .stage .n { font-family: Georgia, serif; font-size: 40px; font-weight: 700; color: var(--deep-pine); }
+  .stage .l { font-size: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(29,33,29,0.55); margin-top: 4px; }
+  .stage.lead { background: var(--pine); border-color: var(--pine); }
+  .stage.lead .n { color: var(--whitewarm); }
+  .stage.lead .l { color: rgba(255,253,248,0.7); }
+
+  /* Schedule */
+  .sched { display: flex; flex-direction: column; }
+  .sched-row { display: grid; grid-template-columns: 90px 1fr 110px 90px; gap: 12px; align-items: center; padding: 12px 0; border-top: 1px solid rgba(52,66,54,0.08); }
+  .sched-row:first-child { border-top: none; }
+  @media (max-width: 640px) { .sched-row { grid-template-columns: 70px 1fr; } .sched-row .crew, .sched-row .stage-tag { display: none; } }
+  .sched-row .day { font-size: 12px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; color: var(--clay); }
+  .sched-row .job { font-weight: 700; font-size: 14px; }
+  .sched-row .job small { display: block; font-size: 12px; color: rgba(29,33,29,0.55); font-weight: 600; }
+  .sched-row .stage-tag { font-size: 11px; font-weight: 900; color: var(--moss); background: rgba(110,119,81,0.12); border-radius: 999px; padding: 3px 10px; text-align: center; }
+  .sched-row .crew { font-size: 12px; font-weight: 700; color: rgba(29,33,29,0.6); text-align: right; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+
+<div class="wrap">
+  <div class="intro">
+    <p class="eyebrow">Dashboard redesign</p>
+    <h1>Three directions to choose from</h1>
+    <p class="lede">Same data, three different ways to lead. Flip between them and see which feels right. These are mockups only, nothing has been changed in the app.</p>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="a">A · Command center</button>
+    <button class="tab" data-tab="b">B · Money first</button>
+    <button class="tab" data-tab="c">C · Pipeline</button>
+  </div>
+
+  <!-- ============ MOCKUP A ============ -->
+  <section class="mockup active" id="mockup-a">
+    <p class="mockup-caption">A · Leads with what needs your attention today, then money, then the week ahead.</p>
+    <div class="app">
+      <div class="topbar">
+        <div class="brand">Freedom Family Electric<small>Tuesday, September 2</small></div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary">New quote</button>
+          <button class="btn btn-ghost">Receivables</button>
+          <button class="btn btn-ghost">Pricing</button>
+        </div>
+      </div>
+      <div class="body">
+        <div>
+          <div class="section-title"><h2>Needs your attention</h2><span class="count">5</span></div>
+          <div class="attention-grid">
+            <div class="card att-group overdue">
+              <h3>Overdue</h3>
+              <div class="att-item"><div><div class="name">Lot 10 Marrin</div><div class="sub">Darren Burke</div></div><span class="pill clay">$830 · 60+ days</span></div>
+              <div class="att-item"><div><div class="name">Fulk Residence</div><div class="sub">Rough-in</div></div><span class="pill clay">$2,400 · 30 days</span></div>
+            </div>
+            <div class="card att-group waiting">
+              <h3>Waiting on customer</h3>
+              <div class="att-item"><div><div class="name">Smith Residence</div><div class="sub">Quote out 12 days</div></div><span class="pill moss">Prepared</span></div>
+              <div class="att-item"><div><div class="name">Jones New Build</div><div class="sub">Quote out 8 days</div></div><span class="pill moss">Prepared</span></div>
+            </div>
+            <div class="card att-group stuck">
+              <h3>Stuck</h3>
+              <div class="att-item"><div><div class="name">Johnson Remodel</div><div class="sub">Rough-in done, no finish scheduled</div></div><span class="pill pine">In progress</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title"><h2>Money at a glance</h2></div>
+          <div class="tiles">
+            <div class="tile emphasize"><div class="label">Outstanding</div><div class="value">$48,230</div><div class="sub">Across 9 jobs</div></div>
+            <div class="tile"><div class="label">Collected this month</div><div class="value">$31,500</div><div class="sub">6 payments</div></div>
+            <div class="tile"><div class="label">Paid in full</div><div class="value">12</div><div class="sub">Jobs fully collected</div></div>
+            <div class="tile"><div class="label">Over 30 days</div><div class="value">$17,230</div><div class="sub">Needs a nudge</div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title"><h2>This week</h2></div>
+          <div class="card sched">
+            <div class="sched-row"><span class="day">Mon</span><span class="job">Fulk Residence<small>Rough-in</small></span><span class="stage-tag">Rough-in</span><span class="crew">Crew A</span></div>
+            <div class="sched-row"><span class="day">Tue</span><span class="job">Lot 10 Marrin<small>Finish</small></span><span class="stage-tag">Finish</span><span class="crew">Crew B</span></div>
+            <div class="sched-row"><span class="day">Wed</span><span class="job">Johnson Remodel<small>Rough-in</small></span><span class="stage-tag">Rough-in</span><span class="crew">Crew A</span></div>
+            <div class="sched-row"><span class="day">Thu</span><span class="job">Smith Residence<small>Service</small></span><span class="stage-tag">Service</span><span class="crew">Crew C</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MOCKUP B ============ -->
+  <section class="mockup" id="mockup-b">
+    <p class="mockup-caption">B · Leads with the money picture, then the pipeline, then the week ahead.</p>
+    <div class="app">
+      <div class="topbar">
+        <div class="brand">Freedom Family Electric<small>Tuesday, September 2</small></div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary">New quote</button>
+          <button class="btn btn-ghost">Receivables</button>
+          <button class="btn btn-ghost">Pricing</button>
+        </div>
+      </div>
+      <div class="body">
+        <div>
+          <div class="section-title"><h2>Money</h2></div>
+          <div class="money-hero">
+            <div class="money-big">
+              <div class="label">Outstanding</div>
+              <div class="value">$48,230</div>
+              <div class="aging">
+                <span style="flex:12400;background:#a8ae91"></span>
+                <span style="flex:18600;background:#c9c0ae"></span>
+                <span style="flex:9100;background:#a56543"></span>
+                <span style="flex:8130;background:#243027"></span>
+              </div>
+              <div class="aging-legend">
+                <span class="lg"><span class="dot" style="background:#a8ae91"></span>Current $12,400</span>
+                <span class="lg"><span class="dot" style="background:#c9c0ae"></span>30 days $18,600</span>
+                <span class="lg"><span class="dot" style="background:#a56543"></span>60 days $9,100</span>
+                <span class="lg"><span class="dot" style="background:#243027"></span>90+ days $8,130</span>
+              </div>
+            </div>
+            <div class="money-side">
+              <div class="tile"><div class="label">Collected this month</div><div class="value">$31,500</div><div class="sub">6 payments</div></div>
+              <div class="tile"><div class="label">Paid in full</div><div class="value">12</div><div class="sub">Jobs fully collected</div></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title"><h2>Pipeline</h2></div>
+          <div class="funnel">
+            <div class="stage"><div class="n">8</div><div class="l">Quotes out</div></div>
+            <div class="stage"><div class="n">5</div><div class="l">Accepted</div></div>
+            <div class="stage lead"><div class="n">4</div><div class="l">In progress</div></div>
+            <div class="stage"><div class="n">12</div><div class="l">Paid</div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title"><h2>This week</h2></div>
+          <div class="card sched">
+            <div class="sched-row"><span class="day">Mon</span><span class="job">Fulk Residence<small>Rough-in</small></span><span class="stage-tag">Rough-in</span><span class="crew">Crew A</span></div>
+            <div class="sched-row"><span class="day">Tue</span><span class="job">Lot 10 Marrin<small>Finish</small></span><span class="stage-tag">Finish</span><span class="crew">Crew B</span></div>
+            <div class="sched-row"><span class="day">Wed</span><span class="job">Johnson Remodel<small>Rough-in</small></span><span class="stage-tag">Rough-in</span><span class="crew">Crew A</span></div>
+            <div class="sched-row"><span class="day">Thu</span><span class="job">Smith Residence<small>Service</small></span><span class="stage-tag">Service</span><span class="crew">Crew C</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MOCKUP C ============ -->
+  <section class="mockup" id="mockup-c">
+    <p class="mockup-caption">C · Leads with the pipeline, then money, then the week ahead.</p>
+    <div class="app">
+      <div class="topbar">
+        <div class="brand">Freedom Family Electric<small>Tuesday, September 2</small></div>
+        <div class="topbar-actions">
+          <button class="btn btn-primary">New quote</button>
+          <button class="btn btn-ghost">Receivables</button>
+          <button class="btn btn-ghost">Pricing</button>
+        </div>
+      </div>
+      <div class="body">
+        <div>
+          <div class="section-title"><h2>Pipeline</h2></div>
+          <div class="funnel">
+            <div class="stage"><div class="n">8</div><div class="l">Quotes out</div></div>
+            <div class="stage"><div class="n">5</div><div class="l">Accepted</div></div>
+            <div class="stage lead"><div class="n">4</div><div class="l">In progress</div></div>
+            <div class="stage"><div class="n">12</div><div class="l">Paid</div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title"><h2>Money</h2></div>
+          <div class="tiles">
+            <div class="tile emphasize"><div class="label">Outstanding</div><div class="value">$48,230</div><div class="sub">Across 9 jobs</div></div>
+            <div class="tile"><div class="label">Collected this month</div><div class="value">$31,500</div><div class="sub">6 payments</div></div>
+            <div class="tile"><div class="label">Over 30 days</div><div class="value">$17,230</div><div class="sub">Needs a nudge</div></div>
+            <div class="tile"><div class="label">Paid in full</div><div class="value">12</div><div class="sub">Jobs fully collected</div></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-title"><h2>This week</h2></div>
+          <div class="card sched">
+            <div class="sched-row"><span class="day">Mon</span><span class="job">Fulk Residence<small>Rough-in</small></span><span class="stage-tag">Rough-in</span><span class="crew">Crew A</span></div>
+            <div class="sched-row"><span class="day">Tue</span><span class="job">Lot 10 Marrin<small>Finish</small></span><span class="stage-tag">Finish</span><span class="crew">Crew B</span></div>
+            <div class="sched-row"><span class="day">Wed</span><span class="job">Johnson Remodel<small>Rough-in</small></span><span class="stage-tag">Rough-in</span><span class="crew">Crew A</span></div>
+            <div class="sched-row"><span class="day">Thu</span><span class="job">Smith Residence<small>Service</small></span><span class="stage-tag">Service</span><span class="crew">Crew C</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const mockups = document.querySelectorAll('.mockup');
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'));
+      mockups.forEach((m) => m.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('mockup-' + tab.dataset.tab).classList.add('active');
+    });
+  });
+</script>
