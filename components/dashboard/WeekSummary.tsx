@@ -5,11 +5,10 @@ import { StatusBadge } from "@/components/status-badge";
 
 type Job = {
   id: string;
-  client_name: string;
-  project_name: string | null;
+  title: string;
+  location: string;
   status: string;
-  created_at: string;
-  assignment_date: string;
+  workDate: string;
 };
 
 export function WeekSummary({ jobs }: { jobs: Job[] }) {
@@ -32,7 +31,7 @@ export function WeekSummary({ jobs }: { jobs: Job[] }) {
           <div key={job.id} className="px-6 py-4 flex items-center justify-between hover:bg-pine/5 transition-colors">
             <div className="flex items-center gap-4">
               <div className="text-xs font-bold text-charcoal/40 w-20 shrink-0">
-                {new Date(job.assignment_date).toLocaleDateString("en-US", {
+                {new Date(job.workDate).toLocaleDateString("en-US", {
                   weekday: "short",
                   month: "short",
                   day: "numeric",
@@ -40,8 +39,7 @@ export function WeekSummary({ jobs }: { jobs: Job[] }) {
               </div>
               <div>
                 <p className="text-sm font-bold text-deep-pine">
-                  {job.client_name}
-                  {job.project_name && <span className="text-charcoal/40 ml-1">({job.project_name})</span>}
+                  {job.title}
                 </p>
               </div>
             </div>
