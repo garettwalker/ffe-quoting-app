@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getScheduleRange } from "@/lib/schedule-server";
-import { outstandingCents, invoiceIsReceivable } from "@/lib/invoice-calculations";
+import { outstandingCents, invoiceIsReceivable, computeInvoiceAmounts } from "@/lib/invoice-calculations";
 import { loadInvoiceReceipts } from "@/lib/email-log";
 import { formatCurrency } from "@/lib/currency";
 import type { DashboardQuoteRow } from "@/lib/types";
@@ -67,7 +67,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       // Logic: find the earliest issued/sent date among unpaid receivable invoices
       let earliestDate: Date | null = null;
 
-      if (quote.invoice_data?.scopeLines?.length || quote.invoice_data?.totalInvoicedCents) {
+      if (quote.invoice_data?.scopeLines?.length || computeInvoiceAmounts(quote.invoice_data!).totalInvoicedCents > 0) {
         // Check initial invoice (rough-in) - receivable on setup
         if (quote.invoice_data.generatedAt) {
           const genDate = new Date(quote.invoice_data.generatedAt);
@@ -111,17 +111,17 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const funnel = {
     quotesOut: quotes.filter((q) => ["draft", "prepared"].includes(q.status || "")).length,
     accepted: quotes.filter((q) =>
-      q.status === "accepted" && (!q.invoice_data || (q.invoice_data as any).totalInvoicedCents <= 0)
+      q.status === "accepted" && (!q.invoice_data || computeInvoiceAmounts(q.invoice_data!).totalInvoicedCents <= 0)
     ).length,
     inProgress: quotes.filter((q) =>
       ["accepted", "scheduled"].includes(q.status || "") &&
-      (q.invoice_data as any)?.totalInvoicedCents > 0 &&
-      !(q.invoice_data as any)?.isPaidInFull
+      q.invoice_data && computeInvoiceAmounts(q.invoice_data).totalInvoicedCents > 0 &&
+      !q.invoice_data.isPaidInFull
     ).length,
     paid: quotes.filter((q) =>
       ["accepted", "scheduled"].includes(q.status || "") &&
-      (q.invoice_data as any)?.totalInvoicedCents > 0 &&
-      (q.invoice_data as any)?.isPaidInFull
+      q.invoice_data && computeInvoiceAmounts(q.invoice_data).totalInvoicedCents > 0 &&
+      q.invoice_data.isPaidInFull
     ).length,
   };
 
