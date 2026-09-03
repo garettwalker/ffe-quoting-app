@@ -54,7 +54,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   // --- Money Calculations ---
   let outstandingTotal = 0;
   let paidInFullCount = 0;
-  const aging = { current: 0, thirtyDays: 0, sixtyDays: 0, ninetyPlus: 0 };
+  const aging: Record<string, number> = { current: 0, thirtyDays: 0, sixtyDays: 0, ninetyPlus: 0 };
 
   quotes.forEach((quote) => {
     const receipts = receiptsById.get(quote.id);
@@ -64,14 +64,13 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       outstandingTotal += outstanding;
 
       // Determine aging bucket based on the oldest receivable invoice
-      // Logic: find the earliest issued/sent date among unpaid receivable invoices
       let earliestDate: Date | null = null;
 
       if (quote.invoice_data?.scopeLines?.length || computeInvoiceAmounts(quote.invoice_data!).totalInvoicedCents > 0) {
         // Check initial invoice (rough-in) - receivable on setup
         if (quote.invoice_data?.generatedAt) {
           const genDate = new Date(quote.invoice_data.generatedAt);
-          if (!earliestDate || genDate < earliestDate) earliestDate = genDate;
+          if (!earliestDate || genDate.getTime() < earliestDate.getTime()) earliestDate = genDate;
         }
 
         // Check finish/service invoices - receivable on email
@@ -79,7 +78,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         quoteReceipts.forEach((r) => {
           if (r.sent_at) {
             const sentDate = new Date(r.sent_at);
-            if (!earliestDate || sentDate < earliestDate) earliestDate = sentDate;
+            if (!earliestDate || sentDate.getTime() < earliestDate.getTime()) earliestDate = sentDate;
           }
         });
       }
@@ -91,7 +90,6 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         else if (diffDays <= 90) aging.sixtyDays += outstanding;
         else aging.ninetyPlus += outstanding;
       } else {
-        // Fallback to current if no date found
         aging.current += outstanding;
       }
     }
