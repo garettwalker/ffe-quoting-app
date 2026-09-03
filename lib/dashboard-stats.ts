@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { getScheduleRange } from "@/lib/schedule-server";
-import { outstandingCents, invoiceIsReceivable, computeInvoiceAmounts } from "@/lib/invoice-calculations";
+import { outstandingCents, invoiceIsReceivable, computeInvoiceAmounts, isPaidInFull } from "@/lib/invoice-calculations";
 import { loadInvoiceReceipts } from "@/lib/email-log";
 import { formatCurrency } from "@/lib/currency";
 import type { DashboardQuoteRow } from "@/lib/types";
@@ -48,43 +48,50 @@ export async function getDashboardStats(): Promise<DashboardStats> {
   const quotes = (quotesResult.data ?? []) as DashboardQuoteRow[];
   const payments = paymentsResult.data ?? [];
 
-  // 2. Batch load email receipts for aging and outstanding calc
+  // 2. Batch load email receipts for aging and outstanding calc. A missing key
+  // means "never emailed" (all kinds null) — never pass undefined, which flips
+  // the calc functions into legacy full-contract semantics.
   const receiptsById = await loadInvoiceReceipts(quotes.map((q) => q.id));
+  const neverEmailed = { initial: null, finish: null, service: null } as const;
 
   // --- Money Calculations ---
   let outstandingTotal = 0;
   let paidInFullCount = 0;
-  const aging: Record<string, number> = { current: 0, thirtyDays: 0, sixtyDays: 0, ninetyPlus: 0 };
+  const aging: MoneyStats["aging"] = { current: 0, thirtyDays: 0, sixtyDays: 0, ninetyPlus: 0 };
 
   quotes.forEach((quote) => {
-    const receipts = receiptsById.get(quote.id);
+    const receipts = receiptsById.get(quote.id) ?? neverEmailed;
     const outstanding = outstandingCents(quote.invoice_data, receipts);
 
     if (outstanding > 0) {
       outstandingTotal += outstanding;
 
-      // Determine aging bucket based on the oldest receivable invoice
-      let earliestDate: Date | null = null;
+      // Aging bucket is set by the OLDEST unpaid receivable invoice. The
+      // initial (rough-in) invoice is receivable from setup (issuedAt, falling
+      // back to the setup timestamp); a finish/service invoice only once
+      // emailed. Paid invoices are not part of the outstanding balance so
+      // they never age.
+      const receivableDates: number[] = [];
 
-      if (quote.invoice_data?.scopeLines?.length || computeInvoiceAmounts(quote.invoice_data!).totalInvoicedCents > 0) {
-        // Check initial invoice (rough-in) - receivable on setup
-        if (quote.invoice_data?.generatedAt) {
-          const genDate = new Date(quote.invoice_data.generatedAt);
-          if (!earliestDate || genDate.getTime() < earliestDate.getTime()) earliestDate = genDate;
-        }
+      if (quote.invoice_data) {
+        for (const invoice of quote.invoice_data.invoices) {
+          if (invoice.status !== "unpaid") continue;
+          if (!invoiceIsReceivable(invoice, invoice.kind, receipts)) continue;
 
-        // Check finish/service invoices - receivable on email
-        const quoteReceipts = receipts?.receipts ?? [];
-        quoteReceipts.forEach((r) => {
-          if (r.sent_at) {
-            const sentDate = new Date(r.sent_at);
-            if (!earliestDate || sentDate.getTime() < earliestDate.getTime()) earliestDate = sentDate;
+          if (invoice.kind === "initial") {
+            const issuedAt = invoice.issuedAt ?? quote.invoice_data.generatedAt;
+            receivableDates.push(new Date(issuedAt).getTime());
+          } else {
+            // finish / service: receivable from the invoice email
+            const sentAt = invoice.kind === "finish" ? receipts.finish : receipts.service;
+            if (sentAt) receivableDates.push(new Date(sentAt).getTime());
           }
-        });
+        }
       }
 
-      if (earliestDate) {
-        const diffDays = Math.floor((now.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (receivableDates.length > 0) {
+        const oldest = Math.min(...receivableDates);
+        const diffDays = Math.floor((now.getTime() - oldest) / (1000 * 60 * 60 * 24));
         if (diffDays <= 30) aging.current += outstanding;
         else if (diffDays <= 60) aging.thirtyDays += outstanding;
         else if (diffDays <= 90) aging.sixtyDays += outstanding;
@@ -94,7 +101,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
       }
     }
 
-    if (quote.invoice_data?.isPaidInFull) {
+    if (isPaidInFull(quote.invoice_data, receipts)) {
       paidInFullCount++;
     }
   });
@@ -114,12 +121,12 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     inProgress: quotes.filter((q) =>
       ["accepted", "scheduled"].includes(q.status || "") &&
       q.invoice_data && computeInvoiceAmounts(q.invoice_data).totalInvoicedCents > 0 &&
-      !q.invoice_data.isPaidInFull
+      !isPaidInFull(q.invoice_data, receiptsById.get(q.id) ?? neverEmailed)
     ).length,
     paid: quotes.filter((q) =>
       ["accepted", "scheduled"].includes(q.status || "") &&
       q.invoice_data && computeInvoiceAmounts(q.invoice_data).totalInvoicedCents > 0 &&
-      q.invoice_data.isPaidInFull
+      isPaidInFull(q.invoice_data, receiptsById.get(q.id) ?? neverEmailed)
     ).length,
   };
 
