@@ -15,17 +15,20 @@ import { ServiceStageStrip } from "@/components/service-stage-strip";
 import { ProjectAdvanceButton } from "@/components/project-advance-button";
 import { ServiceProjectAdvanceButton } from "@/components/service-project-advance-button";
 import { ProjectStageEditor } from "@/components/project-stage-editor";
+import { ServiceStageEditor } from "@/components/service-stage-editor";
 import { normalizeQuoteType, normalizeStatus } from "@/lib/types";
 import type { InvoiceData } from "@/lib/types";
 
 // Project Status Tracker. Every ACCEPTED (or scheduled service-call) quote is
-// a project. New builds show an 8-stage strip (Quote to Paid); service calls
-// show a simpler 5-stage strip (Quote / Accepted / Scheduled / Billed / Paid).
-// The 4 new-build field stages are advanced manually here; the billing/paid
-// stages are derived from invoice + email-log facts so this view can never
-// disagree with /quotes or /receivables. Filter chips narrow by bucket via
-// ?filter=. Read-only except the stage-advance / edit-stages controls, which
-// write quotes.project_status (new builds) or quotes.status (service schedule).
+// a project, shown in ONE combined list (newest first) — not separated by quote
+// type. Each card still renders its own strip: new builds an 8-stage strip
+// (Quote to Paid), service calls a simpler 5-stage strip (Quote / Accepted /
+// Scheduled / Billed / Paid) plus a "Service call" tag. The 4 new-build field
+// stages are advanced manually here; the billing/paid stages are derived from
+// invoice + email-log facts so this view can never disagree with /quotes or
+// /receivables. Filter chips narrow by bucket via ?filter=. Read-only except
+// the stage-advance / edit-stages controls, which write quotes.project_status
+// (new builds) or quotes.status (service schedule).
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +63,23 @@ const CHIPS: Array<{ key: BucketFilter; label: string }> = [
 ];
 
 const EMPTY_RECEIPTS = { initial: null, finish: null, service: null };
+
+type NewBuildJob = {
+  kind: "new_build";
+  row: Row;
+  projectStatus: ReturnType<typeof normalizeProjectStatus>;
+  stages: ReturnType<typeof computeProjectStages>;
+  crew: string[];
+};
+
+type ServiceJob = {
+  kind: "service_call";
+  row: Row;
+  stages: ReturnType<typeof computeServiceCallStages>;
+  crew: string[];
+};
+
+type Job = NewBuildJob | ServiceJob;
 
 export default async function ProjectsPage({
   searchParams
@@ -105,14 +125,14 @@ export default async function ProjectsPage({
     crew: string[];
   };
 
-  const newBuildJobs: NewBuildJob[] = [];
-  const serviceJobs: ServiceJob[] = [];
+  const jobs: Job[] = [];
 
   for (const row of rows) {
     const receipts = receiptsMap.get(row.id) ?? EMPTY_RECEIPTS;
     const crew = crewMap.get(row.id) ?? [];
     if (normalizeQuoteType(row.quote_type) === "service_call") {
-      serviceJobs.push({
+      jobs.push({
+        kind: "service_call",
         row,
         crew,
         stages: computeServiceCallStages({
@@ -124,7 +144,8 @@ export default async function ProjectsPage({
       });
     } else {
       const projectStatus = normalizeProjectStatus(row.project_status);
-      newBuildJobs.push({
+      jobs.push({
+        kind: "new_build",
         row,
         crew,
         projectStatus,
@@ -138,33 +159,30 @@ export default async function ProjectsPage({
     }
   }
 
-  // Combined bucket counts across both sections so the chips reflect every
-  // accepted job regardless of type.
+  // One combined list, newest first — no separation by quote type.
+  jobs.sort((a, b) => b.row.created_at.localeCompare(a.row.created_at));
+
+  // Bucket counts across the whole list so the chips reflect every accepted
+  // job regardless of type.
   const counts: Record<BucketFilter, number> = {
-    all: newBuildJobs.length + serviceJobs.length,
+    all: jobs.length,
     in_field: 0,
     awaiting_payment: 0,
     completed: 0
   };
-  for (const j of newBuildJobs) counts[j.stages.filterBucket] += 1;
-  for (const j of serviceJobs) counts[j.stages.filterBucket] += 1;
+  for (const j of jobs) counts[j.stages.filterBucket] += 1;
 
   const selected: BucketFilter =
     searchParams.filter && CHIPS.some((c) => c.key === searchParams.filter)
       ? (searchParams.filter as BucketFilter)
       : "all";
-  const visibleNewBuilds =
+  const visibleJobs =
     selected === "all"
-      ? newBuildJobs
-      : newBuildJobs.filter((j) => j.stages.filterBucket === selected);
-  const visibleService =
-    selected === "all"
-      ? serviceJobs
-      : serviceJobs.filter((j) => j.stages.filterBucket === selected);
+      ? jobs
+      : jobs.filter((j) => j.stages.filterBucket === selected);
 
   const capped = rows.length >= PROJECTS_LIMIT;
-  const nothingVisible =
-    visibleNewBuilds.length === 0 && visibleService.length === 0;
+  const nothingVisible = visibleJobs.length === 0;
 
   return (
     <AppShell>
@@ -207,29 +225,15 @@ export default async function ProjectsPage({
         </section>
       ) : null}
 
-      {visibleNewBuilds.length > 0 ? (
-        <div className="mb-8">
-          <h3 className="mb-4 font-display text-2xl font-bold tracking-[-0.03em] text-moss">
-            New Builds
-          </h3>
-          <div className="space-y-5">
-            {visibleNewBuilds.map((j) => (
+      {visibleJobs.length > 0 ? (
+        <div className="space-y-5">
+          {visibleJobs.map((j) =>
+            j.kind === "new_build" ? (
               <ProjectCard key={j.row.id} job={j} />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {visibleService.length > 0 ? (
-        <div className="mb-8">
-          <h3 className="mb-4 font-display text-2xl font-bold tracking-[-0.03em] text-moss">
-            Service Calls
-          </h3>
-          <div className="space-y-5">
-            {visibleService.map((j) => (
+            ) : (
               <ServiceProjectCard key={j.row.id} job={j} />
-            ))}
-          </div>
+            )
+          )}
         </div>
       ) : null}
 
@@ -261,25 +265,17 @@ function ProjectsHeader() {
         Every job, quote to paid.
       </h1>
       <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
-        Each accepted job tracked end-to-end through field stages and billing.
-        New builds show an 8-stage strip; service calls show a simpler 5-stage
-        strip. Mark a stage complete to advance it; billing and paid stages
-        update automatically from invoicing.
+        Every accepted job in one list, tracked end-to-end from field work
+        through billing. New builds show an 8-stage strip; service calls (tagged
+        below each card's name) show a simpler 5-stage strip. Mark a stage
+        complete or edit stages to correct them; billing and paid stages update
+        automatically from invoicing.
       </p>
     </div>
   );
 }
 
-function ProjectCard({
-  job
-}: {
-  job: {
-    row: Row;
-    projectStatus: ReturnType<typeof normalizeProjectStatus>;
-    stages: ReturnType<typeof computeProjectStages>;
-    crew: string[];
-  };
-}) {
+function ProjectCard({ job }: { job: NewBuildJob }) {
   const { row, projectStatus, stages, crew } = job;
   const jobName = row.project_name || row.client_name || "Untitled";
   const subName = row.project_name ? row.client_name : null;
@@ -355,15 +351,7 @@ function ProjectCard({
   );
 }
 
-function ServiceProjectCard({
-  job
-}: {
-  job: {
-    row: Row;
-    stages: ReturnType<typeof computeServiceCallStages>;
-    crew: string[];
-  };
-}) {
+function ServiceProjectCard({ job }: { job: ServiceJob }) {
   const { row, stages, crew } = job;
   const jobName = row.project_name || row.client_name || "Untitled";
   const subName = row.project_name ? row.client_name : null;
@@ -396,15 +384,20 @@ function ServiceProjectCard({
             Invoice {formatCurrency(row.client_quote_total_cents)} · {row.quote_id}
           </p>
         </div>
-        <span
-          className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] ${
-            completed
-              ? "bg-moss/15 text-moss"
-              : "bg-clay/12 text-clay"
-          }`}
-        >
-          {stageNowLabel}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="whitespace-nowrap rounded-full bg-sage/30 px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] text-deep-pine">
+            Service call
+          </span>
+          <span
+            className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] ${
+              completed
+                ? "bg-moss/15 text-moss"
+                : "bg-clay/12 text-clay"
+            }`}
+          >
+            {stageNowLabel}
+          </span>
+        </div>
       </div>
 
       <div className="mt-6">
@@ -415,6 +408,10 @@ function ServiceProjectCard({
         <ServiceProjectAdvanceButton
           quoteId={row.id}
           activeStageId={stages.activeStageId}
+        />
+        <ServiceStageEditor
+          quoteId={row.id}
+          status={normalizeStatus(row.status) === "scheduled" ? "scheduled" : "accepted"}
         />
         <Link
           href={`/quotes/${row.id}`}
