@@ -71,6 +71,45 @@ export default async function SavedQuotePage({ params }: PageProps) {
     getEmailHistoryForQuote(params.id)
   ]);
 
+  // A failed read is NOT the same as a missing quote (mirrors the invoices
+  // page). `.single()` error code PGRST116 = the row genuinely doesn't exist;
+  // anything else is a transient infrastructure failure and should say so,
+  // with a retry, instead of claiming the quote was removed.
+  if (error && error.code !== "PGRST116") {
+    console.error(
+      `[quote] Failed to load quote ${params.id}: ${error.code} ${error.message}`
+    );
+    return (
+      <AppShell>
+        <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-8 shadow-soft">
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
+            Saved Quote
+          </p>
+          <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
+            This page hit a snag.
+          </h1>
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
+            We couldn&apos;t load this quote just now — usually a momentary
+            connection hiccup, not a problem with the quote itself. Nothing was
+            lost.{" "}
+            <Link
+              href={`/quotes/${params.id}`}
+              className="font-bold text-deep-pine underline hover:text-moss"
+            >
+              Try again
+            </Link>
+          </p>
+          <Link
+            href="/quotes"
+            className="mt-6 inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
+          >
+            Back to Quotes
+          </Link>
+        </section>
+      </AppShell>
+    );
+  }
+
   if (error || !data) {
     return (
       <AppShell>

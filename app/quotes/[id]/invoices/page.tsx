@@ -94,7 +94,47 @@ export default async function InvoicingPage({ params }: PageProps) {
     getEmailHistoryForQuote(params.id)
   ]);
 
-  if (error || !data || !data.quote_data || !data.calculation_data) {
+  // A failed read is NOT the same as a missing quote. `.single()` returns
+  // error code PGRST116 only when the row genuinely doesn't exist; any other
+  // error is a transient infrastructure failure (network blip, Supabase
+  // timeout). Those used to render as a bare Next 404, which made a live
+  // invoice look deleted mid-session ("random 404"). Now: a real no-row is a
+  // 404, anything else is logged and shown as a retryable error page.
+  if (error) {
+    if (error.code !== "PGRST116") {
+      console.error(
+        `[invoices] Failed to load quote ${params.id}: ${error.code} ${error.message}`
+      );
+      return (
+        <AppShell>
+          <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-8 shadow-soft">
+            <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
+              Invoicing
+            </p>
+            <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
+              This page hit a snag.
+            </h1>
+            <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
+              We couldn&apos;t load this quote&apos;s invoicing just now —
+              usually a momentary connection hiccup, not a problem with the
+              quote itself. Nothing was lost.{" "}
+              <Link
+                href={`/quotes/${params.id}/invoices`}
+                className="font-bold text-deep-pine underline hover:text-moss"
+              >
+                Try again
+              </Link>
+              , and if it keeps happening, check the runtime logs for
+              &ldquo;Failed to load quote.&rdquo;
+            </p>
+          </section>
+        </AppShell>
+      );
+    }
+    notFound();
+  }
+
+  if (!data || !data.quote_data || !data.calculation_data) {
     notFound();
   }
 

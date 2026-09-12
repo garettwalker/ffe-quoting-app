@@ -94,7 +94,13 @@ export async function getCustomer(id: string): Promise<Customer | null> {
     )
     .eq("id", id)
     .maybeSingle();
-  if (error || !data) return null;
+  if (error) {
+    // A failed read (network blip, timeout) is not "customer not found" — log
+    // it so transient 404-style symptoms on /customers/[id] are diagnosable.
+    console.error(`[customers] Failed to load customer ${id}: ${error.code} ${error.message}`);
+    return null;
+  }
+  if (!data) return null;
   return normalizeCustomer(data as CustomerRow);
 }
 
