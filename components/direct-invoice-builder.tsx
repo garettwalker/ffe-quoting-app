@@ -520,31 +520,35 @@ function DirectInvoiceCreate({
               />
             </Field>
 
-            <Field label="City / State / ZIP">
-              <div className="flex gap-2">
-                <input
-                  value={quote.projectCity}
-                  onChange={(event) => updateQuote("projectCity", event.target.value)}
-                  placeholder="City"
-                  className="form-input min-w-0 flex-1"
-                />
-                <input
-                  value={quote.projectState}
-                  onChange={(event) =>
-                    updateQuote("projectState", event.target.value.toUpperCase())
-                  }
-                  maxLength={2}
-                  placeholder="NC"
-                  className="form-input w-16 shrink-0"
-                />
-                <input
-                  inputMode="numeric"
-                  value={quote.projectZip}
-                  onChange={(event) => updateQuote("projectZip", event.target.value)}
-                  placeholder="27021"
-                  className="form-input w-24 shrink-0"
-                />
-              </div>
+            <Field label="City">
+              <input
+                value={quote.projectCity}
+                onChange={(event) => updateQuote("projectCity", event.target.value)}
+                placeholder="City"
+                className="form-input"
+              />
+            </Field>
+
+            <Field label="State">
+              <input
+                value={quote.projectState}
+                onChange={(event) =>
+                  updateQuote("projectState", event.target.value.toUpperCase())
+                }
+                maxLength={2}
+                placeholder="NC"
+                className="form-input"
+              />
+            </Field>
+
+            <Field label="ZIP Code">
+              <input
+                inputMode="numeric"
+                value={quote.projectZip}
+                onChange={(event) => updateQuote("projectZip", event.target.value)}
+                placeholder="27021"
+                className="form-input"
+              />
             </Field>
           </div>
         </section>
