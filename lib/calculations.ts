@@ -340,11 +340,12 @@ function sanitizeMoneyCents(value: number): number {
 }
 
 // Compute a service-call quote: the total is simply the sum of the freeform
-// line amounts (no base package, no multipliers, no variance). Each line's
-// amount is entered directly in cents, so there is no unit price and no
-// rounding drift. The lines are echoed back (sanitized) so the preview/PDF
-// and the saved calculation_data snapshot all agree. Pure computation, no
-// Supabase access — safe to call from a client component.
+// line amounts (no base package, no multipliers, no variance). Lines carry a
+// unit price and the amount is qty × unit price (the builders derive the
+// amount; this function echoes what was entered so the preview/PDF and the
+// saved calculation_data snapshot all agree). Direct-invoice lines share the
+// same shape. Pure computation, no Supabase access — safe to call from a
+// client component.
 export function calculateServiceQuote(
   quote: QuoteFormState
 ): ServiceQuoteCalculationResult {
@@ -352,6 +353,13 @@ export function calculateServiceQuote(
     id: line.id,
     name: line.name.trim(),
     quantity: sanitizeQuantity(line.quantity),
+    // Only set when the line carries a unit price (new service quotes and all
+    // direct invoices). Undefined is dropped when the snapshot is JSON-encoded,
+    // so old flat-amount lines stay flat.
+    unitPriceCents:
+      line.unitPriceCents !== undefined
+        ? sanitizeMoneyCents(line.unitPriceCents)
+        : undefined,
     amountCents: sanitizeMoneyCents(line.amountCents),
     comment: line.comment?.trim() || undefined
   }));

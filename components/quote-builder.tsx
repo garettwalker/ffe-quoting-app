@@ -161,11 +161,12 @@ export function QuoteBuilder({
 
     const storedQuote = getActiveQuote();
 
-    // Only resume a stored draft that is NOT a service-call draft. A service
-    // call draft in localStorage is left alone (the owner is starting a new
-    // build explicitly); this builder starts fresh instead of clobbering it,
-    // and the service draft remains resumable from the chooser.
-    if (storedQuote && storedQuote.quote.quoteType !== "service_call") {
+    // Only resume a stored draft that is actually a new-build draft. A
+    // service-call or direct-invoice draft in localStorage is left alone (the
+    // owner is starting a new build explicitly); this builder starts fresh
+    // instead of clobbering it, and the other draft remains resumable from
+    // the chooser.
+    if (storedQuote && storedQuote.quote.quoteType === "new_build") {
       setQuote(
         adoptBaseRatePreset(
           normalizeLegacyQuote(storedQuote.quote),
@@ -265,18 +266,20 @@ export function QuoteBuilder({
     }));
   }
 
+  // New adders insert at the TOP of the list so the qty is immediately
+  // visible / editable without scrolling (owner request).
   function handleAddLineItem(pricingItemId: string) {
     setCompletionMessage("");
     setDraftMessage("");
     setQuote((current) => ({
       ...current,
       lineItems: [
-        ...current.lineItems,
         {
           pricingItemId,
           quantity: 1,
           comment: ""
-        }
+        },
+        ...current.lineItems
       ]
     }));
   }

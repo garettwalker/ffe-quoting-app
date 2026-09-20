@@ -17,16 +17,17 @@ export const dynamic = "force-dynamic";
 // Printable invoice. Dispatch is by QUOTE TYPE, not kind: a service call may be
 // unsplit (kind "service") or split (kind "initial" deposit + "finish" final),
 // so a service-call quote routes ALL of its invoice kinds to the service print
-// page; a new build routes initial/finish to the new-build print page. The
-// on-screen section below is a preview of the downloaded PDF; both render from
-// the same pre-formatted props built by the loaders, so they can never drift
-// apart. Clicking Download PDF hits /quotes/[id]/invoices/[kind]/pdf which
-// renders the react-pdf document to a buffer and streams it back. kind is
-// validated by the loaders (return null for an unknown kind or when invoicing
-// has not been set up).
+// page; a direct invoice (created without a quote first) always has the single
+// kind "service" invoice and routes there too; a new build routes
+// initial/finish to the new-build print page. The on-screen section below is a
+// preview of the downloaded PDF; both render from the same pre-formatted props
+// built by the loaders, so they can never drift apart. Clicking Download PDF
+// hits /quotes/[id]/invoices/[kind]/pdf which renders the react-pdf document
+// to a buffer and streams it back. kind is validated by the loaders (return
+// null for an unknown kind or when invoicing has not been set up).
 export default async function PrintInvoicePage({ params }: PageProps) {
   const quoteType = await fetchQuoteType(params.id);
-  if (quoteType === "service_call") {
+  if (quoteType === "service_call" || quoteType === "direct_invoice") {
     return (
       <ServiceInvoicePrintPage
         id={params.id}
@@ -239,6 +240,9 @@ async function ServiceInvoicePrintPage({
   const suggestedEmails = await getCustomerEmailsForQuote(id);
 
   const { pdfProps } = input;
+  // Direct invoices carry a per-unit price on their lines; when any line has
+  // one, the on-screen preview mirrors the PDF's extra Unit Price column.
+  const showUnitPrice = pdfProps.lines.some((line) => line.unitPrice);
   const projectName = pdfProps.projectName || "";
   const projectPrimary = projectName || pdfProps.fullAddress;
   const projectSecondary = projectName
@@ -337,6 +341,9 @@ async function ServiceInvoicePrintPage({
               <tr>
                 <th className="p-3 font-black">Description</th>
                 <th className="p-3 text-right font-black">Qty</th>
+                {showUnitPrice ? (
+                  <th className="p-3 text-right font-black">Unit Price</th>
+                ) : null}
                 <th className="p-3 text-right font-black">Amount</th>
               </tr>
             </thead>
@@ -344,7 +351,7 @@ async function ServiceInvoicePrintPage({
               {pdfProps.lines.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={showUnitPrice ? 4 : 3}
                     className="p-3 text-sm font-bold text-charcoal/60"
                   >
                     No charges on this invoice.
@@ -362,6 +369,9 @@ async function ServiceInvoicePrintPage({
                       ) : null}
                     </td>
                     <td className="p-3 text-right">{line.quantityLabel}</td>
+                    {showUnitPrice ? (
+                      <td className="p-3 text-right">{line.unitPrice ?? ""}</td>
+                    ) : null}
                     <td className="p-3 text-right font-black text-deep-pine">
                       {line.amount}
                     </td>

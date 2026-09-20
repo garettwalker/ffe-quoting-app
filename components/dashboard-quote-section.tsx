@@ -90,8 +90,13 @@ function QuoteCard({
     .filter(Boolean)
     .join(", ");
 
-  const isService = normalizeQuoteType(quote.quote_type) === "service_call";
-  const stage = isService
+  const quoteType = normalizeQuoteType(quote.quote_type);
+  const isService = quoteType === "service_call";
+  // A direct invoice (created without a quote) shares the service lifecycle
+  // (single invoice, accepted → paid) and money summary.
+  const isDirectInvoice = quoteType === "direct_invoice";
+  const isServiceLike = isService || isDirectInvoice;
+  const stage = isServiceLike
     ? serviceLifecycleStage(quote.status, quote.invoice_data, receipts)
     : lifecycleStage(quote.status, quote.invoice_data, receipts);
 
@@ -103,7 +108,7 @@ function QuoteCard({
   // service accepted/scheduled (the single invoice may be set up but not yet
   // emailed = "scheduled" / not owed).
   const showMoneySummary =
-    isService
+    isServiceLike
       ? quote.status === "accepted" || quote.status === "scheduled"
       : quote.status === "accepted";
 
@@ -114,6 +119,11 @@ function QuoteCard({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{quote.quote_id}</span>
             <StatusBadge stage={stage} />
+            {isDirectInvoice ? (
+              <span className="rounded-full bg-moss/12 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-moss">
+                Direct invoice
+              </span>
+            ) : null}
           </div>
           <p className="mt-1 font-bold text-charcoal">
             {quote.project_name || quote.client_name}
@@ -134,7 +144,7 @@ function QuoteCard({
                 : owed > 0
                   ? `Outstanding: ${formatCurrency(owed)}`
                   : pending > 0
-                    ? `${isService ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
+                    ? `${isServiceLike ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
                     : "Invoice paid in full"}
             </p>
           ) : null}
@@ -146,7 +156,11 @@ function QuoteCard({
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <CardActions quote={quote} isService={isService} />
+        <CardActions
+          quote={quote}
+          isService={isService}
+          isDirectInvoice={isDirectInvoice}
+        />
       </div>
     </div>
   );
@@ -154,10 +168,12 @@ function QuoteCard({
 
 function CardActions({
   quote,
-  isService
+  isService,
+  isDirectInvoice
 }: {
   quote: DashboardQuoteRow;
   isService: boolean;
+  isDirectInvoice: boolean;
 }) {
   const openLink = (
     <Link
@@ -168,7 +184,9 @@ function CardActions({
     </Link>
   );
 
-  const printLink = (
+  // Quote-document PDF: new builds and service calls have one; a direct
+  // invoice does not (it IS the invoice), so its link is never shown.
+  const printLink = isDirectInvoice ? null : (
     <Link
       href={`/quotes/${quote.id}/print`}
       className="rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
@@ -179,7 +197,7 @@ function CardActions({
 
   // Summary quote is new-build-only (category subtotals). Service calls have no
   // categories, so the link is hidden and the route guards against them too.
-  const summaryLink = isService ? null : (
+  const summaryLink = isService || isDirectInvoice ? null : (
     <Link
       href={`/quotes/${quote.id}/summary`}
       className="rounded-full border border-pine/20 px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine hover:text-whitewarm"

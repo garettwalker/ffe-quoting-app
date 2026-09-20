@@ -168,7 +168,43 @@ export default function QuoteReviewPage() {
 
   const { quote, result, savedQuoteId } = storedQuote;
 
+  // A direct invoice has no two-step review/prepare flow — its working copy
+  // saves in one step from the direct-invoice builder. If one is sitting in the
+  // shared working-copy slot, refuse it here rather than letting "Prepare"
+  // half-create a direct invoice with status "prepared". The direct-invoice
+  // builder resumes the same working copy.
+  if (quote.quoteType === "direct_invoice") {
+    return (
+      <AppShell>
+        <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-8 shadow-soft">
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
+            Quote Review
+          </p>
+          <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
+            This is a direct invoice, not a quote.
+          </h1>
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
+            Direct invoices skip the review step — they save in one step from
+            their own builder. Continue there to save the invoice.
+          </p>
+          <Link
+            href="/quotes/new?type=direct_invoice"
+            className="mt-6 inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
+          >
+            Continue the direct invoice
+          </Link>
+        </section>
+      </AppShell>
+    );
+  }
+
   const isServiceCall = quote.quoteType === "service_call";
+  // Unit Price column on the review table when any line carries a unit price
+  // (the qty × price model); legacy flat-amount lines omit the column.
+  const showServiceUnitPrice =
+    isServiceCall &&
+    isServiceResult(result) &&
+    result.lines.some((line) => line.unitPriceCents !== undefined);
 
   const fullAddress = [
     quote.projectStreet,
@@ -270,7 +306,12 @@ export default function QuoteReviewPage() {
                     <th className="p-3 font-black">Item</th>
                     <th className="p-3 font-black">Qty</th>
                     {isServiceCall ? (
-                      <th className="p-3 font-black">Amount</th>
+                      <>
+                        {showServiceUnitPrice ? (
+                          <th className="p-3 font-black">Unit Price</th>
+                        ) : null}
+                        <th className="p-3 font-black">Amount</th>
+                      </>
                     ) : (
                       <>
                         <th className="p-3 font-black">Unit</th>
@@ -293,6 +334,13 @@ export default function QuoteReviewPage() {
                             ) : null}
                           </td>
                           <td className="p-3">{line.quantity.toLocaleString()}</td>
+                          {showServiceUnitPrice ? (
+                            <td className="p-3">
+                              {line.unitPriceCents !== undefined
+                                ? formatCurrency(line.unitPriceCents)
+                                : "—"}
+                            </td>
+                          ) : null}
                           <td className="p-3 font-black text-deep-pine">
                             {formatCurrency(line.amountCents)}
                           </td>

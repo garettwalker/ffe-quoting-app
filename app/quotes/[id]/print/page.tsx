@@ -17,13 +17,40 @@ export const dynamic = "force-dynamic";
 export default async function PrintQuotePage({ params }: PageProps) {
   // Dispatch on quote_type BEFORE loading the full row so a service-call quote
   // gets the purpose-built service preview (Description / Qty / Amount, no
-  // pricing levers) and a new-build quote gets the existing detailed preview.
+  // pricing levers) and a new-build quote gets the existing detailed preview. A
+  // direct invoice has NO quote document (it was created as an invoice), so it
+  // never renders here.
   const quoteType = await fetchQuoteType(params.id);
 
+  if (quoteType === "direct_invoice") {
+    return <NoQuoteDocument />;
+  }
   if (quoteType === "service_call") {
     return <ServiceQuotePrintPage id={params.id} />;
   }
   return <NewBuildQuotePrintPage id={params.id} />;
+}
+
+// Direct invoices are invoice-first records — there is no quote document to
+// preview or download.
+function NoQuoteDocument() {
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-10">
+      <p className="mb-4 font-display text-3xl font-bold text-moss">
+        No quote document.
+      </p>
+      <p className="mb-6 text-charcoal/75">
+        This record is a direct invoice — it was created without a quote, so
+        there is no quote PDF. Manage it from its invoicing page instead.
+      </p>
+      <Link
+        href="/quotes"
+        className="inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
+      >
+        Back to Quotes
+      </Link>
+    </div>
+  );
 }
 
 // --- New build (existing flow) ----------------------------------------------
@@ -218,6 +245,11 @@ async function ServiceQuotePrintPage({ id }: { id: string }) {
   }
 
   const { quote, result, settings, fullAddress, quoteDateLabel } = input;
+  // Lines carrying a unit price (qty × price model) get a Unit Price column,
+  // mirroring the PDF; legacy flat-amount lines render without it.
+  const showUnitPrice = result.lines.some(
+    (line) => line.unitPriceCents !== undefined
+  );
   const projectName = quote.projectName || "";
   const projectPrimary = projectName || fullAddress;
   const projectSecondary = projectName
@@ -311,6 +343,9 @@ async function ServiceQuotePrintPage({ id }: { id: string }) {
               <tr>
                 <th className="p-3 font-black">Description</th>
                 <th className="p-3 text-right font-black">Qty</th>
+                {showUnitPrice ? (
+                  <th className="p-3 text-right font-black">Unit Price</th>
+                ) : null}
                 <th className="p-3 text-right font-black">Amount</th>
               </tr>
             </thead>
@@ -318,7 +353,7 @@ async function ServiceQuotePrintPage({ id }: { id: string }) {
               {result.lines.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={showUnitPrice ? 4 : 3}
                     className="p-3 text-sm font-bold text-charcoal/60"
                   >
                     No line items on this quote.
@@ -338,6 +373,13 @@ async function ServiceQuotePrintPage({ id }: { id: string }) {
                     <td className="p-3 text-right">
                       {line.quantity.toLocaleString()}
                     </td>
+                    {showUnitPrice ? (
+                      <td className="p-3 text-right">
+                        {line.unitPriceCents !== undefined
+                          ? formatCurrency(line.unitPriceCents)
+                          : "—"}
+                      </td>
+                    ) : null}
                     <td className="p-3 text-right font-black text-deep-pine">
                       {formatCurrency(line.amountCents)}
                     </td>

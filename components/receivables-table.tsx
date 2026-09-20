@@ -285,7 +285,12 @@ function ReceivablesSection({
 }
 
 function JobRow({ job }: { job: ReceivableJob }) {
-  const isService = job.quoteType === "service_call";
+  // A direct invoice renders through the same unsplit single-invoice shape as
+  // an unsplit service call, so it shares the service-like cells (single
+  // primary column, Finish N/A); the tag + cell labels distinguish it.
+  const isService =
+    job.quoteType === "service_call" || job.quoteType === "direct_invoice";
+  const isDirectInvoice = job.quoteType === "direct_invoice";
   // A split service call (deposit + final) fills both columns like a new
   // build; an unsplit service call fills only the primary column (Finish = N/A).
   const isSplitService = isService && job.finish != null;
@@ -307,7 +312,7 @@ function JobRow({ job }: { job: ReceivableJob }) {
         ) : null}
         {isService ? (
           <span className="mt-1 inline-block rounded-full bg-moss/12 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-moss">
-            Service call
+            {isDirectInvoice ? "Direct invoice" : "Service call"}
           </span>
         ) : null}
       </td>
@@ -315,8 +320,18 @@ function JobRow({ job }: { job: ReceivableJob }) {
       <td className="py-4 pr-4">
         <InvoiceCell
           invoice={job.initial}
-          label={isSplitService ? "Deposit" : isService ? "Service" : "Rough-in"}
-          caption={isService ? (isSplitService ? "Deposit" : "Service") : undefined}
+          label={
+            isSplitService ? "Deposit" : isDirectInvoice ? "Invoice" : isService ? "Service" : "Rough-in"
+          }
+          caption={
+            isService
+              ? isSplitService
+                ? "Deposit"
+                : isDirectInvoice
+                  ? "Invoice"
+                  : "Service"
+              : undefined
+          }
         />
       </td>
 

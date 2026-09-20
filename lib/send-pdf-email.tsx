@@ -47,6 +47,9 @@ export async function renderEmailAttachment(
     // so a service quote gets the purpose-built service PDF, not the new-build
     // detailed quote (which would return null for a service row anyway).
     const quoteType = await fetchQuoteType(id);
+    // A direct invoice has NO quote document — refuse (caller surfaces
+    // not-found) rather than falling through to the new-build loader.
+    if (quoteType === "direct_invoice") return null;
     if (quoteType === "service_call") {
       const input = await loadServiceQuotePdfInput(id);
       if (!input) return null;
@@ -80,6 +83,14 @@ export async function renderEmailAttachment(
   }
 
   if (doc === "summary") {
+    // The summary quote is a new-build document only: service calls have their
+    // own purpose-built quote PDF (sent as doc "detailed"), and a direct
+    // invoice has no quote document at all. Refuse both (caller surfaces
+    // not-found) instead of loading new-build props off the wrong row shape.
+    const quoteType = await fetchQuoteType(id);
+    if (quoteType === "service_call" || quoteType === "direct_invoice") {
+      return null;
+    }
     const input = await loadSummaryQuotePdfInput(id);
     if (!input) return null;
     const buffer = await renderToBuffer(
@@ -101,11 +112,13 @@ export async function renderEmailAttachment(
   // Dispatch by QUOTE TYPE, not kind: a service call may be unsplit (kind
   // "service") or split (kind "initial" deposit + "finish" final), and ALL of
   // its invoice kinds render through the purpose-built service invoice
-  // document. A new build renders initial/finish through the new-build invoice
-  // document. docTitle flows from each loader's pdfProps.title ("Service
+  // document. A direct invoice (single kind "service" invoice, lines carrying
+  // unit prices) renders through the same document. A new build renders
+  // initial/finish through the new-build invoice document. docTitle flows from
+  // each loader's pdfProps.title ("Invoice" for direct invoices, "Service
   // Invoice" / "Deposit Invoice" / "Final Invoice" for service calls).
   const quoteType = await fetchQuoteType(id);
-  if (quoteType === "service_call") {
+  if (quoteType === "service_call" || quoteType === "direct_invoice") {
     const input = await loadServiceInvoicePdfInput(id, invoiceKind);
     if (!input) return null;
     const buffer = await renderToBuffer(

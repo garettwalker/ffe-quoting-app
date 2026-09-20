@@ -98,6 +98,12 @@ function buildServiceQuotePdfInput(
       name: line.name,
       comment: line.comment ?? "",
       quantityLabel: line.quantity.toLocaleString(),
+      // Lines carrying a unit price (qty × price model) get a Unit Price column
+      // on the quote PDF; legacy flat-amount lines render without it.
+      unitPrice:
+        line.unitPriceCents !== undefined
+          ? formatCurrency(line.unitPriceCents)
+          : undefined,
       amount: formatCurrency(line.amountCents)
     })),
     quoteTotal: formatCurrency(result.clientQuoteTotalCents),

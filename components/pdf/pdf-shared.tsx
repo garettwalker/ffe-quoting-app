@@ -403,6 +403,13 @@ const serviceLineStyles = StyleSheet.create({
     fontFamily: "Helvetica-Bold",
     color: PDF_COLORS.deepPine
   },
+  headUnit: {
+    width: 88,
+    textAlign: "right",
+    fontSize: 8,
+    fontFamily: "Helvetica-Bold",
+    color: PDF_COLORS.deepPine
+  },
   headAmount: {
     width: 96,
     textAlign: "right",
@@ -442,6 +449,13 @@ const serviceLineStyles = StyleSheet.create({
     fontFamily: "Helvetica",
     color: PDF_INK.textStrong
   },
+  unit: {
+    width: 88,
+    textAlign: "right",
+    fontSize: 9.5,
+    fontFamily: "Helvetica",
+    color: PDF_INK.textStrong
+  },
   amount: {
     width: 96,
     textAlign: "right",
@@ -455,6 +469,10 @@ export type PdfServiceLine = {
   name: string;
   comment: string;
   quantityLabel: string;
+  // Optional per-unit price (direct-invoice lines carry it; service-call lines
+  // don't). When ANY line on the table carries a unit price, the table renders
+  // an extra UNIT PRICE column between QTY and AMOUNT.
+  unitPrice?: string;
   amount: string;
 };
 
@@ -465,11 +483,15 @@ export function PdfServiceLineTable({
   lines: PdfServiceLine[];
   emptyLabel?: string;
 }) {
+  const showUnitPrice = lines.some((line) => line.unitPrice);
   return (
     <View style={serviceLineStyles.list}>
       <View style={serviceLineStyles.head} fixed>
         <Text style={serviceLineStyles.headDesc}>DESCRIPTION</Text>
         <Text style={serviceLineStyles.headQty}>QTY</Text>
+        {showUnitPrice ? (
+          <Text style={serviceLineStyles.headUnit}>UNIT PRICE</Text>
+        ) : null}
         <Text style={serviceLineStyles.headAmount}>AMOUNT</Text>
       </View>
       {lines.length === 0 ? (
@@ -496,6 +518,9 @@ export function PdfServiceLineTable({
               ) : null}
             </View>
             <Text style={serviceLineStyles.qty}>{line.quantityLabel}</Text>
+            {showUnitPrice ? (
+              <Text style={serviceLineStyles.unit}>{line.unitPrice ?? ""}</Text>
+            ) : null}
             <Text style={serviceLineStyles.amount}>{line.amount}</Text>
           </View>
         ))

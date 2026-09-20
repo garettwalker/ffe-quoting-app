@@ -269,7 +269,7 @@ function RecentQuoteRow({
             <span className="font-black text-deep-pine">{row.quote_id}</span>
             <StatusBadge
               stage={
-                normalizeQuoteType(row.quote_type) === "service_call"
+                normalizeQuoteType(row.quote_type) !== "new_build"
                   ? serviceLifecycleStage(
                       normalizeStatus(row.status),
                       row.invoice_data,

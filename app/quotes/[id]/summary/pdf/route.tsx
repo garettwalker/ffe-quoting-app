@@ -11,8 +11,8 @@ import { loadSummaryQuotePdfInput } from "@/lib/summary-quote-pdf";
 // render, so no blank-screen risk). Mirrors the Detailed Quote PDF route.
 //
 // The Summary Quote is new-build-only (category subtotals). A service-call
-// quote has no categories, so 404 it here rather than calling the new-build
-// loader on a service row.
+// quote has no categories, and a direct invoice has no quote document at all,
+// so 404 both here rather than calling the new-build loader on those rows.
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export async function GET(
 ) {
   const quoteType = await fetchQuoteType(params.id);
   const input =
-    quoteType === "service_call" ? null : await loadSummaryQuotePdfInput(params.id);
+    quoteType === "new_build" ? await loadSummaryQuotePdfInput(params.id) : null;
   if (!input) {
     return new NextResponse("Quote not found.", { status: 404 });
   }

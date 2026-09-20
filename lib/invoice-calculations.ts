@@ -17,14 +17,16 @@ import type { InvoiceReceipts } from "@/lib/email-log";
 //   - UNSPLIT: a single kind "service" invoice (due on completion). The
 //     original service-call model, preserved for quick jobs (troubleshoot, a
 //     small repair) and for every service quote saved before the split option
-//     existed.
+//     existed. Direct invoices (created without a quote first) ALWAYS have this
+//     single-service shape, so they count here too.
 //   - SPLIT: kind "initial" (deposit) + kind "finish" (final), reusing the
 //     new-build two-invoice machinery (a % split of the contract, no permit,
 //     paid-deposit freeze). Lets Chad bill 50% up front / 50% at finish on a
 //     remodel sized like a service call.
 export function isUnsplitServiceCall(data: InvoiceData | null): boolean {
   return (
-    data?.quoteType === "service_call" &&
+    (data?.quoteType === "service_call" ||
+      data?.quoteType === "direct_invoice") &&
     Array.isArray(data.invoices) &&
     data.invoices.some((invoice) => invoice.kind === "service")
   );

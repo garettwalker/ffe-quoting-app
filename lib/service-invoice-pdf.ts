@@ -44,9 +44,13 @@ export type ServiceInvoicePdfInput = {
 };
 
 // Returns null when the quote, its invoice setup, or the requested invoice
-// record can't be loaded OR when the quote is not a service call, so the route
-// handler can render its own not-found UI / fall through to the new-build
-// loader. `kind` must be "service", "initial", or "finish".
+// record can't be loaded OR when the quote is neither a service call nor a
+// direct invoice, so the route handler can render its own not-found UI / fall
+// through to the new-build loader. `kind` must be "service", "initial", or
+// "finish". A direct invoice (created without a quote first) always has the
+// single kind "service" invoice and renders through here too — its lines carry
+// unit prices, so the PDF adds a Unit Price column, and its single invoice is
+// titled "Invoice" rather than "Service Invoice".
 export async function loadServiceInvoicePdfInput(
   id: string,
   kind: InvoiceKind
@@ -78,7 +82,8 @@ export async function loadServiceInvoicePdfInput(
 
   const row = data as ServiceInvoiceRow;
   const quoteType = normalizeQuoteType(row.quote_type);
-  if (quoteType !== "service_call") return null;
+  if (quoteType !== "service_call" && quoteType !== "direct_invoice") return null;
+  const isDirectInvoice = quoteType === "direct_invoice";
 
   const quote = row.quote_data;
   const invoiceData = row.invoice_data as InvoiceData;
@@ -113,12 +118,21 @@ export async function loadServiceInvoicePdfInput(
     name: line.name,
     comment: line.comment ?? "",
     quantityLabel: line.quantity.toLocaleString(),
+    // Lines carrying a per-unit price (direct invoices always; service quotes
+    // since the qty × price model) get a Unit Price column in the PDF table.
+    // Legacy flat-amount lines don't set it and render without the column.
+    unitPrice:
+      line.unitPriceCents !== undefined
+        ? formatCurrency(line.unitPriceCents)
+        : undefined,
     amount: formatCurrency(line.amountCents)
   }));
 
   const title =
     kind === "service"
-      ? "Service Invoice"
+      ? isDirectInvoice
+        ? "Invoice"
+        : "Service Invoice"
       : kind === "initial"
         ? "Deposit Invoice"
         : "Final Invoice";

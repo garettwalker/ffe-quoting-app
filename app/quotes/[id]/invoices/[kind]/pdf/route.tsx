@@ -18,8 +18,9 @@ import type { InvoiceKind } from "@/lib/types";
 // kinds "initial" deposit + "finish" final) routes ALL of its invoice kinds to
 // the purpose-built service invoice document (Description / Qty / Amount
 // lines, no rough-in/finish split, no scope block, optional previously-invoiced
-// block on the final); a new build routes initial/finish to the existing
-// new-build invoice document.
+// block on the final); a direct invoice (single kind "service" invoice, lines
+// carrying unit prices) routes there too; a new build routes initial/finish to
+// the existing new-build invoice document.
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export async function GET(
 ) {
   const quoteType = await fetchQuoteType(params.id);
 
-  if (quoteType === "service_call") {
+  if (quoteType === "service_call" || quoteType === "direct_invoice") {
     const input = await loadServiceInvoicePdfInput(
       params.id,
       params.kind as InvoiceKind

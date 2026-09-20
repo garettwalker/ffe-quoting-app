@@ -24,11 +24,11 @@ export const dynamic = "force-dynamic";
 export default async function SummaryQuotePage({ params }: PageProps) {
   // The Summary Quote is a new-build-only document (one subtotal per pricing
   // category; service calls have no categories). A service-call quote has no
-  // summary, so guard here and render not-found rather than calling the
-  // new-build loader on a service row.
+  // summary, and a direct invoice has no quote document at all, so guard here
+  // and render not-found rather than calling the new-build loader on those rows.
   const quoteType = await fetchQuoteType(params.id);
   const input =
-    quoteType === "service_call" ? null : await loadSummaryQuotePdfInput(params.id);
+    quoteType === "new_build" ? await loadSummaryQuotePdfInput(params.id) : null;
 
   // The linked customer's emails (empty when no customer is linked) so the
   // Email To field can offer them as suggestions for a multi-recipient send.
@@ -40,7 +40,9 @@ export default async function SummaryQuotePage({ params }: PageProps) {
         <p className="mb-4 font-display text-3xl font-bold text-moss">
           {quoteType === "service_call"
             ? "Summary quote is not available for service calls."
-            : "Quote not found."}
+            : quoteType === "direct_invoice"
+              ? "No quote document — this record is a direct invoice."
+              : "Quote not found."}
         </p>
         <Link
           href={`/quotes/${params.id}`}

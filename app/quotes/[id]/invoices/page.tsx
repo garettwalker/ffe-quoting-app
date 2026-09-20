@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
+import { DirectInvoiceBuilder } from "@/components/direct-invoice-builder";
 import { InvoiceBuilder } from "@/components/invoice-builder";
 import { ServiceInvoiceBuilder } from "@/components/service-invoice-builder";
 import { InvoicePaidButton } from "@/components/invoice-paid-button";
@@ -144,13 +145,19 @@ export default async function InvoicingPage({ params }: PageProps) {
   const invoiceData = row.invoice_data;
   const quoteType = normalizeQuoteType(row.quote_type);
   const isService = quoteType === "service_call";
+  // A direct invoice (created without a quote first) uses the same single
+  // kind "service" invoice machinery as an unsplit service call, so almost
+  // every service branch below treats it as service-like too.
+  const isDirectInvoice = quoteType === "direct_invoice";
+  const isServiceLike = isService || isDirectInvoice;
   // A service call is either UNSPLIT (single kind "service" invoice, the
   // original model) or SPLIT (kind "initial" deposit + kind "finish" final,
   // reusing the new-build two-invoice machinery). The split renders two invoice
-  // cards (Deposit / Final) like a new build; the unsplit renders one.
-  const unsplitService = isService && isUnsplitServiceCall(invoiceData);
-  const serviceResult = isService ? (result as ServiceQuoteCalculationResult) : null;
-  const newBuildResult = !isService ? (result as QuoteCalculationResult) : null;
+  // cards (Deposit / Final) like a new build; the unsplit renders one. A direct
+  // invoice is ALWAYS the unsplit single-invoice shape.
+  const unsplitService = isServiceLike && isUnsplitServiceCall(invoiceData);
+  const serviceResult = isServiceLike ? (result as ServiceQuoteCalculationResult) : null;
+  const newBuildResult = !isServiceLike ? (result as QuoteCalculationResult) : null;
 
   // Emailed-state of each invoice from the email history. A finish/service
   // invoice that has never been emailed (and isn't paid) is "scheduled" and
@@ -182,7 +189,7 @@ export default async function InvoicingPage({ params }: PageProps) {
 
   const contractTotalCents = invoiceData
     ? invoiceData.contractAmountCents
-    : isService
+    : isServiceLike
       ? (serviceResult?.clientQuoteTotalCents ?? 0)
       : (newBuildResult?.clientQuoteTotalCents ?? 0);
 
@@ -221,7 +228,7 @@ export default async function InvoicingPage({ params }: PageProps) {
           </Link>
 
           <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
-            {isService ? "Service Invoice" : "Invoicing"}
+            {isDirectInvoice ? "Direct Invoice" : isService ? "Service Invoice" : "Invoicing"}
           </p>
           <h1 className="font-display text-4xl font-bold tracking-[-0.035em] text-moss md:text-5xl">
             {quote.projectName || quote.clientName || "Unnamed Client"}
@@ -247,7 +254,7 @@ export default async function InvoicingPage({ params }: PageProps) {
                     : owed > 0
                       ? `Outstanding: ${formatCurrency(owed)}`
                       : pending > 0
-                        ? `${isService ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
+                        ? `${isServiceLike ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
                         : "Paid in full"}
                 </p>
               );
@@ -284,7 +291,9 @@ export default async function InvoicingPage({ params }: PageProps) {
             How invoicing works
           </p>
           <p className="text-sm font-bold leading-6 text-charcoal/75">
-            {isService
+            {isDirectInvoice
+              ? "The invoice amount is the sum of the line items below (qty × unit price). One invoice, due on completion — edit the line items any time, then mark it paid when it is collected."
+              : isService
               ? unsplitService
                 ? "The invoice amount is the sum of the freeform line items. A service call has a single invoice (no rough-in/finish split, no permit fee). Mark it paid when it is collected."
                 : roughInPaid
@@ -298,7 +307,17 @@ export default async function InvoicingPage({ params }: PageProps) {
       </div>
 
       <div className="min-w-0 space-y-6">
-        {isService ? (
+        {isDirectInvoice ? (
+          // Direct invoice: the owner edits the invoice's own manual lines
+          // (qty × unit price). invoiceData is normally present (created in
+          // one step); null only after Delete invoices — the editor then
+          // starts empty and saving re-creates the invoice with a fresh number.
+          <DirectInvoiceBuilder
+            mode="edit"
+            quoteId={row.id}
+            initialInvoiceData={invoiceData}
+          />
+        ) : isService ? (
           <ServiceInvoiceBuilder
             quoteId={row.id}
             initialInvoiceData={invoiceData}
@@ -328,18 +347,18 @@ export default async function InvoicingPage({ params }: PageProps) {
         {invoiceData ? (
           <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-soft">
             <p className="mb-4 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              {isService && unsplitService ? "Current invoice" : "Current invoices"}
+              {isServiceLike && unsplitService ? "Current invoice" : "Current invoices"}
             </p>
 
             <div className="grid gap-4">
-              {isService && unsplitService ? (
+              {isServiceLike && unsplitService ? (
                 serviceInvoice ? (
                   <InvoiceCard
                     quoteId={row.id}
                     invoiceData={invoiceData}
                     kind="service"
                     reference={invoiceDisplayNumber(row.quote_id, serviceInvoice)}
-                    title="Service Invoice"
+                    title={isService ? "Service Invoice" : "Invoice"}
                     amountCents={serviceInvoice.amountCents}
                     status={serviceInvoice.status}
                     recordedBy={user?.email ?? ""}
@@ -395,7 +414,9 @@ export default async function InvoicingPage({ params }: PageProps) {
           </section>
         ) : (
           <section className="rounded-xl2 border border-pine/10 bg-cream p-6 text-sm font-bold text-charcoal/70">
-            {isService
+            {isDirectInvoice
+              ? "No invoice on this record yet. Add the line items above and click Save Changes to create it (it gets a fresh invoice number)."
+              : isService
               ? "No invoice yet. Set up the line items above (and toggle the deposit/final split if you want two invoices), then click Save."
               : "No invoices yet. Set up the line items, split, and permit fee above, then click Save Invoices."}
           </section>

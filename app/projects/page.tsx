@@ -22,13 +22,14 @@ import type { InvoiceData } from "@/lib/types";
 // Project Status Tracker. Every ACCEPTED (or scheduled service-call) quote is
 // a project, shown in ONE combined list (newest first) — not separated by quote
 // type. Each card still renders its own strip: new builds an 8-stage strip
-// (Quote to Paid), service calls a simpler 5-stage strip (Quote / Accepted /
-// Scheduled / Billed / Paid) plus a "Service call" tag. The 4 new-build field
-// stages are advanced manually here; the billing/paid stages are derived from
-// invoice + email-log facts so this view can never disagree with /quotes or
-// /receivables. Filter chips narrow by bucket via ?filter=. Read-only except
-// the stage-advance / edit-stages controls, which write quotes.project_status
-// (new builds) or quotes.status (service schedule).
+// (Quote to Paid), service calls and direct invoices a simpler 5-stage strip
+// (Quote / Accepted / Scheduled / Billed / Paid) plus a "Service call" /
+// "Direct invoice" tag. The 4 new-build field stages are advanced manually
+// here; the billing/paid stages are derived from invoice + email-log facts so
+// this view can never disagree with /quotes or /receivables. Filter chips
+// narrow by bucket via ?filter=. Read-only except the stage-advance /
+// edit-stages controls, which write quotes.project_status (new builds) or
+// quotes.status (service schedule).
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,9 @@ type NewBuildJob = {
 
 type ServiceJob = {
   kind: "service_call";
+  // True when the row is a direct invoice (created without a quote): it shares
+  // the service-call 5-stage strip and card, but tags "Direct invoice".
+  direct: boolean;
   row: Row;
   stages: ReturnType<typeof computeServiceCallStages>;
   crew: string[];
@@ -120,6 +124,7 @@ export default async function ProjectsPage({
     crew: string[];
   };
   type ServiceJob = {
+    direct: boolean;
     row: Row;
     stages: ReturnType<typeof computeServiceCallStages>;
     crew: string[];
@@ -130,9 +135,11 @@ export default async function ProjectsPage({
   for (const row of rows) {
     const receipts = receiptsMap.get(row.id) ?? EMPTY_RECEIPTS;
     const crew = crewMap.get(row.id) ?? [];
-    if (normalizeQuoteType(row.quote_type) === "service_call") {
+    const quoteType = normalizeQuoteType(row.quote_type);
+    if (quoteType === "service_call" || quoteType === "direct_invoice") {
       jobs.push({
         kind: "service_call",
+        direct: quoteType === "direct_invoice",
         row,
         crew,
         stages: computeServiceCallStages({
@@ -266,10 +273,10 @@ function ProjectsHeader() {
       </h1>
       <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
         Every accepted job in one list, tracked end-to-end from field work
-        through billing. New builds show an 8-stage strip; service calls (tagged
-        below each card's name) show a simpler 5-stage strip. Mark a stage
-        complete or edit stages to correct them; billing and paid stages update
-        automatically from invoicing.
+        through billing. New builds show an 8-stage strip; service calls and
+        direct invoices (tagged below each card's name) show a simpler 5-stage
+        strip. Mark a stage complete or edit stages to correct them; billing and
+        paid stages update automatically from invoicing.
       </p>
     </div>
   );
@@ -386,7 +393,7 @@ function ServiceProjectCard({ job }: { job: ServiceJob }) {
         </div>
         <div className="flex items-center gap-2">
           <span className="whitespace-nowrap rounded-full bg-sage/30 px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] text-deep-pine">
-            Service call
+            {job.direct ? "Direct invoice" : "Service call"}
           </span>
           <span
             className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-black uppercase tracking-[0.08em] ${

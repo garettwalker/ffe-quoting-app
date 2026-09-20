@@ -358,11 +358,12 @@ export function InvoiceBuilder({
     });
   }
 
+  // New lines insert at the TOP of the list so they are immediately visible /
+  // editable without scrolling (owner request).
   function addScopeLine(pricingItemId: string) {
     const item = pricingItems.find((p) => p.id === pricingItemId);
     if (!item) return;
     setScopeLines((prev) => [
-      ...prev,
       {
         pricingItemId: item.id,
         name: item.name,
@@ -370,7 +371,8 @@ export function InvoiceBuilder({
         quantity: 1,
         unitPriceCents: Math.round(item.basePriceCents * clientMultiplier),
         comment: ""
-      }
+      },
+      ...prev
     ]);
   }
 
@@ -382,7 +384,6 @@ export function InvoiceBuilder({
   // target dropdown (default "both").
   function addAdjustmentLine() {
     setScopeLines((prev) => [
-      ...prev,
       {
         pricingItemId: "",
         name: "Pricing adjustment",
@@ -392,7 +393,8 @@ export function InvoiceBuilder({
         comment: "",
         isAdjustment: true,
         adjustmentTarget: "both"
-      }
+      },
+      ...prev
     ]);
   }
 

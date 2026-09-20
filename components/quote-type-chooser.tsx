@@ -26,18 +26,24 @@ export function QuoteTypeChooser() {
     setHasLoaded(true);
   }, []);
 
-  function startNew(type: "new_build" | "service_call") {
+  function startNew(type: "new_build" | "service_call" | "direct_invoice") {
     clearActiveQuote();
     router.push(`/quotes/new?type=${type}`);
   }
 
   const resumeType = stored?.quote.quoteType ?? "new_build";
   const resumeLabel =
-    resumeType === "service_call" ? "Service call quote" : "New build quote";
+    resumeType === "service_call"
+      ? "Service call quote"
+      : resumeType === "direct_invoice"
+        ? "Direct invoice"
+        : "New build quote";
   const resumeHref =
     resumeType === "service_call"
       ? "/quotes/new?type=service_call"
-      : "/quotes/new?type=new_build";
+      : resumeType === "direct_invoice"
+        ? "/quotes/new?type=direct_invoice"
+        : "/quotes/new?type=new_build";
 
   return (
     <div className="space-y-8">
@@ -67,7 +73,7 @@ export function QuoteTypeChooser() {
         </section>
       ) : null}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
         <button
           type="button"
           onClick={() => startNew("new_build")}
@@ -106,6 +112,27 @@ export function QuoteTypeChooser() {
           </p>
           <span className="mt-auto pt-5 text-sm font-black text-deep-pine group-hover:underline">
             Start service call quote &rarr;
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => startNew("direct_invoice")}
+          className="group flex min-h-64 flex-col rounded-xl2 border border-clay/25 bg-whitewarm/75 p-8 text-left shadow-card transition hover:border-clay/40 hover:bg-whitewarm"
+        >
+          <p className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-clay">
+            Direct Invoice
+          </p>
+          <h2 className="font-display text-3xl font-bold tracking-[-0.035em] text-moss">
+            Skip the quote
+          </h2>
+          <p className="mt-3 text-sm font-medium leading-6 text-charcoal/75">
+            An invoice without a quote. Manual line items (catalog prefill,
+            everything editable) and one invoice due on completion — created in
+            a single save.
+          </p>
+          <span className="mt-auto pt-5 text-sm font-black text-deep-pine group-hover:underline">
+            Create direct invoice &rarr;
           </span>
         </button>
       </div>

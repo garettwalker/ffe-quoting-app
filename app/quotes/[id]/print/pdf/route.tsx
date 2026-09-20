@@ -24,6 +24,14 @@ export async function GET(
 ) {
   const quoteType = await fetchQuoteType(params.id);
 
+  // A direct invoice has no quote document — never render the new-build
+  // detailed quote off its row.
+  if (quoteType === "direct_invoice") {
+    return new NextResponse("Direct invoices have no quote document.", {
+      status: 404
+    });
+  }
+
   if (quoteType === "service_call") {
     const input = await loadServiceQuotePdfInput(params.id);
     if (!input) {

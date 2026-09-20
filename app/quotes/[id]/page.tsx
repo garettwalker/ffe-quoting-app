@@ -140,7 +140,19 @@ export default async function SavedQuotePage({ params }: PageProps) {
   const result = row.calculation_data;
   const status = normalizeStatus(row.status);
   const quoteType: QuoteType = normalizeQuoteType(row.quote_type);
+  // A direct invoice is an invoice-first record (no quote document): it shares
+  // the service lifecycle + line-item table but never links to quote PDFs or
+  // the edit page.
+  const isDirectInvoice = quoteType === "direct_invoice";
   const isService = quoteType === "service_call";
+  const isServiceLike = isService || isDirectInvoice;
+  // Service-like line items. The Unit Price column only shows when the lines
+  // carry per-unit prices: direct invoices always do; service quotes saved
+  // before the qty × price model keep their flat amounts (no column).
+  const serviceLines = quote.serviceLines ?? [];
+  const showUnitPrice = serviceLines.some(
+    (line) => line.unitPriceCents !== undefined
+  );
   const newBuildResult = !isServiceResult(result) ? result : null;
   // Prefer the customer_id column (source of truth, set by backfill) over the
   // JSONB snapshot so a backfilled quote still links to its customer record.
@@ -223,11 +235,16 @@ export default async function SavedQuotePage({ params }: PageProps) {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <StatusBadge
               stage={
-                isService
+                isServiceLike
                   ? serviceLifecycleStage(status, row.invoice_data, receipts)
                   : lifecycleStage(status, row.invoice_data, receipts)
               }
             />
+            {isDirectInvoice ? (
+              <span className="rounded-full bg-moss/12 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.08em] text-moss">
+                Direct invoice
+              </span>
+            ) : null}
             <span className="text-sm font-bold text-charcoal/60">
               Saved {createdDate}
             </span>
@@ -236,7 +253,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
 
         <div className="rounded-xl1 border border-pine/10 bg-whitewarm/75 px-5 py-4 shadow-card">
           <p className="text-xs font-black uppercase tracking-[0.14em] text-clay">
-            Final Total
+            {isDirectInvoice ? "Invoice Total" : "Final Total"}
           </p>
           <p className="font-display text-4xl font-bold tracking-[-0.04em] text-deep-pine">
             {formatCurrency(result.clientQuoteTotalCents)}
@@ -268,13 +285,13 @@ export default async function SavedQuotePage({ params }: PageProps) {
             />
             <ReviewField label="Project Address" value={fullAddress} />
             <ReviewField label="Project Type" value={quote.projectType} />
-            {isService ? null : (
+            {isServiceLike ? null : (
               <ReviewField
                 label="Square Footage"
                 value={quote.squareFootage.toLocaleString()}
               />
             )}
-            {isService || !newBuildResult ? null : (
+            {isServiceLike || !newBuildResult ? null : (
               <ReviewField
                 label="Base Rate"
                 value={`${newBuildResult.baseRateLabel ?? "Base rate"} - ${formatCurrency(newBuildResult.baseRateCents)}/sf`}
@@ -284,7 +301,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
 
           <div className="mt-8">
             <p className="mb-3 text-sm font-black uppercase tracking-[0.16em] text-clay">
-              {isService ? "Line Items" : "Customer-Facing Line Items"}
+              {isServiceLike ? "Line Items" : "Customer-Facing Line Items"}
             </p>
 
             <div className="responsive-table-wrap rounded-xl1 border border-pine/10">
@@ -293,8 +310,13 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   <tr>
                     <th className="p-3 font-black">Item</th>
                     <th className="p-3 font-black">Qty</th>
-                    {isService ? (
-                      <th className="p-3 font-black">Amount</th>
+                    {isServiceLike ? (
+                      <>
+                        {showUnitPrice ? (
+                          <th className="p-3 font-black">Unit Price</th>
+                        ) : null}
+                        <th className="p-3 font-black">Amount</th>
+                      </>
                     ) : (
                       <>
                         <th className="p-3 font-black">Unit</th>
@@ -305,8 +327,8 @@ export default async function SavedQuotePage({ params }: PageProps) {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-pine/10 bg-cream">
-                  {isService
-                    ? quote.serviceLines.map((line) => (
+                  {isServiceLike
+                    ? serviceLines.map((line) => (
                         <tr key={line.id}>
                           <td className="p-3 font-bold text-charcoal">
                             <div>{line.name}</div>
@@ -317,6 +339,13 @@ export default async function SavedQuotePage({ params }: PageProps) {
                             ) : null}
                           </td>
                           <td className="p-3">{line.quantity.toLocaleString()}</td>
+                          {showUnitPrice ? (
+                            <td className="p-3">
+                              {line.unitPriceCents !== undefined
+                                ? formatCurrency(line.unitPriceCents)
+                                : "—"}
+                            </td>
+                          ) : null}
                           <td className="p-3 font-black text-deep-pine">
                             {formatCurrency(line.amountCents)}
                           </td>
@@ -347,7 +376,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
             </div>
           </div>
 
-          {!isService && newBuildResult ? (
+          {!isServiceLike && newBuildResult ? (
             <div className="mt-8">
               <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
                 Internal Math Breakdown
@@ -515,13 +544,16 @@ export default async function SavedQuotePage({ params }: PageProps) {
 
             {status === "accepted" ? (
               <>
-                <Link
-                  href={`/quotes/${row.id}/print`}
-                  className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
-                >
-                  {isService ? "Quote PDF" : "Detailed Quote PDF"}
-                </Link>
-                {isService ? null : (
+                {/* A direct invoice has no quote document — no PDF / Summary links. */}
+                {isDirectInvoice ? null : (
+                  <Link
+                    href={`/quotes/${row.id}/print`}
+                    className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
+                  >
+                    {isService ? "Quote PDF" : "Detailed Quote PDF"}
+                  </Link>
+                )}
+                {isServiceLike ? null : (
                   <Link
                     href={`/quotes/${row.id}/summary`}
                     className="rounded-full border border-pine/20 px-5 py-3 text-center font-black text-deep-pine hover:bg-pine hover:text-whitewarm"
@@ -535,7 +567,7 @@ export default async function SavedQuotePage({ params }: PageProps) {
                 >
                   Invoicing
                 </Link>
-                {isService ? (
+                {isServiceLike ? (
                   <QuoteStatusButton
                     quoteId={row.id}
                     newStatus="scheduled"

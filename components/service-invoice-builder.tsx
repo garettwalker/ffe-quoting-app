@@ -24,6 +24,22 @@ function newLineId(): string {
   return `line-${Date.now()}-${lineCounter}`;
 }
 
+// Invoice lines are qty × unit price (= amount). Lines saved before the
+// unit-price model (flat amounts) get a derived unit price (amount ÷ qty) when
+// they load, so editing nothing keeps the total (± a cent when the qty doesn't
+// divide the amount evenly) and any edit then follows the new math.
+function normalizeServiceLines(lines: ServiceLine[]): ServiceLine[] {
+  return (lines ?? []).map((line) => ({
+    ...line,
+    unitPriceCents:
+      line.unitPriceCents !== undefined
+        ? line.unitPriceCents
+        : line.quantity > 0
+          ? Math.round(line.amountCents / line.quantity)
+          : line.amountCents
+  }));
+}
+
 type ServiceInvoiceBuilderProps = {
   quoteId: string;
   // The saved invoice setup, if any. Null means invoices have not been set up.
@@ -67,15 +83,9 @@ export function ServiceInvoiceBuilder({
   // empty (a $0 / no-charge service call is allowed).
   const [lines, setLines] = useState<ServiceLine[]>(() => {
     if (Array.isArray(existing?.serviceLines)) {
-      return (existing!.serviceLines as ServiceLine[]).map((line) => ({
-        id: line.id,
-        name: line.name,
-        quantity: line.quantity,
-        amountCents: line.amountCents,
-        comment: line.comment
-      }));
+      return normalizeServiceLines(existing!.serviceLines as ServiceLine[]);
     }
-    return seedServiceLines.map((line) => ({ ...line }));
+    return normalizeServiceLines(seedServiceLines);
   });
 
   // Billing schedule shape. Inferred from the saved records: a kind "service"
@@ -307,26 +317,38 @@ export function ServiceInvoiceBuilder({
 
   // --- Line editing -------------------------------------------------------
 
+  // New lines insert at the TOP of the list so they are immediately visible /
+  // editable without scrolling (owner request).
   function handleAddLine() {
     setSaveMessage("");
     setSaveError(false);
     setLines((prev) => [
-      ...prev,
       {
         id: newLineId(),
         name: "",
         quantity: 1,
+        unitPriceCents: 0,
         amountCents: 0,
         comment: ""
-      }
+      },
+      ...prev
     ]);
   }
 
+  // Every patch re-derives the row amount as qty × unit price — the amount is
+  // never typed directly.
   function handleUpdateLine(id: string, patch: Partial<ServiceLine>) {
     setSaveMessage("");
     setSaveError(false);
     setLines((prev) =>
-      prev.map((line) => (line.id === id ? { ...line, ...patch } : line))
+      prev.map((line) => {
+        if (line.id !== id) return line;
+        const next = { ...line, ...patch };
+        return {
+          ...next,
+          amountCents: Math.round(next.quantity * (next.unitPriceCents ?? 0))
+        };
+      })
     );
   }
 
@@ -401,7 +423,8 @@ export function ServiceInvoiceBuilder({
         id: line.id,
         name: line.name.trim(),
         quantity: line.quantity,
-        amountCents: line.amountCents,
+        unitPriceCents: line.unitPriceCents ?? 0,
+        amountCents: Math.round(line.quantity * (line.unitPriceCents ?? 0)),
         comment: line.comment?.trim() || undefined
       }))
     };
@@ -447,9 +470,10 @@ export function ServiceInvoiceBuilder({
         </h2>
         <p className="mt-2 text-sm font-bold text-charcoal/65">
           The contract is the sum of the line amounts below. Add a description,
-          a quantity, and the row amount. No unit price, no permit fee. Then
-          choose whether to bill it as one invoice (due on completion) or split
-          into a deposit and a final invoice.
+          a quantity, and a unit price — the row amount is qty × unit price,
+          computed for you. No permit fee. Then choose whether to bill it as one
+          invoice (due on completion) or split into a deposit and a final
+          invoice.
         </p>
       </div>
 
@@ -720,7 +744,7 @@ function ServiceInvoiceLineRow({
         </button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1fr_120px_160px]">
+      <div className="grid gap-3 md:grid-cols-[1fr_80px_130px_130px]">
         <label className="grid min-w-0 gap-1">
           <span className="text-xs font-black text-deep-pine">Description</span>
           <input
@@ -744,13 +768,13 @@ function ServiceInvoiceLineRow({
         </label>
 
         <label className="grid min-w-0 gap-1">
-          <span className="text-xs font-black text-deep-pine">Amount ($)</span>
+          <span className="text-xs font-black text-deep-pine">Unit price ($)</span>
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold text-charcoal/55">$</span>
             <FormattedNumberInput
-              value={centsToDollars(line.amountCents)}
+              value={centsToDollars(line.unitPriceCents ?? 0)}
               onChange={(dollars) =>
-                onUpdate({ amountCents: dollarsToCents(dollars) })
+                onUpdate({ unitPriceCents: dollarsToCents(dollars) })
               }
               allowDecimal
               min={0}
@@ -759,6 +783,13 @@ function ServiceInvoiceLineRow({
             />
           </div>
         </label>
+
+        <div className="grid min-w-0 gap-1">
+          <span className="text-xs font-black text-deep-pine">Amount</span>
+          <div className="flex items-center rounded-soft border border-pine/15 bg-sand/60 px-3 py-2 font-black tabular-nums text-deep-pine">
+            {formatCurrency(Math.round(line.quantity * (line.unitPriceCents ?? 0)))}
+          </div>
+        </div>
       </div>
 
       <label className="mt-3 grid min-w-0 gap-1">

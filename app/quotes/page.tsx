@@ -14,7 +14,9 @@ import type { DashboardQuoteRow } from "@/lib/types";
 // from Supabase. The overview dashboard at `/` is the landing hub; this page is
 // where the day-to-day quoting work lives. A type toggle (New builds / Service
 // calls / All) filters the pipeline: new builds show the 5-stage lifecycle,
-// service calls show their simpler 4-stage lifecycle, All stacks both.
+// service calls show their simpler 4-stage lifecycle, All stacks both. Direct
+// invoices (created without a quote) ride along with the service rows — they
+// share the single-invoice lifecycle and are tagged on each card.
 export const dynamic = "force-dynamic";
 
 // Ceiling on how many quotes the pipeline loads. High enough that every
@@ -65,13 +67,17 @@ export default async function QuotesPage({
   // excluded from outstanding + keeps the job out of Paid in Full.
   const receiptsById = await loadInvoiceReceipts(rows.map((row) => row.id));
 
-  // Partition by quote type. Old rows default to new_build (normalizeQuoteType).
+  // Partition by quote type. Old rows default to new_build
+  // (normalizeQuoteType). Direct invoices share the service-call lifecycle
+  // sections (tagged on each card), since they bill through the same single
+  // service invoice.
   const newBuildRows = rows.filter(
     (row) => normalizeQuoteType(row.quote_type) === "new_build"
   );
-  const serviceRows = rows.filter(
-    (row) => normalizeQuoteType(row.quote_type) === "service_call"
-  );
+  const serviceRows = rows.filter((row) => {
+    const quoteType = normalizeQuoteType(row.quote_type);
+    return quoteType === "service_call" || quoteType === "direct_invoice";
+  });
 
   // New-build lifecycle stage (5 stages). Accepted derives a sub-stage from the
   // invoice setup; a not-yet-emailed finish is "scheduled" (not owed yet), so a

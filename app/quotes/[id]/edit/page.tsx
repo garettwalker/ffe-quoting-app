@@ -85,6 +85,7 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
   const status = normalizeStatus(row.status);
   const quoteType = normalizeQuoteType(row.quote_type);
   const isService = quoteType === "service_call";
+  const isDirectInvoice = quoteType === "direct_invoice";
   const paymentCount = paymentsRes.count ?? 0;
   const hasInvoices = !!row.invoice_data;
 
@@ -131,7 +132,30 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
         </p>
       </div>
 
-      {showProtectedBanner ? (
+      {/* A direct invoice is an invoice-first record: routing it through either
+          quote builder would re-type the row (quote_type / status / quote_data)
+          and corrupt it. Point the owner at the invoicing page instead, where
+          the invoice lines are edited. */}
+      {isDirectInvoice ? (
+        <section className="rounded-xl2 border border-clay/30 bg-clay/10 p-8 shadow-soft">
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.14em] text-clay">
+            Direct invoices have no quote to edit
+          </p>
+          <p className="mb-6 max-w-2xl text-sm font-bold leading-6 text-charcoal/80">
+            This record was created as a direct invoice (no quote first), so
+            there is nothing to edit here — editing would overwrite it as a
+            quote. Its invoice line items are edited on the invoicing page.
+          </p>
+          <Link
+            href={`/quotes/${row.id}/invoices`}
+            className="inline-flex rounded-full bg-pine px-6 py-3 font-black text-whitewarm shadow-card hover:bg-deep-pine"
+          >
+            Go to invoicing
+          </Link>
+        </section>
+      ) : null}
+
+      {showProtectedBanner && !isDirectInvoice ? (
         <section className="mb-6 rounded-xl2 border border-clay/30 bg-clay/10 p-5 shadow-soft">
           <p className="mb-1 text-sm font-black uppercase tracking-[0.14em] text-clay">
             This quote is accepted or has invoices / payments
@@ -146,22 +170,24 @@ export default async function EditSavedQuotePage({ params }: PageProps) {
         </section>
       ) : null}
 
-      {isService ? (
-        <ServiceQuoteBuilder
-          initialQuote={quote}
-          savedQuoteId={row.id}
-          customers={customers}
-          projectTypes={catalog.projectTypes}
-          defaultQuoteNotes={catalog.settings.defaultQuoteNotes}
-        />
-      ) : (
-        <QuoteBuilder
-          initialQuote={quote}
-          savedQuoteId={row.id}
-          catalog={catalog}
-          customers={customers}
-        />
-      )}
+      {!isDirectInvoice ? (
+        isService ? (
+          <ServiceQuoteBuilder
+            initialQuote={quote}
+            savedQuoteId={row.id}
+            customers={customers}
+            projectTypes={catalog.projectTypes}
+            defaultQuoteNotes={catalog.settings.defaultQuoteNotes}
+          />
+        ) : (
+          <QuoteBuilder
+            initialQuote={quote}
+            savedQuoteId={row.id}
+            catalog={catalog}
+            customers={customers}
+          />
+        )
+      ) : null}
     </AppShell>
   );
 }

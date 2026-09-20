@@ -90,10 +90,13 @@ function buildReceivableJob(
 
   // A service call is either UNSPLIT (a single "service" invoice, rendered in
   // the primary column slot with finish = null) or SPLIT (a deposit "initial" +
-  // a final "finish", rendered like a new build in both columns). A new build
-  // always uses the initial + finish pair. The table relabels the columns
-  // inline for service rows.
-  const unsplit = quoteType === "service_call" && isUnsplitServiceCall(data);
+  // a final "finish", rendered like a new build in both columns). A direct
+  // invoice is always unsplit (single "service" invoice). A new build always
+  // uses the initial + finish pair. The table relabels the columns inline for
+  // service rows.
+  const unsplit =
+    (quoteType === "service_call" || quoteType === "direct_invoice") &&
+    isUnsplitServiceCall(data);
   const initial = toReceivableInvoice(unsplit ? "service" : "initial");
   const finish = unsplit ? null : toReceivableInvoice("finish");
 

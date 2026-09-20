@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
+import { DirectInvoiceBuilder } from "@/components/direct-invoice-builder";
 import { QuoteBuilder } from "@/components/quote-builder";
 import { ServiceQuoteBuilder } from "@/components/service-quote-builder";
 import { QuoteTypeChooser } from "@/components/quote-type-chooser";
@@ -19,7 +20,9 @@ type PageProps = {
 };
 
 function parseQuoteType(value: string | undefined): QuoteType | null {
-  if (value === "new_build" || value === "service_call") return value;
+  if (value === "new_build" || value === "service_call" || value === "direct_invoice") {
+    return value;
+  }
   return null;
 }
 
@@ -51,7 +54,8 @@ export default async function NewQuotePage({ searchParams }: PageProps) {
             Pick the quote type first. A new build uses the full pricing catalog
             (base rate, pricing level, contingency, two invoices). A service
             call is a simpler freeform quote with manual line items and a single
-            invoice.
+            invoice. A direct invoice skips the quote entirely — manual line
+            items, one invoice, done.
           </p>
         </div>
 
@@ -64,6 +68,55 @@ export default async function NewQuotePage({ searchParams }: PageProps) {
     getPricingCatalog(),
     getCustomers()
   ]);
+
+  if (type === "direct_invoice") {
+    // Catalog items offered to prefill an invoice line: active non-Base items
+    // (the same availability rule the invoice builder uses — the per-sqft
+    // base package does not belong on a manual invoice). Prefill only; the
+    // builder keeps every field editable and accepts blank freeform lines.
+    const catalogItems = catalog.items
+      .filter((item) => item.active && item.category !== "Base")
+      .map((item) => ({
+        id: item.id,
+        category: item.category,
+        name: item.name,
+        basePriceCents: item.basePriceCents,
+        unitType: item.unitType
+      }));
+
+    return (
+      <AppShell>
+        <div className="mb-8">
+          <Link
+            href="/quotes/new"
+            className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
+          >
+            Back to quote type
+          </Link>
+
+          <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
+            New Invoice
+          </p>
+
+          <h1 className="font-display text-5xl font-bold tracking-[-0.04em] text-moss md:text-6xl">
+            Create a direct invoice.
+          </h1>
+
+          <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
+            No quote needed. Enter the customer, add manual line items (catalog
+            prefill optional — everything is editable), and save. One invoice,
+            due on completion.
+          </p>
+        </div>
+
+        <DirectInvoiceBuilder
+          mode="create"
+          catalogItems={catalogItems}
+          customers={customers}
+        />
+      </AppShell>
+    );
+  }
 
   if (type === "service_call") {
     return (

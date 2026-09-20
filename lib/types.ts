@@ -10,10 +10,13 @@ export type QuoteStatus = "draft" | "prepared" | "accepted" | "scheduled";
 // Which kind of quote this is. New build = the full catalog-driven quoting tool
 // (per-sqft base rate, pricing level, contingency, two-invoice rough-in/finish
 // model). Service call = freeform manual line items, single invoice, simpler
-// 4-stage lifecycle. Lives on the `quotes.quote_type` column (default 'new_build'
-// so every existing quote stays a new build). Old invoice_data blobs that predate
-// the field are treated as new_build.
-export type QuoteType = "new_build" | "service_call";
+// 4-stage lifecycle. Direct invoice = an invoice created WITHOUT a quote first
+// (saved in one step with status "accepted" + invoice_data; reuses the service
+// invoice machinery — single kind "service" invoice, freeform lines — but has
+// no quote document). Lives on the `quotes.quote_type` column (default
+// 'new_build' so every existing quote stays a new build). Old invoice_data
+// blobs that predate the field are treated as new_build.
+export type QuoteType = "new_build" | "service_call" | "direct_invoice";
 
 // Coerce a raw `quotes.status` value (typed as unknown/string from Supabase)
 // into the QuoteStatus union. Anything unexpected — including the legacy
@@ -36,7 +39,11 @@ export function normalizeStatus(value: unknown): QuoteStatus {
 // unexpected (including null/undefined on old rows before the column existed)
 // falls back to "new_build" so the existing flow is the default.
 export function normalizeQuoteType(value: unknown): QuoteType {
-  if (value === "new_build" || value === "service_call") {
+  if (
+    value === "new_build" ||
+    value === "service_call" ||
+    value === "direct_invoice"
+  ) {
     return value;
   }
   return "new_build";
@@ -185,17 +192,22 @@ export type InvoiceData = {
     adjustmentTarget?: "both" | "rough_in" | "finish";
   }>;
   // Service-call freeform line items. Used only when quoteType === "service_call"
-  // (a single invoice with no split/permit). Each line is a free-text
-  // description, a quantity, and a row amount in cents (NO unit price — the
-  // amount is entered directly so there is no rounding drift). The contract
-  // amount is the SUM of amountCents across these lines. Seeded from the quote's
-  // serviceLines when invoicing is first set up, then lives on the invoice and is
-  // edited independently of the quote (mirrors the new-build scopeLines pattern).
-  // Optional so new-build invoice_data (which never has this field) still loads.
+  // or "direct_invoice" (a single invoice with no split/permit). Each line is a
+  // free-text description, a quantity, and a unit price in cents; the row
+  // amount is quantity × unitPriceCents (computed by the builders, never typed
+  // directly). The contract amount is the SUM of amountCents across these
+  // lines. Seeded from the quote's serviceLines when invoicing is first set up
+  // (for a direct invoice the builder writes them directly at creation), then
+  // lives on the invoice and is edited independently of the quote (mirrors the
+  // new-build scopeLines pattern). unitPriceCents is optional so lines saved
+  // before the qty × price model (flat amounts) still load unchanged.
+  // Optional field itself so new-build invoice_data (which never has this
+  // field) still loads.
   serviceLines?: Array<{
     id: string;
     name: string;
     quantity: number;
+    unitPriceCents?: number;
     amountCents: number;
     comment?: string;
   }>;
@@ -365,11 +377,21 @@ export type QuoteLineInput = {
 // amount is entered directly, so there is no unit price and no rounding drift).
 // Optional customer-facing comment. Stored in quote_data.serviceLines (JSONB).
 // The quote total is the SUM of amountCents across these lines.
+//
+// DIRECT INVOICES reuse this shape with one addition: an optional
+// unitPriceCents (qty × unit price, with amountCents = quantity ×
+// unitPriceCents) so a direct-invoice line is fully editable per unit while a
+// service-call line keeps its flat-amount model. Service-call lines never set
+// the field; when the service invoice PDF sees unit prices on any line it adds
+// a Unit Price column.
 export type ServiceLine = {
   id: string;
   name: string;
   quantity: number;
   amountCents: number;
+  // Direct-invoice lines only: the editable per-unit price. Optional so
+  // service-call lines (flat amounts) and old saved rows keep loading.
+  unitPriceCents?: number;
   comment?: string;
 };
 
@@ -425,8 +447,9 @@ export type QuoteFormState = {
   internalNotes: string;
   lineItems: QuoteLineInput[];
   // Service-call freeform line items. Used only when quoteType === "service_call"
-  // (the pricing levers above are unused for service calls). Empty/ignored for
-  // new builds. Old quotes predate the field and resolve to empty.
+  // or "direct_invoice" (the pricing levers above are unused for both; direct
+  // invoices also leave the address/project-type fields optional). Empty/ignored
+  // for new builds. Old quotes predate the field and resolve to empty.
   serviceLines: ServiceLine[];
 };
 

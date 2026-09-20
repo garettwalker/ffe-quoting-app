@@ -14,14 +14,16 @@ import {
   type PdfServiceLine
 } from "./pdf-shared";
 
-// Purpose-built PDF for a service-call invoice. Reuses the shared pdf blocks
-// (header / info grid / total / notes / footer) and the same service line
-// table as the service quote (Description / Qty / Amount — no unit price), so
-// the quote and invoice line layouts match exactly.
+// Purpose-built PDF for a service-call or direct invoice. Reuses the shared
+// pdf blocks (header / info grid / total / notes / footer) and the service
+// line table (Description / Qty / Amount). Direct-invoice lines may carry unit
+// prices — the table then adds a Unit Price column; service-call lines are
+// flat amounts and never do.
 //
 // A service call comes in two shapes:
 //   - UNSPLIT: a single "Service Invoice" whose amount due is the sum of the
-//     line amounts (no previously-invoiced block).
+//     line amounts (no previously-invoiced block). A direct invoice renders
+//     the same single shape, titled "Invoice".
 //   - SPLIT: a "Deposit Invoice" (kind initial) and a "Final Invoice" (kind
 //     finish). The final carries a "previously invoiced (Deposit)" block above
 //     the amount due so the customer sees the deposit already paid against the

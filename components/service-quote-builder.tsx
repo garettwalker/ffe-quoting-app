@@ -65,6 +65,23 @@ function newLineId(): string {
   return `line-${Date.now()}-${lineCounter}`;
 }
 
+// Service-call lines are qty × unit price (= amount). Older saved quotes have
+// flat-amount lines without a unit price, so give those a derived unit price
+// (amount ÷ qty) when they load — editing nothing keeps the total (a qty that
+// divides the amount evenly is exact; otherwise it can shift by a cent), and
+// any edit then follows the new math. Direct-invoice lines always carry one.
+function normalizeServiceLines(lines: ServiceLine[]): ServiceLine[] {
+  return (lines ?? []).map((line) => ({
+    ...line,
+    unitPriceCents:
+      line.unitPriceCents !== undefined
+        ? line.unitPriceCents
+        : line.quantity > 0
+          ? Math.round(line.amountCents / line.quantity)
+          : line.amountCents
+  }));
+}
+
 type ServiceQuoteBuilderProps = {
   // When provided, the builder opens in edit mode prefilled with this saved
   // quote and ignores the browser's active-quote storage for initial load.
@@ -89,7 +106,12 @@ export function ServiceQuoteBuilder({
 }: ServiceQuoteBuilderProps) {
   const router = useRouter();
   const [quote, setQuote] = useState<QuoteFormState>(() =>
-    initialQuote ? { ...initialQuote } : createDraftServiceQuote()
+    initialQuote
+      ? {
+          ...initialQuote,
+          serviceLines: normalizeServiceLines(initialQuote.serviceLines)
+        }
+      : createDraftServiceQuote()
   );
   const [savedQuoteId, setSavedQuoteId] = useState<string | undefined>(
     savedQuoteIdProp
@@ -110,11 +132,15 @@ export function ServiceQuoteBuilder({
     const storedQuote = getActiveQuote();
 
     // Only resume a stored draft that is actually a service-call draft. A
-    // new-build draft in localStorage is left alone (the owner is starting a
-    // service call explicitly); this builder starts fresh instead of clobbering
-    // it, and the new-build draft remains resumable from the chooser.
+    // new-build or direct-invoice draft in localStorage is left alone (the
+    // owner is starting a service call explicitly); this builder starts fresh
+    // instead of clobbering it, and the other draft remains resumable from
+    // the chooser.
     if (storedQuote && storedQuote.quote.quoteType === "service_call") {
-      setQuote(storedQuote.quote);
+      setQuote({
+        ...storedQuote.quote,
+        serviceLines: normalizeServiceLines(storedQuote.quote.serviceLines)
+      });
       if (storedQuote.savedQuoteId) {
         setSavedQuoteId(storedQuote.savedQuoteId);
       }
@@ -172,33 +198,42 @@ export function ServiceQuoteBuilder({
     }));
   }
 
-  // Freeform line handlers.
+  // Freeform line handlers. New lines insert at the TOP of the list so they are
+  // immediately visible / editable without scrolling (owner request).
   function handleAddLine() {
     setCompletionMessage("");
     setDraftMessage("");
     setQuote((current) => ({
       ...current,
       serviceLines: [
-        ...current.serviceLines,
         {
           id: newLineId(),
           name: "",
           quantity: 1,
+          unitPriceCents: 0,
           amountCents: 0,
           comment: ""
-        }
+        },
+        ...current.serviceLines
       ]
     }));
   }
 
+  // Every patch re-derives the row amount as qty × unit price — the amount is
+  // never typed directly (matches the direct-invoice builder's line model).
   function handleUpdateLine(id: string, patch: Partial<ServiceLine>) {
     setCompletionMessage("");
     setDraftMessage("");
     setQuote((current) => ({
       ...current,
-      serviceLines: current.serviceLines.map((line) =>
-        line.id === id ? { ...line, ...patch } : line
-      )
+      serviceLines: current.serviceLines.map((line) => {
+        if (line.id !== id) return line;
+        const next = { ...line, ...patch };
+        return {
+          ...next,
+          amountCents: Math.round(next.quantity * (next.unitPriceCents ?? 0))
+        };
+      })
     }));
   }
 
@@ -255,14 +290,16 @@ export function ServiceQuoteBuilder({
     }
 
     // Persist only lines with a description so blank trailing rows do not
-    // carry into the saved quote / review.
+    // carry into the saved quote / review. The amount is re-derived as
+    // qty × unit price so the stored math matches what the row shows.
     const cleaned: QuoteFormState = {
       ...quote,
       serviceLines: realLines.map((line) => ({
         id: line.id,
         name: line.name.trim(),
         quantity: line.quantity,
-        amountCents: line.amountCents,
+        unitPriceCents: line.unitPriceCents ?? 0,
+        amountCents: Math.round(line.quantity * (line.unitPriceCents ?? 0)),
         comment: line.comment?.trim() || undefined
       }))
     };
@@ -580,9 +617,9 @@ export function ServiceQuoteBuilder({
                 Freeform line items.
               </h2>
               <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-charcoal/70">
-                Add a description, a quantity, and the row amount. The quote
-                total is the sum of the row amounts. No unit price, no pricing
-                levers.
+                Add a description, a quantity, and a unit price — the row amount
+                is qty × unit price, computed for you. The quote total is the sum
+                of the row amounts. No pricing levers.
               </p>
             </div>
 
@@ -745,7 +782,7 @@ function ServiceLineRow({
         </button>
       </div>
 
-      <div className="grid gap-3 md:grid-cols-[1fr_120px_160px]">
+      <div className="grid gap-3 md:grid-cols-[1fr_80px_130px_130px]">
         <label className="grid min-w-0 gap-1">
           <span className="text-xs font-black text-deep-pine">Description</span>
           <input
@@ -769,13 +806,13 @@ function ServiceLineRow({
         </label>
 
         <label className="grid min-w-0 gap-1">
-          <span className="text-xs font-black text-deep-pine">Amount ($)</span>
+          <span className="text-xs font-black text-deep-pine">Unit price ($)</span>
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-bold text-charcoal/55">$</span>
             <FormattedNumberInput
-              value={centsToDollars(line.amountCents)}
+              value={centsToDollars(line.unitPriceCents ?? 0)}
               onChange={(dollars) =>
-                onUpdate({ amountCents: dollarsToCents(dollars) })
+                onUpdate({ unitPriceCents: dollarsToCents(dollars) })
               }
               allowDecimal
               min={0}
@@ -784,6 +821,13 @@ function ServiceLineRow({
             />
           </div>
         </label>
+
+        <div className="grid min-w-0 gap-1">
+          <span className="text-xs font-black text-deep-pine">Amount</span>
+          <div className="flex items-center rounded-soft border border-pine/15 bg-sand/60 px-3 py-2 font-black tabular-nums text-deep-pine">
+            {formatCurrency(Math.round(line.quantity * (line.unitPriceCents ?? 0)))}
+          </div>
+        </div>
       </div>
 
       <label className="mt-3 grid min-w-0 gap-1">
