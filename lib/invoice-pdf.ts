@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, formatDate } from "@/lib/currency";
 import {
   computeInvoiceAmounts,
   findInvoice,
@@ -219,7 +219,12 @@ export async function loadInvoicePdfInput(
           total: formatCurrency(invoice.amountCents),
           collected: formatCurrency(collectedCents),
           balance: formatCurrency(balanceCents),
-          isPaidInFull: invoiceFullyPaid(invoice)
+          isPaidInFull: invoiceFullyPaid(invoice),
+          // The invoice's paidAt is the most recent payment's date (kept in
+          // sync by withInvoicePaidCents), which is the date the owner typed in
+          // when recording a partial. Blank on a legacy invoice paid before
+          // dates were stored, so the row falls back to the bare label.
+          paidAtLabel: formatDate(invoice.paidAt)
         }
       : null,
     amountDue: formatCurrency(hasPayments ? balanceCents : invoice.amountCents),

@@ -56,6 +56,10 @@ export type InvoicePdfProps = {
     collected: string;
     balance: string;
     isPaidInFull: boolean;
+    // The date the most recent payment was received, shown beside "Payments
+    // received" so the customer's copy carries when the money came in. Empty
+    // on a legacy invoice paid before payment dates were recorded.
+    paidAtLabel: string;
   } | null;
   amountDue: string; // the amount still owed: balance when partially paid
   paymentTerms: string; // settings.invoicePaymentTerms
@@ -79,6 +83,12 @@ const priorStyles = StyleSheet.create({
   label: {
     fontFamily: "Helvetica",
     color: PDF_INK.textStrong
+  },
+  // The received date beside a label, in the same line flow but lighter, so it
+  // reads as an annotation on the row rather than part of its name.
+  labelDate: {
+    fontFamily: "Helvetica",
+    color: PDF_INK.textMuted
   },
   value: {
     fontFamily: "Helvetica-Bold",
@@ -262,7 +272,14 @@ export function InvoicePdfDocument(props: InvoicePdfProps) {
             </View>
             <View style={priorStyles.divider} />
             <View style={priorStyles.row}>
-              <Text style={priorStyles.label}>Payments received</Text>
+              <Text style={priorStyles.label}>
+                Payments received
+                {paymentsBlock.paidAtLabel ? (
+                  <Text style={priorStyles.labelDate}>
+                    {` (${paymentsBlock.paidAtLabel})`}
+                  </Text>
+                ) : null}
+              </Text>
               <Text style={priorStyles.value}>{paymentsBlock.collected}</Text>
             </View>
           </View>

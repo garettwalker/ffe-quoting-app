@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/currency";
+import { formatCurrency, formatDate } from "@/lib/currency";
 import {
   findInvoice,
   invoiceBalanceCents,
@@ -180,7 +180,10 @@ export async function loadServiceInvoicePdfInput(
           total: formatCurrency(invoice.amountCents),
           collected: formatCurrency(collectedCents),
           balance: formatCurrency(balanceCents),
-          isPaidInFull: invoiceFullyPaid(invoice)
+          isPaidInFull: invoiceFullyPaid(invoice),
+          // Most recent payment's date (see lib/invoice-pdf.ts); blank on a
+          // legacy invoice paid before dates were stored.
+          paidAtLabel: formatDate(invoice.paidAt)
         }
       : null,
     amountDue: formatCurrency(collectedCents > 0 ? balanceCents : invoice.amountCents),

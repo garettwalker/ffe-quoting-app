@@ -189,7 +189,14 @@ async function NewBuildInvoicePrintPage({
               <span>{pdfProps.paymentsBlock.total}</span>
             </div>
             <div className="mt-1 flex items-center justify-between gap-4">
-              <span>Payments received</span>
+              <span>
+                Payments received
+                {pdfProps.paymentsBlock.paidAtLabel ? (
+                  <span className="ml-1 text-charcoal/55">
+                    ({pdfProps.paymentsBlock.paidAtLabel})
+                  </span>
+                ) : null}
+              </span>
               <span>{pdfProps.paymentsBlock.collected}</span>
             </div>
           </div>
@@ -402,7 +409,14 @@ async function ServiceInvoicePrintPage({
               <span>{pdfProps.paymentsBlock.total}</span>
             </div>
             <div className="mt-1 flex items-center justify-between gap-4">
-              <span>Payments received</span>
+              <span>
+                Payments received
+                {pdfProps.paymentsBlock.paidAtLabel ? (
+                  <span className="ml-1 text-charcoal/55">
+                    ({pdfProps.paymentsBlock.paidAtLabel})
+                  </span>
+                ) : null}
+              </span>
               <span>{pdfProps.paymentsBlock.collected}</span>
             </div>
           </div>
