@@ -9,7 +9,7 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 const supabase = getSupabaseBrowser();
 
 import { FormattedNumberInput } from "@/components/formatted-number-input";
-import { centsToDollars, formatCurrency, formatDate } from "@/lib/currency";
+import { centsToDollars, dollarsToCents, formatCurrency, formatDate } from "@/lib/currency";
 import {
   invoiceBalanceCents,
   invoiceIsOverpaid,
@@ -98,7 +98,10 @@ export function InvoicePaymentControls({
 
   // What an amount typed into the form would leave owing. Drives the live
   // "New balance" preview so the owner sees the result before saving.
-  const typedCents = Math.max(0, Math.round(centsToDollars(amountDollars)) || 0);
+  // The amount field holds DOLLARS (FormattedNumberInput parses what was typed),
+  // so it must be converted once, with dollarsToCents. Using centsToDollars here
+  // read $15,000 as 150 cents.
+  const typedCents = Math.max(0, dollarsToCents(amountDollars) || 0);
   const previewBalanceCents = Math.max(0, balanceCents - typedCents);
   const previewIsFull = typedCents > 0 && typedCents >= balanceCents;
 
