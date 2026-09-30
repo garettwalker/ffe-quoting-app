@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EmailPdfButton } from "@/components/pdf/email-pdf-button";
 import type { EmailDocKind, InvoiceKind } from "@/lib/send-pdf-email";
+import type { CustomerEmail } from "@/lib/types";
 
 type EmailProps = {
   doc: EmailDocKind;
@@ -10,8 +11,9 @@ type EmailProps = {
   defaultSubject: string;
   defaultMessage: string;
   docTitle: string;
-  // The linked customer's emails, offered as suggestions on the To field.
-  suggestedEmails?: string[];
+  // The linked customer's emails, offered as one-click toggle chips on the To
+  // field so both of a customer's addresses can be selected together.
+  suggestedEmails?: CustomerEmail[];
 };
 
 type PdfActionBarProps = {

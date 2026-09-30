@@ -104,14 +104,16 @@ export async function getCustomer(id: string): Promise<Customer | null> {
   return normalizeCustomer(data as CustomerRow);
 }
 
-// The linked customer's email list for a quote, for the email To-field datalist.
-// Reads the quotes.customer_id column (the source of truth, set by backfill and
-// by the builder) then loads the customer's emails. Empty when the quote has no
-// linked customer (a one-off quote or a backfilled quote whose customer was
-// removed). Lightweight: one small query plus one lookup.
+// The linked customer's email list for a quote, for the email panel's
+// one-click contact chips. Reads the quotes.customer_id column (the source of
+// truth, set by backfill and by the builder) then loads the customer's emails.
+// Empty when the quote has no linked customer (a one-off quote or a backfilled
+// quote whose customer was removed). Lightweight: one small query plus one
+// lookup. Keeps each email's optional label (a husband/wife team) so the chips
+// can name who is who rather than showing two bare addresses.
 export async function getCustomerEmailsForQuote(
   quoteId: string
-): Promise<string[]> {
+): Promise<CustomerEmail[]> {
   const supabase = getSupabaseServer();
   const { data } = await supabase
     .from("quotes")
@@ -123,7 +125,7 @@ export async function getCustomerEmailsForQuote(
   if (!customerId) return [];
   const customer = await getCustomer(customerId);
   if (!customer) return [];
-  return customer.emails.map((e) => e.email).filter(Boolean);
+  return customer.emails.filter((e) => Boolean(e.email));
 }
 
 // One customer's quotes for the detail page, newest first. Mirrors the fields

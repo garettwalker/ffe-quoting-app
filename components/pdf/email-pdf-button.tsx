@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { EmailDocKind, InvoiceKind } from "@/lib/send-pdf-email";
+import type { CustomerEmail } from "@/lib/types";
 
 type EmailPdfButtonProps = {
   doc: EmailDocKind;
@@ -11,10 +12,11 @@ type EmailPdfButtonProps = {
   defaultSubject: string;
   defaultMessage: string;
   docTitle: string; // shown in the success message, e.g. "Detailed Quote"
-  // The linked customer's emails, offered as a <datalist> on the To field so the
-  // owner can add a second contact (a husband/wife team) with one keystroke. The
-  // To field still accepts free-text and multiple comma-separated recipients.
-  suggestedEmails?: string[];
+  // The linked customer's emails, offered as one-click toggle chips under the
+  // To field so both halves of a husband/wife team (or an office contact) can be
+  // added to the send without hand-typing a comma. The To field still accepts
+  // free text and comma-separated addresses.
+  suggestedEmails?: CustomerEmail[];
 };
 
 type Status = "idle" | "sending" | "sent" | "error";
@@ -45,15 +47,30 @@ export function EmailPdfButton({
   // The To field accepts multiple comma-separated recipients. Each must be a
   // valid address; a single bad address rejects the whole send so a typo is
   // never silently dropped.
-  const recipients = to
-    .split(",")
-    .map((addr) => addr.trim())
-    .filter(Boolean);
+  const recipients = splitRecipients(to);
   const toValid =
     recipients.length > 0 &&
     recipients.every((addr) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(addr));
   const canSend = status !== "sending" && toValid && subject.trim().length > 0;
-  const hasSuggestions = (suggestedEmails ?? []).filter(Boolean).length > 0;
+
+  // The contacts on file, deduped against each other. Matched by lowercased
+  // address so a chip reads as selected whether the address was added by
+  // clicking it or typed in by hand.
+  const contacts = dedupeContacts(suggestedEmails ?? []);
+  const selectedKeys = new Set(recipients.map((addr) => addr.toLowerCase()));
+  const unselected = contacts.filter(
+    (contact) => !selectedKeys.has(contact.email.toLowerCase())
+  );
+
+  // Add or remove one contact from the To field. Rebuilds the string from the
+  // current list so toggling is reversible and can never duplicate an address.
+  function toggleContact(email: string) {
+    const key = email.toLowerCase();
+    const next = selectedKeys.has(key)
+      ? recipients.filter((addr) => addr.toLowerCase() !== key)
+      : [...recipients, email];
+    setTo(next.join(", "));
+  }
 
   function handleReset() {
     setOpen(false);
@@ -148,20 +165,77 @@ export function EmailPdfButton({
               className="w-full rounded-soft border border-pine/20 px-3 py-2 text-sm text-charcoal focus:outline-none focus:ring-2 focus:ring-pine/40"
               required
               autoComplete="off"
-              list={hasSuggestions ? "email-pdf-recipients" : undefined}
             />
-            {hasSuggestions ? (
-              <datalist id="email-pdf-recipients">
-                {(suggestedEmails ?? [])
-                  .filter(Boolean)
-                  .map((email) => (
-                    <option key={email} value={email} />
-                  ))}
-              </datalist>
+
+            {contacts.length > 0 ? (
+              <div className="mt-2">
+                <p className="mb-1 text-xs font-bold text-charcoal/60">
+                  Emails on file for this customer
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {contacts.map((contact) => {
+                    const isSelected = selectedKeys.has(
+                      contact.email.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={contact.email}
+                        type="button"
+                        onClick={() => toggleContact(contact.email)}
+                        aria-pressed={isSelected}
+                        title={
+                          isSelected
+                            ? `Remove ${contact.email}`
+                            : `Add ${contact.email}`
+                        }
+                        className={`flex items-center gap-2 rounded-full border px-3 py-2 text-left text-sm font-bold transition ${
+                          isSelected
+                            ? "border-pine bg-pine text-whitewarm"
+                            : "border-pine/25 bg-cream text-deep-pine hover:border-pine hover:bg-pine/10"
+                        }`}
+                      >
+                        <span aria-hidden="true" className="font-black">
+                          {isSelected ? "✓" : "+"}
+                        </span>
+                        {contact.label ? (
+                          <span className="font-black uppercase tracking-[0.08em]">
+                            {contact.label}
+                          </span>
+                        ) : null}
+                        <span>{contact.email}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {contacts.length > 1 && unselected.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setTo(
+                        [
+                          ...recipients,
+                          ...unselected.map((contact) => contact.email)
+                        ].join(", ")
+                      )
+                    }
+                    className="mt-2 text-xs font-black text-clay underline decoration-clay/40 decoration-2 underline-offset-4 hover:text-deep-pine"
+                  >
+                    {unselected.length === 1
+                      ? "Add the other email"
+                      : `Add the other ${unselected.length} emails`}
+                  </button>
+                ) : null}
+              </div>
             ) : null}
+
             {to.length > 0 && !toValid ? (
               <p className="mt-1 text-xs font-bold text-clay">
                 Enter a valid email address for each recipient (comma-separated).
+              </p>
+            ) : null}
+            {recipients.length > 1 ? (
+              <p className="mt-1 text-xs font-bold text-charcoal/60">
+                This will send one email to all {recipients.length} addresses.
               </p>
             ) : null}
           </div>
@@ -217,4 +291,33 @@ export function EmailPdfButton({
       ) : null}
     </div>
   );
+}
+
+// The To field's addresses, trimmed and without the blanks a trailing comma
+// leaves behind.
+function splitRecipients(value: string): string[] {
+  return value
+    .split(",")
+    .map((addr) => addr.trim())
+    .filter(Boolean);
+}
+
+// The customer's emails as offered chips: valid-looking addresses only (a
+// half-typed address on the customer record would otherwise be offered as a
+// recipient), deduped case-insensitively, since two entries for the same
+// address would render as two chips that always move together.
+function dedupeContacts(emails: CustomerEmail[]): CustomerEmail[] {
+  const seen = new Set<string>();
+  const contacts: CustomerEmail[] = [];
+  for (const entry of emails) {
+    const email = (entry.email ?? "").trim();
+    if (!email) continue;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) continue;
+    const key = email.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const label = (entry.label ?? "").trim();
+    contacts.push(label ? { email, label } : { email });
+  }
+  return contacts;
 }
