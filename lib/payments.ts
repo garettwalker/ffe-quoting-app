@@ -1,5 +1,9 @@
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
-import { findInvoice } from "@/lib/invoice-calculations";
+import {
+  findInvoice,
+  invoiceBalanceCents,
+  withInvoicePaidCents
+} from "@/lib/invoice-calculations";
 import type { InvoiceData, InvoiceKind } from "@/lib/types";
 
 // Server-only Stripe payment ledger helpers, used by the webhook
@@ -32,15 +36,17 @@ export function achAvailableForAmount(amountCents: number): boolean {
 
 type QuoteRow = { quote_id: string; invoice_data: InvoiceData | null };
 
-// Read the live invoice amount for a quote + kind from the DB. The amount shown
-// to the customer and charged is always this DB value, never anything Stripe
-// sends — so a tampered session or replayed event can never charge the wrong
-// amount. Returns exists=false when the quote / invoice setup / that invoice
-// kind can't be found.
-export async function readInvoiceAmount(
+// Read the live BALANCE for a quote + kind from the DB: the invoice amount less
+// everything already collected on it. This is what the customer is shown and
+// charged, so an invoice that already has a partial payment only ever takes the
+// remainder. The amount always comes from here, never from Stripe or the
+// browser, so a tampered session or replayed event can never charge the wrong
+// amount. Returns exists=false when the quote / invoice setup / that kind can't
+// be found.
+export async function readInvoiceBalance(
   quoteUuid: string,
   kind: InvoiceKind
-): Promise<{ exists: boolean; amountCents: number }> {
+): Promise<{ exists: boolean; balanceCents: number }> {
   const supabase = getSupabaseAdmin();
   const result = await supabase
     .from("quotes")
@@ -48,10 +54,10 @@ export async function readInvoiceAmount(
     .eq("id", quoteUuid)
     .single();
   const row = result.data as QuoteRow | null;
-  if (!row || !row.invoice_data) return { exists: false, amountCents: 0 };
+  if (!row || !row.invoice_data) return { exists: false, balanceCents: 0 };
   const invoice = findInvoice(row.invoice_data, kind);
-  if (!invoice) return { exists: false, amountCents: 0 };
-  return { exists: true, amountCents: Math.round(invoice.amountCents) || 0 };
+  if (!invoice) return { exists: false, balanceCents: 0 };
+  return { exists: true, balanceCents: invoiceBalanceCents(invoice) };
 }
 
 // Upsert a Stripe payment ledger row keyed by the Stripe payment intent id, so
@@ -115,18 +121,27 @@ export async function updatePaymentStatus(
 }
 
 // Double-payment guard. Returns true when there is an active (non-terminal)
-// payment for this invoice in the ledger: one that is still processing, pending,
-// or already succeeded. /api/create-checkout-session calls this BEFORE creating
-// a new Stripe session and refuses if it returns true, so a customer can't be
-// charged twice on one invoice. This matters most in live mode: an ACH payment
-// sits "processing" for 1-3 business days while the invoice flag is still unpaid
-// (the flag only flips on payment_intent.succeeded, which arrives days later),
-// so without this guard a customer who reopens the link could pay again. A
-// failed/refunded/cancelled payment does NOT count: those are terminal and the
-// customer is allowed to retry. Fail-open on a read error (the primary guard is
-// the invoice paid flag, which is checked separately and reliably; a transient
-// ledger read failure in this narrow window is near-impossible and failing open
-// avoids blocking a legitimate customer).
+// ONLINE payment for this invoice in the ledger: one that is still processing,
+// pending, or already succeeded. /api/create-checkout-session calls this BEFORE
+// creating a new Stripe session and refuses if it returns true, so a customer
+// can't be charged twice on one invoice. This matters most in live mode: an ACH
+// payment sits "processing" for 1-3 business days while the invoice flag is
+// still unpaid (the flag only flips on payment_intent.succeeded, which arrives
+// days later), so without this guard a customer who reopens the link could pay
+// again. A failed/refunded/cancelled payment does NOT count: those are terminal
+// and the customer is allowed to retry.
+//
+// Manual rows are excluded on purpose. A manual payment (a check recorded on
+// the invoicing page) is money already taken by other means, and the customer
+// must still be able to pay whatever is LEFT of the invoice online. Counting
+// them here would lock the pay link the moment a partial payment is recorded.
+// The remaining balance is the real guard on that side: once the invoice is
+// fully collected the balance is 0 and the checkout refuses.
+//
+// Fail-open on a read error (the primary guard is the invoice paid flag, which
+// is checked separately and reliably; a transient ledger read failure in this
+// narrow window is near-impossible and failing open avoids blocking a
+// legitimate customer).
 export async function hasActivePayment(
   quoteUuid: string,
   kind: InvoiceKind
@@ -137,6 +152,7 @@ export async function hasActivePayment(
     .select("id")
     .eq("quote_id", quoteUuid)
     .eq("invoice_kind", kind)
+    .neq("method", "manual")
     .in("status", ["processing", "pending", "succeeded"])
     .limit(1);
   if (error) {
@@ -151,14 +167,15 @@ export async function hasActivePayment(
   return Array.isArray(data) && data.length > 0;
 }
 
-// Flip one invoice's paid flag in quotes.invoice_data (the UI source of truth).
-// Idempotent: setting "paid" twice is harmless. `paid=false` reverses it (used
-// on refund). Reads the live invoice_data, updates just the matching invoice's
-// status + paidAt, writes the whole object back.
-export async function setInvoicePaid(
+// Set one invoice's collected amount in quotes.invoice_data (the UI source of
+// truth), keeping its status + paidAt in sync through withInvoicePaidCents so
+// the two can never drift. Reads the live invoice_data, updates just the
+// matching invoice, writes the whole object back. Idempotent.
+export async function setInvoicePaymentCents(
   quoteUuid: string,
   kind: InvoiceKind,
-  paid: boolean
+  paidCents: number,
+  paidAt?: string | null
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
   const result = await supabase
@@ -168,27 +185,92 @@ export async function setInvoicePaid(
     .single();
   const row = result.data as QuoteRow | null;
   if (!row || !row.invoice_data) {
-    throw new Error(`setInvoicePaid: invoice_data not found for ${quoteUuid}`);
+    throw new Error(
+      `setInvoicePaymentCents: invoice_data not found for ${quoteUuid}`
+    );
   }
-  const invoiceData = row.invoice_data;
   const now = new Date().toISOString();
-  const invoices = invoiceData.invoices.map((invoice) =>
-    invoice.kind === kind
-      ? {
-          ...invoice,
-          status: (paid ? "paid" : "unpaid") as "paid" | "unpaid",
-          paidAt: paid ? now : null
-        }
-      : invoice
+  const nextData = withInvoicePaidCents(
+    row.invoice_data,
+    kind,
+    paidCents,
+    paidAt ?? now
   );
-  const nextData: InvoiceData = { ...invoiceData, invoices };
   const { error } = await supabase
     .from("quotes")
     .update({ invoice_data: nextData, updated_at: now })
     .eq("id", quoteUuid);
   if (error) {
-    throw new Error(`setInvoicePaid update failed: ${error.message}`);
+    throw new Error(`setInvoicePaymentCents update failed: ${error.message}`);
   }
+}
+
+// Recompute one invoice's collected amount from the SUCCEEDED rows in the
+// payments ledger and write it back. Only succeeded money counts: an ACH still
+// in "processing" has not settled and must never read as collected.
+//
+// This is what the Stripe path uses, and why it is safe there: the ledger holds
+// one row per payment intent (the unique index on stripe_payment_intent_id),
+// so summing is idempotent no matter how many webhook events arrive or how
+// often Stripe redelivers one. Adding a delta instead would double-count a
+// redelivered `checkout.session.completed`.
+export async function syncInvoicePaidFromLedger(
+  quoteUuid: string,
+  kind: InvoiceKind
+): Promise<number> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("payments")
+    .select("amount_cents, paid_at")
+    .eq("quote_id", quoteUuid)
+    .eq("invoice_kind", kind)
+    .eq("status", "succeeded");
+  if (error) {
+    throw new Error(`syncInvoicePaidFromLedger read failed: ${error.message}`);
+  }
+  const rows = (data ?? []) as { amount_cents: number; paid_at: string | null }[];
+  const collected = rows.reduce(
+    (sum, row) => sum + (Math.round(row.amount_cents) || 0),
+    0
+  );
+  const latestPaidAt =
+    rows
+      .map((row) => row.paid_at)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .pop() ?? null;
+  await setInvoicePaymentCents(quoteUuid, kind, collected, latestPaidAt);
+  return collected;
+}
+
+// Apply a Stripe refund to a ledger row and report which invoice it belongs to.
+// `remainingAmountCents` is what is still collected after the refund:
+//   - 0 (a full refund) marks the row "refunded", so the recompute drops it.
+//   - above 0 (a PARTIAL refund) keeps the row succeeded with the reduced
+//     amount, so only the refunded part comes off the invoice. Marking a
+//     partially refunded payment "refunded" would drop money the customer still
+//     has with us.
+// Both are derived from the charge's cumulative amount_refunded, so a repeated
+// event is harmless. Returns the row's quote + kind so the caller can resync.
+export async function applyStripeRefund(
+  stripePaymentIntentId: string,
+  remainingAmountCents: number
+): Promise<{ quoteUuid: string; kind: InvoiceKind } | null> {
+  const supabase = getSupabaseAdmin();
+  const remaining = Math.max(0, Math.round(remainingAmountCents) || 0);
+  const patch: Record<string, unknown> =
+    remaining > 0
+      ? { status: "succeeded", amount_cents: remaining }
+      : { status: "refunded" };
+  const { data, error } = await supabase
+    .from("payments")
+    .update(patch)
+    .eq("stripe_payment_intent_id", stripePaymentIntentId)
+    .select("quote_id, invoice_kind")
+    .maybeSingle();
+  if (error || !data) return null;
+  const row = data as { quote_id: string; invoice_kind: InvoiceKind };
+  return { quoteUuid: row.quote_id, kind: row.invoice_kind };
 }
 
 // Record that a Stripe event was processed (audit / idempotency log). Best

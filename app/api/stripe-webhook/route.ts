@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import {
-  readInvoiceAmount,
+  applyStripeRefund,
+  readInvoiceBalance,
   recordWebhookEvent,
-  setInvoicePaid,
+  syncInvoicePaidFromLedger,
   updatePaymentStatus,
   upsertStripePayment,
   type PaymentMethod,
@@ -99,13 +100,20 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
           : session.payment_intent?.id ?? null;
       if (!intentId) return;
 
-      // Amount comes from our DB, never from Stripe.
-      const { exists, amountCents } = await readInvoiceAmount(quoteUuid, kind);
-      if (!exists) return;
+      // The amount actually charged. It is the balance the checkout route
+      // stamped into the session metadata when it created it (our own value,
+      // round-tripped through Stripe), falling back to the live balance for a
+      // session created before that stamp existed. Reading it here rather than
+      // adding a delta is what makes a redelivered event harmless, and it
+      // records the right amount now that a partially paid invoice only charges
+      // the remainder.
+      const chargedCents =
+        parseAmountCents(session.metadata?.amount_cents) ??
+        (await readInvoiceBalance(quoteUuid, kind)).balanceCents;
 
       const method = await resolveMethod(stripe, intentId);
       // Card: session.payment_status === "paid" (immediate). ACH: "processing"
-      // (settles days later -> payment_intent.succeeded flips the flag then).
+      // (settles days later -> payment_intent.succeeded syncs it then).
       const status: PaymentStatus =
         session.payment_status === "paid" ? "succeeded" : "processing";
       const paidAt = status === "succeeded" ? new Date().toISOString() : null;
@@ -113,7 +121,7 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
       await upsertStripePayment({
         quoteUuid,
         kind,
-        amountCents,
+        amountCents: chargedCents,
         method,
         status,
         stripePaymentIntentId: intentId,
@@ -121,7 +129,10 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
         paidAt
       });
       if (status === "succeeded") {
-        await setInvoicePaid(quoteUuid, kind, true);
+        // Recompute the invoice's collected amount from the ledger. Idempotent:
+        // one row per payment intent, so a replayed event sets the same total
+        // instead of adding twice.
+        await syncInvoicePaidFromLedger(quoteUuid, kind);
       }
       return;
     }
@@ -139,14 +150,14 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
             ? "failed"
             : "processing";
       const ctx = await updatePaymentStatus(intent.id, status);
-      // Only "succeeded" flips the invoice to paid (the ACH success path; for
-      // cards the flag was already flipped at checkout.session.completed, and
-      // setInvoicePaid is idempotent). failed/processing/canceled never mark an
-      // invoice paid. A canceled attempt does NOT un-flip the flag either: the
-      // invoice may have been paid by a different, successful payment, and
-      // reversing a real success is a refund (charge.refunded), not a cancel.
-      if (status === "succeeded" && ctx) {
-        await setInvoicePaid(ctx.quoteUuid, ctx.kind, true);
+      // Resync after EVERY status change. Only succeeded rows count toward the
+      // invoice, so this is a no-op for processing/pending while still being
+      // right for the two cases that matter: an ACH settling days later
+      // (processing -> succeeded adds the money), and an ACH RETURN after it
+      // looked settled (succeeded -> failed takes it back off). A canceled
+      // attempt that never settled correctly leaves the invoice as it was.
+      if (ctx) {
+        await syncInvoicePaidFromLedger(ctx.quoteUuid, ctx.kind);
       }
       return;
     }
@@ -158,10 +169,19 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
           ? charge.payment_intent
           : charge.payment_intent?.id ?? null;
       if (!intentId) return;
-      const ctx = await updatePaymentStatus(intentId, "refunded");
+      // What is still collected after this refund. amount_refunded is
+      // cumulative for the charge, so this is safe to recompute on a repeated
+      // event. A partial refund keeps the row succeeded at the reduced amount
+      // (marking it refunded would drop money the customer still has with us);
+      // a full refund marks it refunded so the recompute takes it off.
+      const remaining =
+        Math.max(0, Math.round(charge.amount) || 0) -
+        Math.max(0, Math.round(charge.amount_refunded) || 0);
+      const ctx = await applyStripeRefund(intentId, remaining);
       if (ctx) {
-        // A refund reverses the paid flag so the invoice is owed again.
-        await setInvoicePaid(ctx.quoteUuid, ctx.kind, false);
+        // Recompute rather than zero: any other payment still standing on that
+        // invoice (another card, or a manual payment) stays collected.
+        await syncInvoicePaidFromLedger(ctx.quoteUuid, ctx.kind);
       }
       return;
     }
@@ -170,6 +190,15 @@ async function handleEvent(stripe: Stripe, event: Stripe.Event): Promise<void> {
       // Other event types are ignored for v1.
       return;
   }
+}
+
+// Parse the amount the checkout route stamped into the session metadata. Returns
+// null when it is missing or unreadable so the caller falls back to the DB.
+function parseAmountCents(value: unknown): number | null {
+  if (typeof value !== "string" || value.trim() === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  return Math.round(parsed);
 }
 
 // Determine card vs ACH from the payment method on the intent. Best-effort: any

@@ -3,7 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
-import { computeInvoiceAmounts, isUnsplitServiceCall } from "@/lib/invoice-calculations";
+import {
+  computeInvoiceAmounts,
+  invoicePaidCents,
+  invoiceStatusFor,
+  isUnsplitServiceCall
+} from "@/lib/invoice-calculations";
 import { nextInvoiceNumber } from "@/lib/invoice-number";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { InvoiceData, InvoiceKind, InvoiceRecord, ServiceLine } from "@/lib/types";
@@ -130,21 +135,21 @@ export function ServiceInvoiceBuilder({
   const existingFinish =
     existing?.invoices.find((invoice) => invoice.kind === "finish") ?? null;
 
-  // A paid invoice records money that was actually collected. Changing the
-  // billing-schedule SHAPE (split on/off) would orphan a paid record of the
-  // other shape, so the toggle is locked while any invoice is paid. Editing
-  // the line items within the same shape is still allowed — the change flows
-  // to an unpaid invoice, or resets a paid invoice whose amount changed (with
-  // a warning before the save).
-  const anyPaid = existing?.invoices.some((i) => i.status === "paid") ?? false;
-  const splitLocked = anyPaid;
+  // An invoice with money collected records money that was actually received.
+  // Changing the billing-schedule SHAPE (split on/off) would orphan a payment
+  // record of the other shape, so the toggle is locked while any invoice has
+  // payments. Editing the line items within the same shape is still allowed:
+  // the change flows to an invoice with nothing collected, and an invoice with
+  // payments keeps them and shows a new balance (with a warning before saving).
+  const anyCollected =
+    existing?.invoices.some((i) => invoicePaidCents(i) > 0) ?? false;
+  const splitLocked = anyCollected;
 
-  // Once the deposit (initial) is paid, it is frozen — the money was
-  // collected. Any later change to the line items flows ONLY to the final
-  // invoice (computeInvoiceAmounts freeze path: final = contract - paid
-  // deposit). The deposit-% field is locked in this state and the live
-  // preview shows the lock.
-  const depositPaid = split && existingInitial?.status === "paid";
+  // Once the deposit (initial) has money collected, it is frozen. Any later
+  // change to the line items flows ONLY to the final invoice
+  // (computeInvoiceAmounts freeze path: final = contract - deposit billed). The
+  // deposit-% field is locked in this state and the live preview shows the lock.
+  const depositPaid = split && Boolean(existingInitial && invoicePaidCents(existingInitial) > 0);
 
   // Build a preview InvoiceData matching the current shape so
   // computeInvoiceAmounts gives live deposit/final amounts. The existing
@@ -212,26 +217,34 @@ export function ServiceInvoiceBuilder({
     [previewData]
   );
 
-  // A paid invoice records money that was actually collected. If the owner's
-  // current lines would give that invoice a different amount, saving must NOT
-  // silently rewrite the collected amount while leaving the "paid" badge in
-  // place. Instead we flag it so we can (1) warn before the save and (2) reset
-  // it to unpaid on save so the owner re-marks it paid at the new amount. The
-  // paid deposit (initial) is frozen and never produces a change; only a paid
-  // final (split) or a paid service invoice (unsplit) can reset.
-  const paidAmountChanges = useMemo(() => {
+  // An invoice with money collected records money that was actually received.
+  // If the owner's current lines would give that invoice a different amount, we
+  // do NOT erase the payments: the money stays and the invoice shows a new
+  // balance. Flagged here so the owner is warned before the save (and told what
+  // the new balance will be). The deposit (initial) is frozen while it has
+  // payments and never produces a change; only the final (split) or the service
+  // invoice (unsplit) can.
+  const collectedAmountChanges = useMemo(() => {
     if (!existing) {
-      return [] as { kind: InvoiceKind; label: string; fromCents: number; toCents: number }[];
+      return [] as {
+        kind: InvoiceKind;
+        label: string;
+        fromCents: number;
+        toCents: number;
+        collectedCents: number;
+      }[];
     }
     const changes: {
       kind: InvoiceKind;
       label: string;
       fromCents: number;
       toCents: number;
+      collectedCents: number;
     }[] = [];
     for (const prev of existing.invoices) {
-      if (prev.status !== "paid") continue;
-      // The paid deposit is frozen — never a paid-amount change.
+      const collectedCents = invoicePaidCents(prev);
+      if (collectedCents <= 0) continue;
+      // The deposit is frozen while it has payments — never an amount change.
       if (split && prev.kind === "initial") continue;
       const toCents = split
         ? prev.kind === "finish"
@@ -247,7 +260,8 @@ export function ServiceInvoiceBuilder({
               : "Deposit"
             : "Service",
           fromCents: prev.amountCents,
-          toCents
+          toCents,
+          collectedCents
         });
       }
     }
@@ -270,17 +284,18 @@ export function ServiceInvoiceBuilder({
     // reserved for this save.
     const invoiceNumber = prev?.invoiceNumber ?? assignNumber;
 
-    // The paid deposit is frozen: never recompute or reset it. The final
-    // absorbs all changes (see computeInvoiceAmounts), so the deposit keeps
-    // exactly the amount that was collected, stays paid, and keeps its
-    // issued/paid timestamps.
-    if (split && kind === "initial" && prev?.status === "paid") {
+    // The deposit is frozen while it has money collected: never recompute or
+    // reset it. The final absorbs all changes (see computeInvoiceAmounts), so
+    // the deposit keeps exactly the amount it was billed at and every payment
+    // recorded against it.
+    if (split && kind === "initial" && prev && invoicePaidCents(prev) > 0) {
       return {
         kind,
         amountCents: prev.amountCents,
-        status: "paid",
+        status: prev.status,
+        paidCents: invoicePaidCents(prev),
         issuedAt: prev.issuedAt ?? now,
-        paidAt: prev.paidAt ?? now,
+        paidAt: prev.paidAt,
         invoiceNumber
       };
     }
@@ -291,26 +306,19 @@ export function ServiceInvoiceBuilder({
         : amounts.finishInvoiceAmountCents
       : amounts.initialInvoiceAmountCents; // unsplit single service = full contract
 
-    // Reset a previously-paid invoice when its amount changed (see note on
-    // paidAmountChanges). The owner must re-mark it paid against the new amount.
-    if (prev?.status === "paid" && prev.amountCents !== amountForKind) {
-      return {
-        kind,
-        amountCents: amountForKind,
-        status: "unpaid",
-        issuedAt: prev.issuedAt ?? now,
-        paidAt: null,
-        invoiceNumber
-      };
-    }
+    // Money already collected is NEVER erased by an amount change (see the note
+    // on collectedAmountChanges). The invoice keeps it and shows a new balance;
+    // if the amount drops below what was collected it reads as overpaid, which
+    // the UI flags. The flag is derived from the money.
+    const collectedCents = prev ? invoicePaidCents(prev) : 0;
 
     return {
       kind,
       amountCents: amountForKind,
-      // Preserve paid status and timestamps across setup edits.
-      status: prev?.status ?? "unpaid",
+      status: invoiceStatusFor(collectedCents, amountForKind),
+      paidCents: collectedCents,
       issuedAt: prev?.issuedAt ?? now,
-      paidAt: prev?.paidAt ?? null,
+      paidAt: collectedCents > 0 ? prev?.paidAt ?? now : null,
       invoiceNumber
     };
   }
@@ -443,15 +451,15 @@ export function ServiceInvoiceBuilder({
     }
 
     setSaveError(false);
-    if (paidAmountChanges.length > 0) {
-      const list = paidAmountChanges
+    if (collectedAmountChanges.length > 0) {
+      const list = collectedAmountChanges
         .map(
           (c) =>
-            `${c.label} (was ${formatCurrency(c.fromCents)}, now ${formatCurrency(c.toCents)})`
+            `${c.label} (was ${formatCurrency(c.fromCents)}, now ${formatCurrency(c.toCents)}, ${formatCurrency(c.collectedCents)} already collected so ${formatCurrency(Math.max(0, c.toCents - c.collectedCents))} remains due)`
         )
         .join("; ");
       setSaveMessage(
-        `Invoice saved. Paid invoice(s) whose amount changed were reset to unpaid so you can re-mark them paid at the new amount: ${list}.`
+        `Invoice saved. Payments already recorded were kept, so the invoice(s) below now show a new balance: ${list}.`
       );
     } else {
       setSaveMessage("Invoice saved. Adjust and save again any time.");
@@ -540,9 +548,10 @@ export function ServiceInvoiceBuilder({
 
         {splitLocked ? (
           <p className="mt-3 text-xs font-bold text-charcoal/55">
-            A paid invoice is on this job, so the billing schedule can&apos;t be
-            changed here. Mark the paid invoice unpaid first if you need to
-            switch between one invoice and a deposit/final split.
+            An invoice on this job has payments recorded, so the billing
+            schedule can&apos;t be changed here. Clear the payments on it first
+            if you need to switch between one invoice and a deposit/final
+            split.
           </p>
         ) : null}
 
@@ -550,10 +559,11 @@ export function ServiceInvoiceBuilder({
           <div className="mt-4">
             {depositPaid ? (
               <div className="mb-3 rounded-soft border border-pine/15 bg-sage/20 p-3 text-sm font-bold leading-6 text-deep-pine">
-                The deposit invoice is paid, so its amount is locked. Any change
-                you make to the line items here will adjust the final invoice
-                only — the paid deposit will not move. The deposit / final split
-                is no longer used while the deposit is paid.
+                The deposit invoice has payments recorded, so its amount is
+                locked. Any change you make to the line items here will adjust
+                the final invoice only, and the payments already recorded on the
+                deposit will not move. The deposit / final split is no longer
+                used while the deposit is locked.
               </div>
             ) : null}
 
@@ -606,7 +616,7 @@ export function ServiceInvoiceBuilder({
               value={formatCurrency(amounts.initialInvoiceAmountCents)}
               sub={
                 depositPaid
-                  ? "paid and locked"
+                  ? "payments recorded, locked"
                   : `${depositPercent}% of contract`
               }
               emphasize
@@ -658,19 +668,23 @@ export function ServiceInvoiceBuilder({
         ) : null}
       </div>
 
-      {paidAmountChanges.length > 0 ? (
+      {collectedAmountChanges.length > 0 ? (
         <div className="mt-5 rounded-soft border border-clay/30 bg-clay/10 p-4 text-sm font-bold leading-6 text-clay">
           <p className="mb-2">
-            Heads up: your changes would change the amount of a paid invoice.
-            Saving resets it to unpaid so you can re-mark it paid at the new
-            amount (a paid invoice records money already collected, so its
-            amount is never changed silently).
+            Heads up: your changes would change the amount of an invoice that
+            already has payments recorded against it. Saving keeps every payment
+            (a payment is never erased by an amount change) and the invoice will
+            simply show a new balance.
           </p>
           <ul className="ml-4 list-disc space-y-1">
-            {paidAmountChanges.map((c) => (
+            {collectedAmountChanges.map((c) => (
               <li key={c.kind}>
-                {c.label}: paid at {formatCurrency(c.fromCents)}, would become{" "}
-                {formatCurrency(c.toCents)}.
+                {c.label}: {formatCurrency(c.fromCents)} becomes{" "}
+                {formatCurrency(c.toCents)}, with{" "}
+                {formatCurrency(c.collectedCents)} already collected.
+                {c.toCents >= c.collectedCents
+                  ? ` The new balance will be ${formatCurrency(c.toCents - c.collectedCents)}.`
+                  : ` That is less than what was collected, so the invoice will read as overpaid by ${formatCurrency(c.collectedCents - c.toCents)}.`}
               </li>
             ))}
           </ul>
@@ -680,7 +694,7 @@ export function ServiceInvoiceBuilder({
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-bold text-charcoal/65">
           {existing
-            ? "Saving updates the line items and invoice amounts, and keeps any paid statuses."
+            ? "Saving updates the line items and invoice amounts, and keeps every payment already recorded."
             : split
               ? "This creates the deposit and final invoices for this accepted quote."
               : "This creates the service invoice for this accepted quote."}

@@ -4,15 +4,19 @@ import { AppShell } from "@/components/app-shell";
 import { DirectInvoiceBuilder } from "@/components/direct-invoice-builder";
 import { InvoiceBuilder } from "@/components/invoice-builder";
 import { ServiceInvoiceBuilder } from "@/components/service-invoice-builder";
-import { InvoicePaidButton } from "@/components/invoice-paid-button";
+import { InvoicePaymentControls } from "@/components/invoice-payment-controls";
+import type { InvoicePaymentRow } from "@/components/invoice-payment-controls";
 import { InvoicePaidBadge } from "@/components/status-badge";
 import { DeleteInvoicesButton } from "@/components/delete-invoices-button";
 import { formatCurrency } from "@/lib/currency";
 import {
+  invoiceBalanceCents,
   invoiceDisplayNumber,
+  invoicePaidCents,
   isUnsplitServiceCall,
   outstandingCents,
   isPaidInFull,
+  quoteCollectedCents,
   scheduledCents
 } from "@/lib/invoice-calculations";
 import { getEmailHistoryForQuote, receiptsFromHistory } from "@/lib/email-log";
@@ -25,6 +29,7 @@ import { normalizeQuoteType } from "@/lib/types";
 import type {
   InvoiceData,
   InvoiceKind,
+  InvoiceRecord,
   PricingItem,
   QuoteCalculationResult,
   QuoteFormState,
@@ -58,7 +63,7 @@ function isServiceResult(
 
 export default async function InvoicingPage({ params }: PageProps) {
   const supabase = getSupabaseServer();
-  const [user, { data, error }, catalog, paymentsRes, stripePaidRes, emailHistory] = await Promise.all([
+  const [user, { data, error }, catalog, paymentsRes, paymentRows, stripePaidRes, emailHistory] = await Promise.all([
     getServerUser(),
     supabase
       .from("quotes")
@@ -75,6 +80,9 @@ export default async function InvoicingPage({ params }: PageProps) {
       .from("payments")
       .select("id", { count: "exact", head: true })
       .eq("quote_id", params.id),
+    // The individual payments, shown per invoice as its history and used to
+    // tell a partial payment from a full one. Newest first.
+    loadPaymentRows(supabase, params.id),
     // Succeeded ONLINE payments (card / ACH) per invoice kind. A succeeded
     // Stripe row means real money was collected; the Mark Unpaid button is
     // blocked for that invoice because flipping the flag back to unpaid here
@@ -181,11 +189,11 @@ export default async function InvoicingPage({ params }: PageProps) {
     invoiceData?.invoices.find((invoice) => invoice.kind === "service") ?? null;
 
   // Once the initial invoice (rough-in for a new build, deposit for a split
-  // service call) is paid, it is frozen and edits flow only to the finish
-  // invoice (see computeInvoiceAmounts). Used to tailor the header hint, the
-  // aside note, and the invoice-card copy below. An unsplit service call has no
-  // initial invoice, so this is false for it.
-  const roughInPaid = initialInvoice?.status === "paid";
+  // service call) has any money collected against it, it is frozen and edits
+  // flow only to the finish invoice (see computeInvoiceAmounts). Used to tailor
+  // the header hint, the aside note, and the invoice-card copy below. An unsplit
+  // service call has no initial invoice, so this is false for it.
+  const roughInPaid = Boolean(initialInvoice && invoicePaidCents(initialInvoice) > 0);
 
   const contractTotalCents = invoiceData
     ? invoiceData.contractAmountCents
@@ -194,20 +202,20 @@ export default async function InvoicingPage({ params }: PageProps) {
       : (newBuildResult?.clientQuoteTotalCents ?? 0);
 
   // Guard for "Delete invoices": block when a payment has been recorded (ledger
-  // row) or any invoice is flagged paid. Either means real money is tied to
+  // row) or any invoice has money collected. Either means real money is tied to
   // this setup and clearing it would orphan the audit trail.
   const paymentCount = paymentsRes.count ?? 0;
   const hasPaidInvoice = Boolean(
-    invoiceData && invoiceData.invoices.some((inv) => inv.status === "paid")
+    invoiceData && invoiceData.invoices.some((inv) => invoicePaidCents(inv) > 0)
   );
   const deleteBlocked = paymentCount > 0 || hasPaidInvoice;
   const deleteBlockedReason =
     paymentCount > 0
       ? "A payment has been recorded on this job (card, ACH, or manual), so the invoices cannot be deleted without orphaning that payment record. Reverse the payment in Stripe first if needed, then try again."
-      : "An invoice on this job is marked paid, so the invoices cannot be deleted. Mark it unpaid first (which also removes its manual ledger row), then try again.";
+      : "An invoice on this job has money collected against it, so the invoices cannot be deleted without orphaning that payment record. Clear the payments on it first, then try again.";
 
-  // Invoice kinds that have a succeeded online (card / ACH) payment. Marking
-  // those unpaid is blocked (see InvoicePaidButton).
+  // Invoice kinds that have a succeeded online (card / ACH) payment. Clearing
+  // those is blocked (see InvoicePaymentControls).
   const stripePaidKinds = new Set<string>(
     ((stripePaidRes.data ?? []) as { invoice_kind: string }[]).map(
       (r) => r.invoice_kind
@@ -215,6 +223,10 @@ export default async function InvoicingPage({ params }: PageProps) {
   );
   const markUnpaidBlockedReason =
     "This invoice was paid online by card or bank transfer, so it can't be marked unpaid from here. To reverse it, issue a refund in Stripe and this invoice will mark itself unpaid automatically once the refund is confirmed.";
+
+  // The payment rows for one invoice kind.
+  const paymentsFor = (kind: InvoiceKind): InvoicePaymentRow[] =>
+    paymentRows.filter((row) => row.invoice_kind === kind);
 
   return (
     <AppShell>
@@ -247,16 +259,24 @@ export default async function InvoicingPage({ params }: PageProps) {
               const paidInFull = isPaidInFull(invoiceData, receipts);
               const owed = outstandingCents(invoiceData, receipts);
               const pending = scheduledCents(invoiceData, receipts);
+              const collected = quoteCollectedCents(invoiceData);
               return (
-                <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
-                  {paidInFull
-                    ? "Paid in full"
-                    : owed > 0
-                      ? `Outstanding: ${formatCurrency(owed)}`
-                      : pending > 0
-                        ? `${isServiceLike ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
-                        : "Paid in full"}
-                </p>
+                <>
+                  <p className="mt-4 inline-flex rounded-full bg-cream px-4 py-2 text-sm font-black text-deep-pine">
+                    {paidInFull
+                      ? "Paid in full"
+                      : owed > 0
+                        ? `Outstanding: ${formatCurrency(owed)}`
+                        : pending > 0
+                          ? `${isServiceLike ? "Invoice" : "Finish"} pending: ${formatCurrency(pending)}`
+                          : "Paid in full"}
+                  </p>
+                  {collected > 0 && !paidInFull ? (
+                    <p className="mt-2 text-sm font-bold text-charcoal/65">
+                      Collected so far: {formatCurrency(collected)}
+                    </p>
+                  ) : null}
+                </>
               );
             })()
           ) : null}
@@ -275,8 +295,8 @@ export default async function InvoicingPage({ params }: PageProps) {
           {roughInPaid ? (
             <p className="mt-2 text-xs font-bold leading-5 text-clay">
               {isService
-                ? "Deposit is paid. Changes to line items apply to the final invoice only."
-                : "Rough-in is paid. Changes to line items apply to the final invoice only."}
+                ? "The deposit has payments recorded and is locked. Changes to line items apply to the final invoice only."
+                : "The rough-in invoice has payments recorded and is locked. Changes to line items apply to the final invoice only."}
             </p>
           ) : null}
         </div>
@@ -292,16 +312,16 @@ export default async function InvoicingPage({ params }: PageProps) {
           </p>
           <p className="text-sm font-bold leading-6 text-charcoal/75">
             {isDirectInvoice
-              ? "The invoice amount is the sum of the line items below (qty × unit price). One invoice, due on completion — edit the line items any time, then mark it paid when it is collected."
+              ? "The invoice amount is the sum of the line items below (qty × unit price). One invoice, due on completion. Edit the line items any time, then record payments as they come in. A customer can pay part of it now and the rest later."
               : isService
               ? unsplitService
-                ? "The invoice amount is the sum of the freeform line items. A service call has a single invoice (no rough-in/finish split, no permit fee). Mark it paid when it is collected."
+                ? "The invoice amount is the sum of the freeform line items. A service call has a single invoice (no rough-in/finish split, no permit fee). Record payments against it as they come in; the invoice is paid when the full amount is collected."
                 : roughInPaid
-                  ? "The contract is the sum of the freeform line items. The deposit invoice is paid and locked, so any change to the line items adjusts the final invoice only. Mark the final invoice paid when it is collected."
-                  : "The contract is the sum of the freeform line items. The deposit invoice is the deposit percent of that contract; the final invoice is the remainder. Mark each invoice paid as it is collected."
+                  ? "The contract is the sum of the freeform line items. The deposit invoice has money collected and is locked, so any change to the line items adjusts the final invoice only. Record payments on the final invoice as they come in."
+                  : "The contract is the sum of the freeform line items. The deposit invoice is the deposit percent of that contract; the final invoice is the remainder. Record payments on each as they come in; an invoice reads paid once its full amount is collected."
               : roughInPaid
-                ? "The contract is the sum of the line items. The rough-in invoice is paid and locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Mark the final invoice paid when it is collected."
-                : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Mark each invoice paid as it is collected."}
+                ? "The contract is the sum of the line items. The rough-in invoice has money collected and is locked, so any change to the line items, contract, or permit fee adjusts the final invoice only. Record payments on the final invoice as they come in."
+                : "The contract is the sum of the line items. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Record payments on each as they come in; an invoice reads paid once its full amount is collected."}
           </p>
         </div>
       </div>
@@ -359,12 +379,12 @@ export default async function InvoicingPage({ params }: PageProps) {
                     kind="service"
                     reference={invoiceDisplayNumber(row.quote_id, serviceInvoice)}
                     title={isService ? "Service Invoice" : "Invoice"}
-                    amountCents={serviceInvoice.amountCents}
-                    status={serviceInvoice.status}
+                    invoice={serviceInvoice}
+                    payments={paymentsFor("service")}
                     recordedBy={user?.email ?? ""}
                     payUrl={buildPayUrl(row.id, "service")}
-                    markUnpaidBlocked={stripePaidKinds.has("service")}
-                    markUnpaidBlockedReason={markUnpaidBlockedReason}
+                    clearBlocked={stripePaidKinds.has("service")}
+                    clearBlockedReason={markUnpaidBlockedReason}
                   />
                 ) : null
               ) : (
@@ -376,12 +396,12 @@ export default async function InvoicingPage({ params }: PageProps) {
                       kind="initial"
                       reference={invoiceDisplayNumber(row.quote_id, initialInvoice)}
                       title={isService ? "Deposit Invoice" : "Invoice 1: Rough-In (Initial)"}
-                      amountCents={initialInvoice.amountCents}
-                      status={initialInvoice.status}
+                      invoice={initialInvoice}
+                      payments={paymentsFor("initial")}
                       recordedBy={user?.email ?? ""}
                       payUrl={buildPayUrl(row.id, "initial")}
-                      markUnpaidBlocked={stripePaidKinds.has("initial")}
-                      markUnpaidBlockedReason={markUnpaidBlockedReason}
+                      clearBlocked={stripePaidKinds.has("initial")}
+                      clearBlockedReason={markUnpaidBlockedReason}
                     />
                   ) : null}
 
@@ -392,12 +412,12 @@ export default async function InvoicingPage({ params }: PageProps) {
                       kind="finish"
                       reference={invoiceDisplayNumber(row.quote_id, finishInvoice)}
                       title={isService ? "Final Invoice" : "Invoice 2: Final"}
-                      amountCents={finishInvoice.amountCents}
-                      status={finishInvoice.status}
+                      invoice={finishInvoice}
+                      payments={paymentsFor("finish")}
                       recordedBy={user?.email ?? ""}
                       payUrl={buildPayUrl(row.id, "finish")}
-                      markUnpaidBlocked={stripePaidKinds.has("finish")}
-                      markUnpaidBlockedReason={markUnpaidBlockedReason}
+                      clearBlocked={stripePaidKinds.has("finish")}
+                      clearBlockedReason={markUnpaidBlockedReason}
                     />
                   ) : null}
                 </>
@@ -426,44 +446,93 @@ export default async function InvoicingPage({ params }: PageProps) {
   );
 }
 
+// The payments ledger rows for one job, newest first.
+//
+// `note` arrived with the partial-payments change, so a database that has not
+// had that one ALTER TABLE run yet would fail this whole query and blank out the
+// page. Fall back to a note-less select in that window (notes simply render
+// blank) so the invoicing page keeps working until the SQL is applied.
+async function loadPaymentRows(
+  supabase: ReturnType<typeof getSupabaseServer>,
+  quoteId: string
+): Promise<(InvoicePaymentRow & { invoice_kind: string })[]> {
+  type Row = InvoicePaymentRow & { invoice_kind: string };
+  const columns = "id, invoice_kind, amount_cents, method, status, note, paid_at, recorded_by";
+  const withNote = await supabase
+    .from("payments")
+    .select(columns)
+    .eq("quote_id", quoteId)
+    .order("paid_at", { ascending: false, nullsFirst: false });
+  if (!withNote.error) return (withNote.data ?? []) as Row[];
+
+  console.error(
+    `[invoices] payments select with note failed, retrying without it: ${withNote.error.message}`
+  );
+  const withoutNote = await supabase
+    .from("payments")
+    .select("id, invoice_kind, amount_cents, method, status, paid_at, recorded_by")
+    .eq("quote_id", quoteId)
+    .order("paid_at", { ascending: false, nullsFirst: false });
+  if (withoutNote.error) {
+    console.error(
+      `[invoices] payments select failed: ${withoutNote.error.message}`
+    );
+    return [];
+  }
+  return ((withoutNote.data ?? []) as Omit<Row, "note">[]).map((row) => ({
+    ...row,
+    note: null
+  }));
+}
+
 function InvoiceCard({
   quoteId,
   invoiceData,
   kind,
   reference,
   title,
-  amountCents,
-  status,
+  invoice,
+  payments,
   recordedBy,
   payUrl,
-  markUnpaidBlocked,
-  markUnpaidBlockedReason
+  clearBlocked,
+  clearBlockedReason
 }: {
   quoteId: string;
   invoiceData: InvoiceData;
   kind: InvoiceKind;
   reference: string;
   title: string;
-  amountCents: number;
-  status: "unpaid" | "paid";
+  invoice: InvoiceRecord;
+  payments: InvoicePaymentRow[];
   recordedBy: string;
   payUrl: string | null;
-  markUnpaidBlocked: boolean;
-  markUnpaidBlockedReason: string;
+  clearBlocked: boolean;
+  clearBlockedReason: string;
 }) {
+  const collectedCents = invoicePaidCents(invoice);
+  const balanceCents = invoiceBalanceCents(invoice);
+
   return (
     <div className="rounded-xl1 border border-pine/10 bg-cream p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-black text-deep-pine">{reference}</span>
-            <InvoicePaidBadge status={status} />
+            <InvoicePaidBadge status={invoice.status} paidCents={collectedCents} />
           </div>
           <p className="mt-1 font-bold text-charcoal">{title}</p>
         </div>
-        <p className="font-display text-lg font-bold text-deep-pine md:text-right">
-          {formatCurrency(amountCents)}
-        </p>
+        <div className="md:text-right">
+          <p className="font-display text-lg font-bold text-deep-pine">
+            {formatCurrency(invoice.amountCents)}
+          </p>
+          {collectedCents > 0 && balanceCents > 0 ? (
+            <p className="text-sm font-bold text-charcoal/70">
+              {formatCurrency(balanceCents)} remaining
+            </p>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-2">
@@ -473,15 +542,17 @@ function InvoiceCard({
         >
           View invoice
         </Link>
-        <InvoicePaidButton
-          quoteId={quoteId}
-          invoiceData={invoiceData}
-          kind={kind}
-          recordedBy={recordedBy}
-          markUnpaidBlocked={markUnpaidBlocked}
-          markUnpaidBlockedReason={markUnpaidBlockedReason}
-        />
       </div>
+
+      <InvoicePaymentControls
+        quoteId={quoteId}
+        invoiceData={invoiceData}
+        kind={kind}
+        payments={payments}
+        recordedBy={recordedBy}
+        clearBlocked={clearBlocked}
+        clearBlockedReason={clearBlockedReason}
+      />
 
       {payUrl ? (
         <div className="mt-3 border-t border-pine/10 pt-3">

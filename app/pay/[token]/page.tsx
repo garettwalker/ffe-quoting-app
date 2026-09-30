@@ -2,7 +2,7 @@ import Image from "next/image";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { getSettings } from "@/lib/pricing";
 import { formatCurrency } from "@/lib/currency";
-import { findInvoice, invoiceDisplayNumber } from "@/lib/invoice-calculations";
+import { findInvoice, invoiceBalanceCents, invoiceDisplayNumber, invoicePaidCents } from "@/lib/invoice-calculations";
 import { ACH_LIMIT_CENTS } from "@/lib/payments";
 import { verifyPayToken } from "@/lib/pay-token";
 import { normalizeQuoteType } from "@/lib/types";
@@ -60,32 +60,35 @@ export default async function PayPage({ params }: PageProps) {
   }
 
   const reference = invoiceDisplayNumber(row.quote_id, invoice);
-  const amountCents = Math.round(invoice.amountCents) || 0;
-  const isPaid = invoice.status === "paid";
+  // What the customer still owes, and what they have already paid. The page
+  // shows and charges the BALANCE: an invoice with a partial payment recorded
+  // (a check, or an earlier card payment) only ever asks for the rest, and one
+  // that is fully collected reports nothing due.
+  const amountCents = invoiceBalanceCents(invoice);
+  const collectedCents = invoicePaidCents(invoice);
   const businessName = settings.businessName || "Freedom Family Electric";
-
-  if (isPaid) {
-    return (
-      <PayShell businessName={businessName}>
-        <p className="font-display text-3xl font-bold text-moss">Thank you</p>
-        <p className="mt-3 text-charcoal/80">
-          Invoice <span className="font-black text-deep-pine">{reference}</span> is
-          already marked paid. If you have any questions, reply to your email or
-          contact us at{" "}
-          <span className="font-bold text-deep-pine">{settings.businessEmail}</span>.
-        </p>
-      </PayShell>
-    );
-  }
 
   if (amountCents <= 0) {
     return (
       <PayShell businessName={businessName}>
-        <p className="font-display text-3xl font-bold text-moss">{reference}</p>
+        <p className="font-display text-3xl font-bold text-moss">
+          {collectedCents > 0 ? "Thank you" : reference}
+        </p>
         <p className="mt-3 text-charcoal/80">
-          There is no balance due on this invoice. If you believe this is an error,
-          contact us at{" "}
-          <span className="font-bold text-deep-pine">{settings.businessEmail}</span>.
+          {collectedCents > 0 ? (
+            <>
+              Invoice <span className="font-black text-deep-pine">{reference}</span>{" "}
+              is paid in full. If you have any questions, reply to your email or
+              contact us at{" "}
+              <span className="font-bold text-deep-pine">{settings.businessEmail}</span>.
+            </>
+          ) : (
+            <>
+              There is no balance due on this invoice. If you believe this is an
+              error, contact us at{" "}
+              <span className="font-bold text-deep-pine">{settings.businessEmail}</span>.
+            </>
+          )}
         </p>
       </PayShell>
     );
@@ -148,6 +151,13 @@ export default async function PayPage({ params }: PageProps) {
             {formatCurrency(amountCents)}
           </p>
         </div>
+        {collectedCents > 0 ? (
+          <p className="mt-2 border-t border-pine/10 pt-2 text-sm font-bold text-charcoal/70">
+            Invoice total {formatCurrency(invoice.amountCents)} · payments received{" "}
+            {formatCurrency(collectedCents)} · remaining balance{" "}
+            {formatCurrency(amountCents)}
+          </p>
+        ) : null}
       </div>
 
       {amountCents > ACH_LIMIT_CENTS ? (

@@ -182,6 +182,19 @@ async function NewBuildInvoicePrintPage({
           </div>
         ) : null}
 
+        {pdfProps.paymentsBlock ? (
+          <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
+            <div className="flex items-center justify-between gap-4">
+              <span>Invoice total</span>
+              <span>{pdfProps.paymentsBlock.total}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-4">
+              <span>Payments received</span>
+              <span>{pdfProps.paymentsBlock.collected}</span>
+            </div>
+          </div>
+        ) : null}
+
         {pdfProps.previouslyInvoiced ? (
           <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
             <div className="flex items-center justify-between gap-4">
@@ -199,7 +212,7 @@ async function NewBuildInvoicePrintPage({
           <div className="w-full max-w-xs rounded-xl1 border border-pine/15 bg-cream px-5 py-4">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-black uppercase tracking-[0.12em] text-clay">
-                Amount Due
+                {pdfProps.paymentsBlock ? "Balance Due" : "Amount Due"}
               </p>
               <p className="font-display text-2xl font-bold text-deep-pine">
                 {pdfProps.amountDue}
@@ -382,6 +395,19 @@ async function ServiceInvoicePrintPage({
           </table>
         </div>
 
+        {pdfProps.paymentsBlock ? (
+          <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
+            <div className="flex items-center justify-between gap-4">
+              <span>Invoice total</span>
+              <span>{pdfProps.paymentsBlock.total}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-4">
+              <span>Payments received</span>
+              <span>{pdfProps.paymentsBlock.collected}</span>
+            </div>
+          </div>
+        ) : null}
+
         {pdfProps.previouslyInvoiced ? (
           <div className="mt-4 rounded-soft bg-sand/60 p-4 text-sm font-bold text-charcoal/75">
             <div className="flex items-center justify-between gap-4">
@@ -399,7 +425,7 @@ async function ServiceInvoicePrintPage({
           <div className="w-full max-w-xs rounded-xl1 border border-pine/15 bg-cream px-5 py-4">
             <div className="flex items-center justify-between gap-4">
               <p className="text-sm font-black uppercase tracking-[0.12em] text-clay">
-                Amount Due
+                {pdfProps.paymentsBlock ? "Balance Due" : "Amount Due"}
               </p>
               <p className="font-display text-2xl font-bold text-deep-pine">
                 {pdfProps.amountDue}

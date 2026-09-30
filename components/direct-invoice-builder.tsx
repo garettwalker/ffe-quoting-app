@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
+import {
+  invoicePaidCents,
+  invoiceStatusFor
+} from "@/lib/invoice-calculations";
 import { nextInvoiceNumber } from "@/lib/invoice-number";
 import {
   clearActiveQuote,
@@ -727,17 +731,20 @@ function DirectInvoiceEdit({
   const existingService: InvoiceRecord | null =
     existing?.invoices.find((invoice) => invoice.kind === "service") ?? null;
 
-  // A paid invoice records money that was actually collected. If the current
-  // lines would give it a different amount, saving resets it to unpaid (with
-  // a warning) so the owner re-marks it paid at the new amount — never a
-  // silent change to a collected amount.
-  const paidAmountChanges = useMemo(() => {
-    if (!existingService || existingService.status !== "paid") return [];
+  // An invoice with money collected records money actually received. If the
+  // current lines would give it a different amount, the payments are KEPT and
+  // the invoice just shows a new balance (warned before saving). A payment is
+  // never erased by an amount change.
+  const collectedAmountChanges = useMemo(() => {
+    if (!existingService) return [];
+    const collectedCents = invoicePaidCents(existingService);
+    if (collectedCents <= 0) return [];
     return existingService.amountCents !== amountCents
       ? [
           {
             fromCents: existingService.amountCents,
-            toCents: amountCents
+            toCents: amountCents,
+            collectedCents
           }
         ]
       : [];
@@ -805,11 +812,12 @@ function DirectInvoiceEdit({
       0
     );
 
-    // Preserve the invoice number + paid status/timestamps. A paid invoice
-    // whose amount changed resets to unpaid (warned above) so it is
-    // re-marked paid at the new amount; the number never changes. A record
-    // with no number (only possible after Delete invoices wiped the setup)
-    // gets a fresh one reserved here.
+    // Preserve the invoice number and every payment recorded against it. Money
+    // already collected is never erased by an amount change (warned above): the
+    // invoice keeps it and shows a new balance, and reads as overpaid if the new
+    // amount is below what came in. The number never changes. A record with no
+    // number (only possible after Delete invoices wiped the setup) gets a fresh
+    // one reserved here.
     const prev = existingService;
     let invoiceNumber = prev?.invoiceNumber;
     if (!invoiceNumber) {
@@ -824,32 +832,16 @@ function DirectInvoiceEdit({
         return;
       }
     }
-    const invoiceRecord: InvoiceRecord = prev
-      ? prev.status === "paid" && prev.amountCents !== contractCents
-        ? {
-            kind: "service",
-            amountCents: contractCents,
-            status: "unpaid",
-            issuedAt: prev.issuedAt ?? now,
-            paidAt: null,
-            invoiceNumber
-          }
-        : {
-            kind: "service",
-            amountCents: contractCents,
-            status: prev.status,
-            issuedAt: prev.issuedAt ?? now,
-            paidAt: prev.paidAt ?? null,
-            invoiceNumber
-          }
-      : {
-          kind: "service",
-          amountCents: contractCents,
-          status: "unpaid",
-          issuedAt: now,
-          paidAt: null,
-          invoiceNumber
-        };
+    const prevCollectedCents = prev ? invoicePaidCents(prev) : 0;
+    const invoiceRecord: InvoiceRecord = {
+      kind: "service",
+      amountCents: contractCents,
+      status: invoiceStatusFor(prevCollectedCents, contractCents),
+      paidCents: prevCollectedCents,
+      issuedAt: prev?.issuedAt ?? now,
+      paidAt: prevCollectedCents > 0 ? prev?.paidAt ?? now : null,
+      invoiceNumber
+    };
 
     const data: InvoiceData = {
       quoteType: "direct_invoice",
@@ -889,11 +881,21 @@ function DirectInvoiceEdit({
     }
 
     setSaveError(false);
-    if (paidAmountChanges.length > 0) {
+    if (collectedAmountChanges.length > 0) {
       setSaveMessage(
-        `Invoice saved. The paid invoice whose amount changed was reset to unpaid so you can re-mark it paid at the new amount (was ${formatCurrency(
-          paidAmountChanges[0].fromCents
-        )}, now ${formatCurrency(paidAmountChanges[0].toCents)}).`
+        `Invoice saved. Payments already recorded were kept (was ${formatCurrency(
+          collectedAmountChanges[0].fromCents
+        )}, now ${formatCurrency(
+          collectedAmountChanges[0].toCents
+        )}, with ${formatCurrency(
+          collectedAmountChanges[0].collectedCents
+        )} collected), so the invoice now shows a balance of ${formatCurrency(
+          Math.max(
+            0,
+            collectedAmountChanges[0].toCents -
+              collectedAmountChanges[0].collectedCents
+          )
+        )}.`
       );
     } else {
       setSaveMessage("Invoice saved. Adjust and save again any time.");
@@ -954,21 +956,32 @@ function DirectInvoiceEdit({
         </div>
       </div>
 
-      {paidAmountChanges.length > 0 ? (
+      {collectedAmountChanges.length > 0 ? (
         <div className="mt-5 rounded-soft border border-clay/30 bg-clay/10 p-4 text-sm font-bold leading-6 text-clay">
-          Heads up: your changes would change the amount of the paid invoice
-          (paid at {formatCurrency(paidAmountChanges[0].fromCents)}, would
-          become {formatCurrency(paidAmountChanges[0].toCents)}). Saving resets
-          it to unpaid so you can re-mark it paid at the new amount — a paid
-          invoice records money already collected, so its amount is never
-          changed silently.
+          Heads up: your changes would change the amount of an invoice that
+          already has payments recorded against it. Saving keeps every payment
+          (a payment is never erased by an amount change). It goes from{" "}
+          {formatCurrency(collectedAmountChanges[0].fromCents)} to{" "}
+          {formatCurrency(collectedAmountChanges[0].toCents)}, with{" "}
+          {formatCurrency(collectedAmountChanges[0].collectedCents)} already
+          collected
+          {collectedAmountChanges[0].toCents >=
+          collectedAmountChanges[0].collectedCents
+            ? `, so the new balance will be ${formatCurrency(
+                collectedAmountChanges[0].toCents -
+                  collectedAmountChanges[0].collectedCents
+              )}.`
+            : `, which is less than what came in, so the invoice will read as overpaid by ${formatCurrency(
+                collectedAmountChanges[0].collectedCents -
+                  collectedAmountChanges[0].toCents
+              )}.`}
         </div>
       ) : null}
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-bold text-charcoal/65">
-          Saving updates the line items and invoice amount, and keeps any paid
-          status.
+          Saving updates the line items and invoice amount, and keeps every
+          payment already recorded.
         </p>
         <button
           type="button"

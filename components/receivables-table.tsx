@@ -421,11 +421,18 @@ function InvoiceCell({
       <p className="text-xs font-bold tabular-nums text-charcoal/45">{invoice.reference}</p>
       <p className="mt-0.5 font-bold text-charcoal">{formatCurrency(invoice.amountCents)}</p>
       <div className="mt-1 flex flex-wrap items-center gap-2">
-        <InvoicePaidBadge status={invoice.status} />
+        <InvoicePaidBadge status={invoice.status} paidCents={invoice.paidCents} />
         {invoice.status === "unpaid" ? (
-          <span className="text-xs font-black text-clay">
-            {formatCurrency(invoice.outstandingCents)} owed
-          </span>
+          <>
+            <span className="text-xs font-black text-clay">
+              {formatCurrency(invoice.outstandingCents)} owed
+            </span>
+            {invoice.paidCents > 0 ? (
+              <span className="text-xs font-bold text-charcoal/55">
+                {formatCurrency(invoice.paidCents)} of it collected
+              </span>
+            ) : null}
+          </>
         ) : (
           <span className="text-xs font-bold text-charcoal/55">
             paid {formatDate(invoice.paidAt) || ""}

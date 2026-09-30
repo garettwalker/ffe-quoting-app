@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase-admin";
 import { hasActivePayment, achAvailableForAmount } from "@/lib/payments";
-import { findInvoice, invoiceDisplayNumber } from "@/lib/invoice-calculations";
+import {
+  findInvoice,
+  invoiceBalanceCents,
+  invoiceDisplayNumber
+} from "@/lib/invoice-calculations";
 import { verifyPayToken, getAppUrl } from "@/lib/pay-token";
 import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
 
@@ -11,12 +15,14 @@ import type { InvoiceData, InvoiceKind, QuoteFormState } from "@/lib/types";
 //
 // Public (the /pay page has no session): the signed token authorizes the
 // request; the invoice + amount are ALWAYS re-read from the database via the
-// service-role client, never from the token or the browser. Creates a Stripe
-// Checkout Session (card + US bank account / ACH) and returns its URL. The
-// session carries metadata (quote_uuid + invoice_kind) so the webhook can find
-// the invoice when Stripe confirms payment. Until STRIPE_SECRET_KEY is set,
-// returns { ok: false, configured: false } so the customer-facing button shows an
-// honest "being set up" message.
+// service-role client, never from the token or the browser. The amount charged
+// is the invoice's REMAINING BALANCE, so an invoice that already has a partial
+// payment only ever takes the rest. Creates a Stripe Checkout Session (card +
+// US bank account / ACH) and returns its URL. The session carries metadata
+// (quote_uuid + invoice_kind + the charged amount) so the webhook can find the
+// invoice and record the right amount when Stripe confirms payment. Until
+// STRIPE_SECRET_KEY is set, returns { ok: false, configured: false } so the
+// customer-facing button shows an honest "being set up" message.
 
 export const dynamic = "force-dynamic";
 
@@ -61,8 +67,15 @@ export async function POST(request: Request) {
   if (!invoice) {
     return NextResponse.json({ ok: false, error: "Invoice not found." }, { status: 404 });
   }
+  // Bill only what is still owed. An invoice that already has a partial payment
+  // (money collected by check, or part paid by another card) charges the
+  // remainder, and a fully collected invoice refuses outright.
   if (invoice.status === "paid") {
     return NextResponse.json({ ok: false, error: "This invoice is already paid." });
+  }
+  const amountCents = invoiceBalanceCents(invoice);
+  if (amountCents <= 0) {
+    return NextResponse.json({ ok: false, error: "No balance is due on this invoice." });
   }
 
   // Double-payment guard: refuse to start a new charge if there is already an
@@ -80,11 +93,6 @@ export async function POST(request: Request) {
       },
       { status: 409 }
     );
-  }
-
-  const amountCents = Math.round(invoice.amountCents) || 0;
-  if (amountCents <= 0) {
-    return NextResponse.json({ ok: false, error: "No balance is due on this invoice." });
   }
 
   // Until Stripe is configured, tell the button to show the "being set up"
@@ -134,9 +142,13 @@ export async function POST(request: Request) {
       success_url: `${appUrl}/pay/success`,
       cancel_url: `${appUrl}/pay/canceled`,
       // The webhook uses these to find the invoice when Stripe confirms payment.
+      // amount_cents is the balance we are charging right now (our own value,
+      // round-tripped through Stripe), so the ledger records exactly what was
+      // charged even if the invoice amount changes before the webhook lands.
       metadata: {
         quote_uuid: verified.quoteUuid,
-        invoice_kind: verified.kind
+        invoice_kind: verified.kind,
+        amount_cents: String(amountCents)
       },
       ...(clientEmail ? { customer_email: clientEmail } : {})
     };

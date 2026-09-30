@@ -8,6 +8,7 @@ import { formatCurrency, formatDate, formatPercent } from "@/lib/currency";
 import { getAdderPriceVariance } from "@/lib/calculations";
 import { getEmailHistoryForQuote, receiptsFromHistory } from "@/lib/email-log";
 import {
+  invoicePaidCents,
   isPaidInFull,
   lifecycleStage,
   outstandingCents,
@@ -174,14 +175,15 @@ export default async function SavedQuotePage({ params }: PageProps) {
       : formatCurrency(varianceCents);
 
   // Protection state for the delete + reopen guards. Mirrors the guard on the
-  // invoicing page: any payment ledger row or any paid invoice means real money
-  // is tied to this quote, so deleting it is locked behind type-to-confirm and
-  // reopening it warns that a paid job will look un-invoiced on the dashboard.
+  // invoicing page: any payment ledger row or any invoice with money collected
+  // means real money is tied to this quote, so deleting it is locked behind
+  // type-to-confirm and reopening it warns that a paid job will look
+  // un-invoiced on the dashboard.
   const paymentCount = paymentsRes.count ?? 0;
   const hasInvoices = !!row.invoice_data;
   const hasPaidInvoice = Boolean(
     row.invoice_data &&
-      row.invoice_data.invoices.some((inv) => inv.status === "paid")
+      row.invoice_data.invoices.some((inv) => invoicePaidCents(inv) > 0)
   );
 
   // The display name shown in the H1. Reused as the type-to-match token for the

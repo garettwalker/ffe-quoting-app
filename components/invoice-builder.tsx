@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { centsToDollars, dollarsToCents, formatCurrency } from "@/lib/currency";
-import { computeInvoiceAmounts } from "@/lib/invoice-calculations";
+import { computeInvoiceAmounts, invoicePaidCents, invoiceStatusFor } from "@/lib/invoice-calculations";
 import { nextInvoiceNumber } from "@/lib/invoice-number";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
@@ -129,15 +129,15 @@ export function InvoiceBuilder({
   const [saveMessage, setSaveMessage] = useState("");
   const [saveError, setSaveError] = useState(false);
 
-  // Once the rough-in (initial) invoice is paid, its amount is frozen — the
-  // money was collected. Any later change to the line items, contract, or
-  // permit then flows ONLY to the finish invoice (computeInvoiceAmounts does
-  // this: finish = contract + permit - paid rough-in). The rough-in/finish
-  // split is bypassed while locked, so the % fields are disabled and the
-  // live preview shows the lock instead of the split.
-  const roughInPaid =
-    existing?.invoices.find((invoice) => invoice.kind === "initial")
-      ?.status === "paid";
+  // Once the rough-in (initial) invoice has money collected against it, its
+  // amount is frozen — the money was taken. Any later change to the line items,
+  // contract, or permit then flows ONLY to the finish invoice
+  // (computeInvoiceAmounts does this: finish = contract + permit - rough-in
+  // billed). The rough-in/finish split is bypassed while locked, so the % fields
+  // are disabled and the live preview shows the lock instead of the split.
+  const roughInInvoice =
+    existing?.invoices.find((invoice) => invoice.kind === "initial") ?? null;
+  const roughInPaid = roughInInvoice !== null && invoicePaidCents(roughInInvoice) > 0;
 
   // Starting unit price of each line that was on the form at load, keyed by
   // pricingItemId. Used to catch accidental price edits: when the owner
@@ -199,25 +199,37 @@ export function InvoiceBuilder({
     [contractCents, roughInPercent, finishPercent, permitDollars, existing]
   );
 
-  // A paid invoice records money that was actually collected. If the owner's
-  // current inputs would give that invoice a different amount, saving must NOT
-  // silently rewrite the collected amount while leaving the "paid" badge in
-  // place (that would make AR and the dashboard report money never collected).
-  // Instead we flag those invoices here so we can (1) warn the owner before the
-  // save and (2) reset them to unpaid on save so they re-mark it paid at the new
-  // amount. Unpaid invoices are unaffected; an unchanged paid invoice is too.
-  const paidAmountChanges = useMemo(() => {
-    if (!existing) return [] as { kind: InvoiceKind; fromCents: number; toCents: number }[];
-    const changes: { kind: InvoiceKind; fromCents: number; toCents: number }[] = [];
+  // An invoice with money collected records money that was actually received.
+  // If the owner's current inputs would give that invoice a different amount, we
+  // do NOT erase the payments: the money stays and the invoice shows a new
+  // balance. These are flagged here so the owner is warned before saving (and
+  // told what the new balance will be). Invoices with nothing collected are
+  // unaffected, and an unchanged invoice is too.
+  const collectedAmountChanges = useMemo(() => {
+    if (!existing) {
+      return [] as {
+        kind: InvoiceKind;
+        fromCents: number;
+        toCents: number;
+        collectedCents: number;
+      }[];
+    }
+    const changes: {
+      kind: InvoiceKind;
+      fromCents: number;
+      toCents: number;
+      collectedCents: number;
+    }[] = [];
     for (const prev of existing.invoices) {
-      if (prev.status !== "paid") continue;
-      // The paid rough-in is frozen and never changes (handled in
-      // buildInvoiceRecord), so it can never produce a paid-amount change.
-      // Only a paid FINISH invoice whose recomputed amount differs is flagged.
+      const collectedCents = invoicePaidCents(prev);
+      if (collectedCents <= 0) continue;
+      // The rough-in/deposit is frozen while it has payments (handled in
+      // buildInvoiceRecord), so it can never produce an amount change. Only the
+      // finish invoice's recomputed amount can differ.
       if (prev.kind === "initial") continue;
       const toCents = amounts.finishInvoiceAmountCents;
       if (prev.amountCents !== toCents) {
-        changes.push({ kind: prev.kind, fromCents: prev.amountCents, toCents });
+        changes.push({ kind: prev.kind, fromCents: prev.amountCents, toCents, collectedCents });
       }
     }
     return changes;
@@ -234,17 +246,18 @@ export function InvoiceBuilder({
     // so re-saving an already-numbered setup never burns a new one).
     const invoiceNumber = prev?.invoiceNumber ?? assignNumber;
 
-    // The paid rough-in is frozen: never recompute or reset it. The finish
-    // invoice absorbs all changes (see computeInvoiceAmounts), so the rough-in
-    // keeps exactly the amount that was collected, stays paid, and keeps its
-    // issued/paid timestamps.
-    if (kind === "initial" && prev?.status === "paid") {
+    // A rough-in/deposit invoice with money collected is frozen: never
+    // recompute or reset it. The finish invoice absorbs all changes (see
+    // computeInvoiceAmounts), so the rough-in keeps exactly the amount it was
+    // billed at and every payment recorded against it.
+    if (kind === "initial" && prev && invoicePaidCents(prev) > 0) {
       return {
         kind,
         amountCents: prev.amountCents,
-        status: "paid",
+        status: prev.status,
+        paidCents: invoicePaidCents(prev),
         issuedAt: prev.issuedAt ?? now,
-        paidAt: prev.paidAt ?? now,
+        paidAt: prev.paidAt,
         invoiceNumber
       };
     }
@@ -254,27 +267,21 @@ export function InvoiceBuilder({
         ? amounts.initialInvoiceAmountCents
         : amounts.finishInvoiceAmountCents;
 
-    // Reset a previously-paid FINISH invoice when its amount changes (see note
-    // on paidAmountChanges). The owner must re-mark it paid against the new
-    // amount. (The paid rough-in is handled above and never reaches here.)
-    if (prev?.status === "paid" && prev.amountCents !== amountCents) {
-      return {
-        kind,
-        amountCents,
-        status: "unpaid",
-        issuedAt: prev.issuedAt ?? now,
-        paidAt: null,
-        invoiceNumber
-      };
-    }
+    // Money already collected is NEVER erased by an amount change. The invoice
+    // keeps it and simply shows a new balance (the owner is warned before
+    // saving, see collectedAmountChanges). If the amount drops below what was
+    // collected the invoice reads as overpaid, which the UI flags rather than
+    // hiding. The flag is derived from the money, so a payment that finishes
+    // the invoice keeps it reading Paid.
+    const collectedCents = prev ? invoicePaidCents(prev) : 0;
 
     return {
       kind,
       amountCents,
-      // Preserve paid status and timestamps across setup edits.
-      status: prev?.status ?? "unpaid",
+      status: invoiceStatusFor(collectedCents, amountCents),
+      paidCents: collectedCents,
       issuedAt: prev?.issuedAt ?? now,
-      paidAt: prev?.paidAt ?? null,
+      paidAt: collectedCents > 0 ? prev?.paidAt ?? now : null,
       invoiceNumber
     };
   }
@@ -285,7 +292,8 @@ export function InvoiceBuilder({
   // catalog dropdown; the unit price defaults to catalog base x the job's
   // pricing-level multiplier. Editing a line's qty/price updates the contract
   // (sum of line totals) and therefore the invoice amounts; on a paid invoice
-  // that changes an amount, the paidAmountChanges warning + reset applies.
+  // that changes an amount, the collectedAmountChanges warning applies and the
+  // payments recorded against it are kept.
   // Editing only a comment is money-free and never resets anything.
 
   function resolveName(pricingItemId: string, fallback: string): string {
@@ -501,17 +509,18 @@ export function InvoiceBuilder({
     }
 
     setSaveError(false);
-    if (paidAmountChanges.length > 0) {
-      const list = paidAmountChanges
+    if (collectedAmountChanges.length > 0) {
+      const list = collectedAmountChanges
         .map((c) => {
           const label = KIND_LABEL[c.kind];
           const from = formatCurrency(c.fromCents);
           const to = formatCurrency(c.toCents);
-          return `${label} (was ${from}, now ${to})`;
+          const balance = formatCurrency(Math.max(0, c.toCents - c.collectedCents));
+          return `${label} (was ${from}, now ${to}, ${formatCurrency(c.collectedCents)} already collected so ${balance} remains due)`;
         })
         .join("; ");
       setSaveMessage(
-        `Invoices saved. Paid invoice(s) whose amount changed were reset to unpaid so you can re-mark them paid at the new amount: ${list}.`
+        `Invoices saved. Payments already recorded were kept, so the invoice(s) below now show a new balance: ${list}.`
       );
     } else {
       setSaveMessage("Invoices saved. Adjust and save again any time.");
@@ -530,7 +539,7 @@ export function InvoiceBuilder({
         </h2>
         <p className="mt-2 text-sm font-bold text-charcoal/65">
           {roughInPaid
-            ? "The contract is the sum of the line items below. The rough-in invoice is paid and locked, so any change you make to the line items, contract, or permit fee adjusts the final invoice only. Add line items from your pricing catalog and set quantity and price."
+            ? "The contract is the sum of the line items below. The rough-in invoice has payments recorded and is locked, so any change you make to the line items, contract, or permit fee adjusts the final invoice only. Add line items from your pricing catalog and set quantity and price."
             : "The contract is the sum of the line items below. The initial invoice is the rough-in percent of that contract plus the permit fee; the final invoice is the remainder. Add line items from your pricing catalog, set quantity and price, and adjust the split."}
         </p>
       </div>
@@ -724,14 +733,16 @@ export function InvoiceBuilder({
 
       {/* Split + permit. The contract is the sum of the line items above; when
           there are no line items, a manual contract amount is used instead.
-          Once the rough-in invoice is paid, the rough-in/finish split is
-          bypassed (the finish absorbs any change), so the % fields are locked. */}
+          Once the rough-in invoice has payments recorded, the rough-in/finish
+          split is bypassed (the finish absorbs any change), so the % fields are
+          locked. */}
       {roughInPaid ? (
         <div className="mt-6 rounded-soft border border-pine/15 bg-sage/20 p-4 text-sm font-bold leading-6 text-deep-pine">
-          The rough-in invoice is paid, so its amount is locked. Any change you
-          make to the line items, contract, or permit fee here will adjust the
-          finish invoice only — the paid rough-in will not move. The rough-in /
-          finish split is no longer used while the rough-in is paid.
+          The rough-in invoice has payments recorded, so its amount is locked.
+          Any change you make to the line items, contract, or permit fee here
+          will adjust the finish invoice only, and the payments already recorded
+          on the rough-in will not move. The rough-in / finish split is no longer
+          used while the rough-in is locked.
         </div>
       ) : null}
 
@@ -805,7 +816,7 @@ export function InvoiceBuilder({
           <PreviewLine
             label="Invoice 1: Rough-In"
             value={formatCurrency(amounts.initialInvoiceAmountCents)}
-            sub={roughInPaid ? "paid and locked" : `${roughInPercent}% + permit`}
+            sub={roughInPaid ? "payments recorded, locked" : `${roughInPercent}% + permit`}
             emphasize
           />
           <PreviewLine
@@ -821,7 +832,7 @@ export function InvoiceBuilder({
           <PreviewLine
             label="Permit fee (in Invoice 1)"
             value={formatCurrency(dollarsToCents(permitDollars))}
-            sub={roughInPaid ? "already collected" : "collected with rough-in"}
+            sub={roughInPaid ? "in the locked rough-in" : "collected with rough-in"}
           />
           <PreviewLine
             label="Total to collect"
@@ -834,7 +845,7 @@ export function InvoiceBuilder({
         <div className="mt-3 text-sm font-bold">
           {roughInPaid ? (
             <p className="text-deep-pine">
-              Rough-in is paid and locked at{" "}
+              Rough-in is locked at{" "}
               {formatCurrency(amounts.initialInvoiceAmountCents)}. The final
               invoice carries the remaining{" "}
               {formatCurrency(amounts.finishInvoiceAmountCents)} of the{" "}
@@ -855,19 +866,23 @@ export function InvoiceBuilder({
         </div>
       </div>
 
-      {paidAmountChanges.length > 0 ? (
+      {collectedAmountChanges.length > 0 ? (
         <div className="mt-5 rounded-soft border border-clay/30 bg-clay/10 p-4 text-sm font-bold leading-6 text-clay">
           <p className="mb-2">
-            Heads up: your changes would change the amount of a paid invoice.
-            Saving resets it to unpaid so you can re-mark it paid at the new
-            amount (a paid invoice records money already collected, so its
-            amount is never changed silently).
+            Heads up: your changes would change the amount of an invoice that
+            already has payments recorded against it. Saving keeps every payment
+            (a payment is never erased by an amount change) and the invoice will
+            simply show a new balance.
           </p>
           <ul className="ml-4 list-disc space-y-1">
-            {paidAmountChanges.map((c) => (
+            {collectedAmountChanges.map((c) => (
               <li key={c.kind}>
-                {KIND_LABEL[c.kind]}: paid at {formatCurrency(c.fromCents)}, would
-                become {formatCurrency(c.toCents)}.
+                {KIND_LABEL[c.kind]}: {formatCurrency(c.fromCents)} becomes{" "}
+                {formatCurrency(c.toCents)}, with{" "}
+                {formatCurrency(c.collectedCents)} already collected.
+                {c.toCents >= c.collectedCents
+                  ? ` The new balance will be ${formatCurrency(c.toCents - c.collectedCents)}.`
+                  : ` That is less than what was collected, so the invoice will read as overpaid by ${formatCurrency(c.collectedCents - c.toCents)}.`}
               </li>
             ))}
           </ul>
@@ -877,7 +892,7 @@ export function InvoiceBuilder({
       <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-bold text-charcoal/65">
           {existing
-            ? "Saving updates the line items, contract, and invoice amounts, and keeps any paid statuses."
+            ? "Saving updates the line items, contract, and invoice amounts, and keeps every payment already recorded."
             : "This creates the two invoices for this accepted quote."}
         </p>
         <button

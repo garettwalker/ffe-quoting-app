@@ -1,7 +1,10 @@
 import { formatCurrency } from "@/lib/currency";
 import {
   findInvoice,
-  invoiceDisplayNumber
+  invoiceBalanceCents,
+  invoiceDisplayNumber,
+  invoiceFullyPaid,
+  invoicePaidCents
 } from "@/lib/invoice-calculations";
 import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
@@ -151,6 +154,13 @@ export async function loadServiceInvoicePdfInput(
         })()
       : null;
 
+  // What has come in against this invoice, and what is left. The customer copy
+  // shows a summary only (a check number or an internal note is not the
+  // customer's business), and the total box below becomes the BALANCE so a
+  // partially paid invoice never asks for the full amount again.
+  const collectedCents = invoicePaidCents(invoice);
+  const balanceCents = invoiceBalanceCents(invoice);
+
   const pdfProps: ServiceInvoicePdfProps = {
     businessName: settings.businessName,
     businessEmail: settings.businessEmail,
@@ -165,7 +175,15 @@ export async function loadServiceInvoicePdfInput(
     projectType: quote.projectType,
     lines,
     previouslyInvoiced,
-    amountDue: formatCurrency(invoice.amountCents),
+    paymentsBlock: collectedCents > 0
+      ? {
+          total: formatCurrency(invoice.amountCents),
+          collected: formatCurrency(collectedCents),
+          balance: formatCurrency(balanceCents),
+          isPaidInFull: invoiceFullyPaid(invoice)
+        }
+      : null,
+    amountDue: formatCurrency(collectedCents > 0 ? balanceCents : invoice.amountCents),
     paymentTerms: settings.invoicePaymentTerms,
     logoDataUri: getLogoDataUri()
   };

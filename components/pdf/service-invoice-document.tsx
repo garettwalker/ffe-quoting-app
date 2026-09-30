@@ -51,7 +51,18 @@ export type ServiceInvoicePdfProps = {
     previouslyInvoicedAmount: string;
     contractTotal: string;
   } | null;
-  amountDue: string; // formatCurrency(invoice.amountCents)
+  // What has come in and what is left, shown only when the invoice has
+  // payments recorded against it (a partial payment, or one paid in several
+  // pieces). Null on an invoice with nothing collected, which keeps the plain
+  // single-total layout those invoices have always had. When present, the total
+  // box below it becomes "BALANCE DUE" instead of "AMOUNT DUE".
+  paymentsBlock?: {
+    total: string;
+    collected: string;
+    balance: string;
+    isPaidInFull: boolean;
+  } | null;
+  amountDue: string; // the amount still owed: balance when partially paid
   paymentTerms: string; // settings.invoicePaymentTerms
   logoDataUri: string | null;
 };
@@ -101,6 +112,7 @@ export function ServiceInvoicePdfDocument(props: ServiceInvoicePdfProps) {
     projectType,
     lines,
     previouslyInvoiced,
+    paymentsBlock,
     amountDue,
     paymentTerms,
     logoDataUri
@@ -153,7 +165,24 @@ export function ServiceInvoicePdfDocument(props: ServiceInvoicePdfProps) {
           </View>
         ) : null}
 
-        <PdfTotalBox label="AMOUNT DUE" value={amountDue} />
+        {paymentsBlock ? (
+          <View style={priorStyles.box}>
+            <View style={priorStyles.row}>
+              <Text style={priorStyles.label}>Invoice total</Text>
+              <Text style={priorStyles.value}>{paymentsBlock.total}</Text>
+            </View>
+            <View style={priorStyles.divider} />
+            <View style={priorStyles.row}>
+              <Text style={priorStyles.label}>Payments received</Text>
+              <Text style={priorStyles.value}>{paymentsBlock.collected}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        <PdfTotalBox
+          label={paymentsBlock ? "BALANCE DUE" : "AMOUNT DUE"}
+          value={amountDue}
+        />
 
         {paymentTerms ? <PdfNotes>{paymentTerms}</PdfNotes> : null}
 

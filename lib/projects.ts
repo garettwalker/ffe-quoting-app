@@ -1,5 +1,5 @@
 import { formatDate } from "@/lib/currency";
-import { isPaidInFull } from "@/lib/invoice-calculations";
+import { invoicePaidCents, isPaidInFull } from "@/lib/invoice-calculations";
 import type { InvoiceReceipts } from "@/lib/email-log";
 import type {
   InvoiceData,
@@ -98,7 +98,9 @@ function billedStage(
   const invoice = findInvoice(invoiceData, kind);
   if (!invoice) return { done: false, date: null };
   const emailedAt = receipts[kind];
-  if (invoice.status === "paid") {
+  // Collected money counts as billed, partially or in full: taking a payment is
+  // itself the billing act, so a partially paid invoice is not still "not billed".
+  if (invoicePaidCents(invoice) > 0) {
     return { done: true, date: emailedAt ?? invoice.paidAt };
   }
   if (emailedAt) {
@@ -119,6 +121,9 @@ export function computeProjectStages(args: ComputeArgs): ProjectStages {
   // Paid = the shared definition used by /quotes and /receivables. Date = the
   // latest paidAt across paid invoices (the moment the job was settled).
   const paidDone = isPaidInFull(invoiceData, receipts);
+  // The settling date is the LATEST payment across invoices that are fully
+  // paid. A partially paid invoice is excluded: it is money in, but the job is
+  // not settled, so it must not stamp the Paid stage.
   const paidDate = invoiceData
     ? invoiceData.invoices
         .filter((inv) => inv.status === "paid" && inv.paidAt)
@@ -283,10 +288,12 @@ export function computeServiceCallStages(
   // date across all invoices (emailed timestamp preferred, else paid timestamp).
   const billedFacts = invoices.map((inv) => {
     const emailedAt = receipts[inv.kind];
-    const paid = inv.status === "paid";
+    // Collected money counts as billed too (partially or in full): taking a
+    // payment is itself the billing act.
+    const collected = invoicePaidCents(inv) > 0;
     return {
-      done: Boolean(emailedAt) || paid,
-      date: emailedAt ?? (paid ? inv.paidAt ?? null : null)
+      done: Boolean(emailedAt) || collected,
+      date: emailedAt ?? (collected ? inv.paidAt ?? null : null)
     };
   });
   const billedDone = billedFacts.some((f) => f.done);

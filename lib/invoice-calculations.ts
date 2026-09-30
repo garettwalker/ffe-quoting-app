@@ -2,6 +2,7 @@ import type {
   InvoiceData,
   InvoiceKind,
   InvoiceRecord,
+  InvoiceStatus,
   LifecycleStage,
   QuoteStatus,
   QuoteType,
@@ -88,13 +89,15 @@ export type InvoiceAmounts = {
 // 100%, both amounts are computed from their percentages independently and
 // isBalanced is false so the UI can warn the owner.
 //
-// Once the rough-in (initial) invoice is PAID, its amount is frozen: the money
-// was already collected and must not change. Any later edit to the contract
-// (line items) or permit fee then flows ENTIRELY to the finish invoice, which
-// becomes (contract + permit) - (paid rough-in). The rough-in/finish split is
+// Once ANY money has been collected against the rough-in (initial) invoice, its
+// amount is frozen: the money was already taken and must not be rewritten. This
+// covers a fully paid rough-in and a partially paid one (a customer paying part
+// of a stalled job, say). Any later edit to the contract (line items) or permit
+// fee then flows ENTIRELY to the finish invoice, which becomes
+// (contract + permit) - (rough-in amount). The rough-in/finish split is
 // bypassed in this state — the finish absorbs the difference — so editing
-// line items after rough-in is collected only moves the finish invoice, never
-// the paid rough-in.
+// line items after rough-in money is collected only moves the finish invoice,
+// never the rough-in.
 export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
   const contract = Math.max(0, Math.round(data.contractAmountCents));
 
@@ -135,7 +138,10 @@ export function computeInvoiceAmounts(data: InvoiceData): InvoiceAmounts {
   const roughInInvoice =
     data.invoices.find((invoice) => invoice.kind === "initial") ?? null;
 
-  if (roughInInvoice?.status === "paid") {
+  // Money collected against the rough-in pins its bill. (The trigger is any
+  // payment on THAT invoice, not a payment anywhere on the job, so collecting
+  // a finish payment never freezes the rough-in.)
+  if (roughInInvoice && invoicePaidCents(roughInInvoice) > 0) {
     // Rough-in is locked at the collected amount. The finish invoice gets the
     // remainder of everything still collectible (contract + permit). The
     // rough-in portion shown in the live preview is an informational
@@ -219,8 +225,109 @@ function sumAdjustments(scopeLines: InvoiceData["scopeLines"]): {
   return { roughInAdjustmentCents, finishAdjustmentCents };
 }
 
+// ---------------------------------------------------------------------------
+// Collected money (partial payments)
+//
+// `paidCents` on an invoice record is the amount actually collected against it.
+// It is optional so invoice_data saved before partial payments keeps loading,
+// and every helper here falls back to the legacy binary flag when it is absent,
+// which is why no backfill is needed: a pre-existing paid invoice still reads
+// as fully collected and a pre-existing unpaid one still reads as nothing in.
+// The `payments` ledger rows remain the audit trail of individual payments.
+// ---------------------------------------------------------------------------
+
+// Money collected against one invoice.
+export function invoicePaidCents(invoice: InvoiceRecord): number {
+  if (
+    typeof invoice.paidCents === "number" &&
+    Number.isFinite(invoice.paidCents)
+  ) {
+    return Math.max(0, Math.round(invoice.paidCents));
+  }
+  // Legacy: no recorded amount, so the flag decides.
+  return invoice.status === "paid" ? Math.max(0, Math.round(invoice.amountCents) || 0) : 0;
+}
+
+// True when the whole invoice has been collected. Keyed on the amount, not on
+// the stored flag, so it can never disagree with the money: a $0 invoice is
+// never "fully paid" by arithmetic (0 >= 0 would otherwise say it was).
+export function invoiceFullyPaid(invoice: InvoiceRecord): boolean {
+  if (invoice.status === "paid") return true;
+  const amount = Math.max(0, Math.round(invoice.amountCents) || 0);
+  return amount > 0 && invoicePaidCents(invoice) >= amount;
+}
+
+// What is still owed on one invoice: its amount less everything collected.
+export function invoiceBalanceCents(invoice: InvoiceRecord): number {
+  const amount = Math.max(0, Math.round(invoice.amountCents) || 0);
+  return Math.max(0, amount - invoicePaidCents(invoice));
+}
+
+// Money is in, but the invoice is not settled yet.
+export function invoiceIsPartial(invoice: InvoiceRecord): boolean {
+  return invoicePaidCents(invoice) > 0 && !invoiceFullyPaid(invoice);
+}
+
+// More was collected than the invoice is for. Only reachable after an invoice
+// is edited down below what was already collected (allowed on purpose, flagged
+// in the UI, since the app has no credit or refund model to resolve it).
+export function invoiceIsOverpaid(invoice: InvoiceRecord): boolean {
+  const amount = Math.max(0, Math.round(invoice.amountCents) || 0);
+  return invoicePaidCents(invoice) > amount;
+}
+
+// Total collected across a job's invoices.
+export function quoteCollectedCents(data: InvoiceData | null): number {
+  if (!data) return 0;
+  return data.invoices.reduce((sum, invoice) => sum + invoicePaidCents(invoice), 0);
+}
+
+// Derive an invoice's stored flag from the money collected against it. The one
+// place that decides paid vs unpaid, so the flag can never disagree with
+// `paidCents`. A $0 invoice is never "paid" by arithmetic (0 >= 0 would
+// otherwise say it was); an amount below what was collected stays "paid" and
+// reads as overpaid in the UI.
+export function invoiceStatusFor(
+  collectedCents: number,
+  amountCents: number
+): InvoiceStatus {
+  const amount = Math.max(0, Math.round(amountCents) || 0);
+  const collected = Math.max(0, Math.round(collectedCents) || 0);
+  return (amount > 0 && collected >= amount ? "paid" : "unpaid") as InvoiceStatus;
+}
+
+// Return a copy of invoice_data with one invoice's collected amount replaced,
+// keeping its `status` and `paidAt` in sync. This is the single place that
+// derives the flag from the money, so the two can never drift apart: callers
+// (the manual payment panel, the Stripe helpers) only decide the amount.
+export function withInvoicePaidCents(
+  data: InvoiceData,
+  kind: InvoiceKind,
+  paidCents: number,
+  paidAt?: string | null
+): InvoiceData {
+  const invoices = data.invoices.map((invoice) => {
+    if (invoice.kind !== kind) return invoice;
+    const collected = Math.max(0, Math.round(paidCents) || 0);
+    // Keep the date of the most recent payment for a partial, and the settling
+    // date for a full payment; clear it when nothing is collected.
+    const nextPaidAt =
+      collected > 0 ? paidAt ?? invoice.paidAt ?? new Date().toISOString() : null;
+    return {
+      ...invoice,
+      paidCents: collected,
+      status: invoiceStatusFor(collected, invoice.amountCents),
+      paidAt: nextPaidAt
+    };
+  });
+  return { ...data, invoices };
+}
+
 // Is this invoice "receivable" (billed and therefore owed / counted on AR)?
 //   - paid invoices are always receivable (they were collected).
+//   - an invoice with money collected is receivable too, even a finish/service
+//     invoice that was never emailed: collecting against it IS the billing act
+//     (handed over in person, paid as cash), so its remaining balance counts.
 //   - when `receipts` is omitted, every invoice is receivable (the legacy
 //     behavior used by P&L, which reasons about the full contract, not the
 //     emailed state).
@@ -240,6 +347,7 @@ export function invoiceIsReceivable(
   receipts?: InvoiceReceipts
 ): boolean {
   if (invoice.status === "paid") return true;
+  if (invoicePaidCents(invoice) > 0) return true;
   if (receipts === undefined) return true;
   if (kind === "initial") return true;
   if (kind === "service") return receipts.service != null;
@@ -252,16 +360,19 @@ export function invoiceIsReceivable(
 // when `receipts` is omitted (legacy full-contract reasoning, used by P&L).
 // Used to show "Scheduled / not yet billed: $X" and to keep a job out of "paid
 // in full" while a positive-amount invoice is still unbilled. This is the
-// generalization of the old finish-only scheduledFinishCents.
+// generalization of the old finish-only scheduledFinishCents. The amount is the
+// invoice's BALANCE, so a partially collected invoice only contributes what is
+// still unbilled and the identity
+//   receivable invoiced = outstanding + scheduled + collected
+// holds on every job.
 export function scheduledCents(
   data: InvoiceData | null,
   receipts?: InvoiceReceipts
 ): number {
   if (!data || receipts === undefined) return 0;
   return data.invoices.reduce((sum, invoice) => {
-    if (invoice.status === "paid") return sum;
     if (invoiceIsReceivable(invoice, invoice.kind, receipts)) return sum;
-    return sum + (Math.round(invoice.amountCents) || 0);
+    return sum + invoiceBalanceCents(invoice);
   }, 0);
 }
 
@@ -274,37 +385,39 @@ export function scheduledFinishCents(
 ): number {
   if (!data || receipts === undefined) return 0;
   const finish = data.invoices.find((invoice) => invoice.kind === "finish");
-  if (!finish || finish.status === "paid") return 0;
-  if (receipts.finish != null) return 0;
-  return Math.round(finish.amountCents) || 0;
+  if (!finish) return 0;
+  if (invoiceIsReceivable(finish, "finish", receipts)) return 0;
+  return invoiceBalanceCents(finish);
 }
 
-// Sum of amounts for invoices that are still unpaid AND receivable (the
-// outstanding balance actually owed now). When `receipts` is omitted this
-// matches the legacy behavior (all unpaid invoices, including a not-yet-billed
-// finish).
+// Sum of what is still owed on invoices that are receivable (the outstanding
+// balance actually owed now). Each invoice contributes its BALANCE, so money
+// already collected is never reported as still owed. When `receipts` is omitted
+// this matches the legacy behavior (all invoices, including a not-yet-billed
+// finish). Billed totals (see receivableInvoicedCents) stay gross on purpose:
+// "invoiced" is what was billed, "outstanding" is what is left of it, and the
+// difference is what has actually been collected.
 export function outstandingCents(
   data: InvoiceData | null,
   receipts?: InvoiceReceipts
 ): number {
   if (!data) return 0;
   return data.invoices.reduce((sum, invoice) => {
-    if (invoice.status !== "unpaid") return sum;
     const kind = invoice.kind;
     if (!invoiceIsReceivable(invoice, kind, receipts)) return sum;
-    return sum + (Math.round(invoice.amountCents) || 0);
+    return sum + invoiceBalanceCents(invoice);
   }, 0);
 }
 
-// Per-invoice outstanding: the invoice amount when still unpaid, 0 once paid.
+// Per-invoice outstanding: the invoice amount less everything collected on it.
 // Used by the Accounts Receivable view's per-invoice (rough-in / finish) columns.
 export function invoiceOutstandingCents(invoice: InvoiceRecord): number {
-  return invoice.status === "unpaid"
-    ? Math.round(invoice.amountCents) || 0
-    : 0;
+  return invoiceBalanceCents(invoice);
 }
 
-// Sum of amounts for invoices that are receivable (billed). When `receipts` is
+// Sum of amounts for invoices that are receivable (billed). Deliberately GROSS
+// (never reduced by payments): this is "Total Invoiced", the amount billed, and
+// AR derives what was collected as invoiced - outstanding. When `receipts` is
 // omitted this equals the full contract (both invoices) — the legacy behavior.
 // Used for AR's "Total Invoiced" headline + per-job totals, which should only
 // count what has actually been billed (a not-yet-emailed finish is excluded).

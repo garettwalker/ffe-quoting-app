@@ -51,14 +51,29 @@ const INVOICE_STATUS_STYLES: Record<InvoiceStatus, string> = {
   paid: "bg-pine text-whitewarm"
 };
 
-export function InvoicePaidBadge({ status }: { status: InvoiceStatus }) {
+// Invoice paid badge. Reads the invoice's collected amount, so a partially
+// collected invoice shows "Partial" instead of the plain "Unpaid" it used to
+// (its status stays "unpaid" until the full amount is in, by design). The
+// optional paidCents prop is what makes that distinction: callers that only
+// have a status still render correctly.
+export function InvoicePaidBadge({
+  status,
+  paidCents = 0
+}: {
+  status: InvoiceStatus;
+  paidCents?: number;
+}) {
+  const collected = Math.max(0, Math.round(paidCents) || 0);
+  const isPartial = status !== "paid" && collected > 0;
+  const style = isPartial
+    ? "bg-clay/25 text-clay"
+    : INVOICE_STATUS_STYLES[status];
+
   return (
     <span
-      className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${
-        INVOICE_STATUS_STYLES[status]
-      }`}
+      className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.12em] ${style}`}
     >
-      {status === "paid" ? "Paid" : "Unpaid"}
+      {isPartial ? "Partial" : status === "paid" ? "Paid" : "Unpaid"}
     </span>
   );
 }

@@ -121,10 +121,22 @@ export type InvoiceRecord = {
   kind: InvoiceKind;
   // initial = roughInAmount + permitFee; finish = finish amount.
   amountCents: number;
+  // "paid" means the FULL amount has been collected. A partially paid invoice
+  // stays "unpaid" with a non-zero paidCents, so every reader of this field
+  // keeps meaning exactly what it always meant.
   status: InvoiceStatus;
+  // Money actually collected against this invoice, in cents. Optional so
+  // invoice_data saved before partial payments keeps loading: when absent the
+  // legacy binary behavior applies (a "paid" invoice collected its full
+  // amount, anything else collected none). A partial payment recorded on the
+  // invoicing page or by the Stripe webhook writes this alongside the matching
+  // `payments` ledger row, which stays the audit trail.
+  paidCents?: number;
   // ISO timestamp of when the invoice was first issued/printed, if ever.
   issuedAt: string | null;
-  // ISO timestamp of when it was marked paid, if ever.
+  // ISO timestamp of the most recent payment. Set whenever paidCents > 0 (so a
+  // partially paid invoice still carries a real "money arrived" date for AR),
+  // and cleared when the invoice's payments are cleared.
   paidAt: string | null;
   // Dedicated sequential invoice number (INV-0001), assigned once at invoice
   // setup and never changed. Optional so invoice_data saved before this field
@@ -228,18 +240,21 @@ export type ProjectStatus = {
 };
 
 // One invoice flattened for the Accounts Receivable view. `outstandingCents`
-// is the invoice amount when still unpaid, 0 once paid (per-invoice balance).
-// `receivable` is true when the invoice counts toward the AR totals: paid, or
-// the rough-in (always, billed at setup), or the finish once it has been emailed
-// (a not-yet-emailed finish is "scheduled" — shown but not counted as owed).
-// `receivableAt` is the date it became receivable (first sent email date, else
-// paidAt, else issuedAt) and drives the "Invoiced" date column + oldest-first
-// sort.
+// is what is still owed on the invoice (its amount less everything collected,
+// so a partially paid invoice reports only the remainder). `paidCents` is what
+// has actually been collected, which is what the Partial badge reads.
+// `receivable` is true when the invoice counts toward the AR totals: paid, has
+// money collected, or the rough-in (always, billed at setup), or the finish once
+// it has been emailed (a not-yet-emailed finish is "scheduled" — shown but not
+// counted as owed). `receivableAt` is the date it became receivable (first sent
+// email date, else paidAt, else issuedAt) and drives the "Invoiced" date column
+// + oldest-first sort.
 export type ReceivableInvoice = {
   kind: InvoiceKind;
   reference: string;
   amountCents: number;
   status: InvoiceStatus;
+  paidCents: number;
   outstandingCents: number;
   receivable: boolean;
   receivableAt: string | null;

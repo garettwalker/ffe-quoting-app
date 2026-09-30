@@ -2,7 +2,10 @@ import { formatCurrency } from "@/lib/currency";
 import {
   computeInvoiceAmounts,
   findInvoice,
-  invoiceDisplayNumber
+  invoiceBalanceCents,
+  invoiceDisplayNumber,
+  invoiceFullyPaid,
+  invoicePaidCents
 } from "@/lib/invoice-calculations";
 import { getLogoDataUri } from "@/lib/pdf-logo";
 import { getSettings } from "@/lib/pricing";
@@ -90,19 +93,28 @@ export async function loadInvoicePdfInput(
 
   const title = kind === "initial" ? "Initial Invoice" : "Final Invoice";
 
-  // When the rough-in is paid, its amount is locked and the finish absorbs
-  // any later changes (see computeInvoiceAmounts). The initial invoice is a
-  // historical record of what was collected, so label the rough-in line as
-  // paid/locked rather than quoting a now-stale percentage of a contract
-  // that may have been edited since.
-  const roughInPaid = invoice.status === "paid";
+  // When the rough-in has money collected against it, its amount is locked and
+  // the finish absorbs any later changes (see computeInvoiceAmounts). The
+  // initial invoice is a historical record of what was billed and collected, so
+  // label the rough-in line as locked rather than quoting a now-stale
+  // percentage of a contract that may have been edited since.
+  const roughInPaid = invoicePaidCents(invoice) > 0;
+
+  // What has come in against this invoice, and what is left. The customer copy
+  // shows a summary (not the individual ledger entries: a check number or an
+  // internal note is not the customer's business), and the total box below
+  // becomes the BALANCE so a partially paid invoice never asks for the full
+  // amount again.
+  const collectedCents = invoicePaidCents(invoice);
+  const balanceCents = invoiceBalanceCents(invoice);
+  const hasPayments = collectedCents > 0;
 
   const lines =
     kind === "initial"
       ? [
           {
             label: roughInPaid
-              ? "Rough-In (paid, locked)"
+              ? "Rough-In (locked)"
               : `Rough-In (${invoiceData.roughInPercent}% of contract)`,
             amount: formatCurrency(amounts.roughInAmountCents)
           },
@@ -202,7 +214,15 @@ export async function loadInvoicePdfInput(
     lines,
     scopeLines,
     previouslyInvoiced,
-    amountDue: formatCurrency(invoice.amountCents),
+    paymentsBlock: hasPayments
+      ? {
+          total: formatCurrency(invoice.amountCents),
+          collected: formatCurrency(collectedCents),
+          balance: formatCurrency(balanceCents),
+          isPaidInFull: invoiceFullyPaid(invoice)
+        }
+      : null,
+    amountDue: formatCurrency(hasPayments ? balanceCents : invoice.amountCents),
     paymentTerms: settings.invoicePaymentTerms,
     logoDataUri: getLogoDataUri()
   };
