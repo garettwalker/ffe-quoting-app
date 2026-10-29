@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatCurrency, formatPercent } from "@/lib/currency";
 import {
@@ -54,6 +54,61 @@ const QUOTE_TYPES: { value: QuoteType; label: string }[] = [
   { value: "new_build", label: "New build" },
   { value: "service_call", label: "Service call" },
   { value: "direct_invoice", label: "Direct invoice" }
+];
+
+type SavedReportView = {
+  id: string;
+  name: string;
+  filters: ReportFilters;
+};
+
+const SAVED_VIEWS_KEY = "ffe-report-views-v1";
+
+// Shown the first time the report builder opens, so the rail is useful before
+// the owner has saved anything. Each one is a normal saved view and can be
+// overwritten or deleted.
+const DEFAULT_SAVED_VIEWS: SavedReportView[] = [
+  {
+    id: "default-quarter",
+    name: "Revenue by quarter",
+    filters: {
+      ...EMPTY_FILTERS,
+      range: "ytd",
+      groupBy: "quarter",
+      compare: "prior_year"
+    }
+  },
+  {
+    id: "default-month",
+    name: "Collections this month",
+    filters: {
+      ...EMPTY_FILTERS,
+      range: "this_month",
+      groupBy: "month",
+      compare: "prior_month"
+    }
+  },
+  {
+    id: "default-camel",
+    name: "Camel City history",
+    filters: {
+      ...EMPTY_FILTERS,
+      range: "all",
+      groupBy: "year",
+      compare: "none",
+      customer: "Camel City Construction"
+    }
+  },
+  {
+    id: "default-aging",
+    name: "AR aging over 60",
+    filters: {
+      ...EMPTY_FILTERS,
+      range: "all",
+      groupBy: "quarter",
+      compare: "none"
+    }
+  }
 ];
 
 const VIEW_COPY: Record<ReportView, { name: string; desc: string }> = {
@@ -197,8 +252,84 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
   const [filters, setFilters] = useState<ReportFilters>(EMPTY_FILTERS);
   const [measure, setMeasure] = useState<Measure>("invoiced");
   const [display, setDisplay] = useState<"chart" | "table">("chart");
+  const [savedViews, setSavedViews] = useState<SavedReportView[]>([]);
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
+  const [viewName, setViewName] = useState("");
 
   const report = useMemo(() => computeReport(dataset, filters), [dataset, filters]);
+
+  // Saved views are a browser convenience for now. They survive refreshes and
+  // app redeploys on this device. A shared table would be the next step if the
+  // owner wants the same list on the phone and the desktop.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(SAVED_VIEWS_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as SavedReportView[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSavedViews(parsed);
+          return;
+        }
+      }
+    } catch {
+      // Corrupt or blocked storage: fall through to the defaults.
+    }
+    setSavedViews(DEFAULT_SAVED_VIEWS);
+    try {
+      window.localStorage.setItem(
+        SAVED_VIEWS_KEY,
+        JSON.stringify(DEFAULT_SAVED_VIEWS)
+      );
+    } catch {
+      // Storage unavailable: the list still works for this session.
+    }
+  }, []);
+
+  const persistSavedViews = (next: SavedReportView[]) => {
+    setSavedViews(next);
+    try {
+      window.localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(next));
+    } catch {
+      // Storage unavailable: keep the in-memory list.
+    }
+  };
+
+  const applySavedView = (saved: SavedReportView) => {
+    setFilters({ ...EMPTY_FILTERS, ...saved.filters });
+    setActiveViewId(saved.id);
+  };
+
+  const saveCurrentView = () => {
+    const name = viewName.trim();
+    if (!name) return;
+    const existing = savedViews.find(
+      (saved) => saved.name.toLowerCase() === name.toLowerCase()
+    );
+    if (existing) {
+      const next = savedViews.map((saved) =>
+        saved.id === existing.id
+          ? { ...saved, filters: { ...filters } }
+          : saved
+      );
+      persistSavedViews(next);
+      setActiveViewId(existing.id);
+    } else {
+      const created: SavedReportView = {
+        id: `view-${Date.now()}`,
+        name,
+        filters: { ...filters }
+      };
+      const next = [...savedViews, created];
+      persistSavedViews(next);
+      setActiveViewId(created.id);
+    }
+    setViewName("");
+  };
+
+  const removeSavedView = (id: string) => {
+    persistSavedViews(savedViews.filter((saved) => saved.id !== id));
+    if (activeViewId === id) setActiveViewId(null);
+  };
 
   const customers = useMemo(
     () =>
@@ -215,8 +346,10 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
     [dataset]
   );
 
-  const patch = (next: Partial<ReportFilters>) =>
+  const patch = (next: Partial<ReportFilters>) => {
+    setActiveViewId(null);
     setFilters((current) => ({ ...current, ...next }));
+  };
 
   const toggleQuoteType = (type: QuoteType) => {
     const active =
@@ -625,60 +758,71 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                   <p className="mb-1 text-[10px] font-black uppercase tracking-[0.14em] text-clay">
                     Saved views
                   </p>
-                  <div className="flex flex-col gap-1">
-                    {[
-                      {
-                        label: "Revenue by quarter",
-                        apply: () =>
-                          patch({
-                            range: "ytd",
-                            groupBy: "quarter",
-                            compare: "prior_year",
-                            customer: "all",
-                            projectType: "all",
-                            quoteTypes: []
-                          })
-                      },
-                      {
-                        label: "Collections this month",
-                        apply: () =>
-                          patch({
-                            range: "this_month",
-                            groupBy: "month",
-                            compare: "prior_month"
-                          })
-                      },
-                      {
-                        label: "Camel City history",
-                        apply: () =>
-                          patch({
-                            range: "all",
-                            groupBy: "year",
-                            compare: "none",
-                            customer: customers.includes("Camel City Construction")
-                              ? "Camel City Construction"
-                              : "all"
-                          })
-                      },
-                      {
-                        label: "AR aging over 60",
-                        apply: () =>
-                          patch({
-                            range: "all",
-                            groupBy: "quarter",
-                            compare: "none"
-                          })
-                      }
-                    ].map((saved) => (
-                      <button
-                        key={saved.label}
-                        type="button"
-                        onClick={saved.apply}
-                        className="rounded-soft border border-transparent px-2 py-1.5 text-left text-xs font-bold text-charcoal/70 hover:border-pine/10 hover:bg-cream"
-                      >
-                        {saved.label}
-                      </button>
-                    ))}
+                  <div className="flex flex-col gap-1.5">
+                    <input
+                      value={viewName}
+                      onChange={(event) => setViewName(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") saveCurrentView();
+                      }}
+                      placeholder="Name this view"
+                      className="focus-ring min-h-9 w-full rounded-soft border border-pine/20 bg-whitewarm px-2.5 text-xs font-bold text-charcoal"
+                    />
+                    <button
+                      type="button"
+                      onClick={saveCurrentView}
+                      disabled={!viewName.trim()}
+                      className="rounded-soft bg-pine px-2.5 py-1.5 text-xs font-black text-whitewarm disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {savedViews.some(
+                        (saved) =>
+                          saved.name.toLowerCase() ===
+                          viewName.trim().toLowerCase()
+                      ) && viewName.trim()
+                        ? "Update this view"
+                        : "Save current view"}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[10px] font-bold leading-4 text-charcoal/50">
+                    Saved in this browser. Reopen any view to restore its filters.
+                  </p>
+
+                  <div className="mt-2 flex flex-col gap-1">
+                    {savedViews.length === 0 ? (
+                      <p className="px-1 text-xs font-bold text-charcoal/55">
+                        No saved views yet.
+                      </p>
+                    ) : (
+                      savedViews.map((saved) => (
+                        <div
+                          key={saved.id}
+                          className="flex items-center gap-1"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => applySavedView(saved)}
+                            aria-current={
+                              activeViewId === saved.id ? "true" : undefined
+                            }
+                            className={
+                              activeViewId === saved.id
+                                ? "min-w-0 flex-1 truncate rounded-soft border border-pine/20 bg-cream px-2 py-1.5 text-left text-xs font-black text-deep-pine"
+                                : "min-w-0 flex-1 truncate rounded-soft border border-transparent px-2 py-1.5 text-left text-xs font-bold text-charcoal/70 hover:border-pine/10 hover:bg-cream"
+                            }
+                          >
+                            {saved.name}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeSavedView(saved.id)}
+                            aria-label={`Delete ${saved.name}`}
+                            className="rounded-soft px-1.5 py-1 text-xs font-black text-charcoal/40 hover:bg-clay/10 hover:text-clay"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
