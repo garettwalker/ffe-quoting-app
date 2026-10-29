@@ -17,13 +17,41 @@ export type ChartSeries = {
   values: number[];
 };
 
-function niceMax(value: number): number {
-  if (value <= 0) return 10;
-  const power = Math.pow(10, Math.floor(Math.log10(value)));
-  const scaled = value / power;
+// Pick three equal intervals with a rounded step, so the axis top stays close
+// to the largest bar instead of jumping to the next broad bracket (253k should
+// land near 300k, not 500k). Fine steps keep the labels readable: 1, 1.2, 1.5,
+// 2, 2.5, 3, 4, 5, 6, 8, 10 times a power of ten.
+function niceStep(raw: number): number {
+  if (raw <= 0) return 1;
+  const power = Math.pow(10, Math.floor(Math.log10(raw)));
+  const scaled = raw / power;
   const step =
-    scaled <= 1.2 ? 1.2 : scaled <= 2 ? 2 : scaled <= 2.5 ? 2.5 : scaled <= 5 ? 5 : 10;
+    scaled <= 1
+      ? 1
+      : scaled <= 1.2
+        ? 1.2
+        : scaled <= 1.5
+          ? 1.5
+          : scaled <= 2
+            ? 2
+            : scaled <= 2.5
+              ? 2.5
+              : scaled <= 3
+                ? 3
+                : scaled <= 4
+                  ? 4
+                  : scaled <= 5
+                    ? 5
+                    : scaled <= 6
+                      ? 6
+                      : scaled <= 8
+                        ? 8
+                        : 10;
   return step * power;
+}
+
+function niceMax(value: number): number {
+  return niceStep(Math.max(1, value) / 3) * 3;
 }
 
 function axisLabel(value: number): string {
@@ -88,7 +116,7 @@ export function GroupedBarChart({
           aria-label={ariaLabel}
           className="block min-w-[340px] w-full"
         >
-          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+          {[0, 1 / 3, 2 / 3, 1].map((fraction) => {
             const y = pad.top + plotH * (1 - fraction);
             return (
               <g key={fraction}>
@@ -208,7 +236,7 @@ export function TrendLineChart({
           aria-label={ariaLabel}
           className="block min-w-[340px] w-full"
         >
-          {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
+          {[0, 1 / 3, 2 / 3, 1].map((fraction) => {
             const y = pad.top + plotH * (1 - fraction);
             return (
               <g key={fraction}>
