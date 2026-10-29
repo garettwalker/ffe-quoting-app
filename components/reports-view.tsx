@@ -6,6 +6,7 @@ import {
   EMPTY_FILTERS,
   computeReport,
   deltaPct,
+  formatCompactCurrency,
   formatDelta,
   rangeLabel,
   type ReportCompare,
@@ -203,18 +204,23 @@ function Delta({
 function Kpi({
   label,
   value,
+  title,
   children
 }: {
   label: string;
   value: string;
+  title?: string;
   children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl1 border border-pine/10 bg-whitewarm p-4">
+    <div className="min-w-0 rounded-xl1 border border-pine/10 bg-whitewarm p-3 sm:p-4">
       <p className="text-[10.5px] font-black uppercase tracking-[0.14em] text-clay">
         {label}
       </p>
-      <p className="mt-1 font-display text-3xl font-bold tabular-nums leading-tight text-deep-pine">
+      <p
+        title={title}
+        className="mt-1 break-words font-display text-2xl font-bold tabular-nums leading-tight text-deep-pine sm:text-3xl"
+      >
         {value}
       </p>
       {children ? (
@@ -959,19 +965,31 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
         ) : (
           <div className="space-y-4 p-5">
             <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-              <Kpi label="Invoiced" value={formatCurrency(report.totals.invoicedCents)}>
+              <Kpi
+                label="Invoiced"
+                value={formatCompactCurrency(report.totals.invoicedCents)}
+                title={formatCurrency(report.totals.invoicedCents)}
+              >
                 <Delta
                   current={report.totals.invoicedCents}
                   prior={report.priorTotals.invoicedCents}
                 />
               </Kpi>
-              <Kpi label="Collected" value={formatCurrency(report.totals.collectedCents)}>
+              <Kpi
+                label="Collected"
+                value={formatCompactCurrency(report.totals.collectedCents)}
+                title={formatCurrency(report.totals.collectedCents)}
+              >
                 <Delta
                   current={report.totals.collectedCents}
                   prior={report.priorTotals.collectedCents}
                 />
               </Kpi>
-              <Kpi label="Outstanding" value={formatCurrency(report.totals.outstandingCents)}>
+              <Kpi
+                label="Outstanding"
+                value={formatCompactCurrency(report.totals.outstandingCents)}
+                title={formatCurrency(report.totals.outstandingCents)}
+              >
                 <Delta
                   current={report.totals.outstandingCents}
                   prior={report.priorTotals.outstandingCents}
@@ -982,8 +1000,13 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                 label={view === "two" ? "Average invoice" : "Collected rate"}
                 value={
                   view === "two"
-                    ? formatCurrency(report.totals.avgInvoiceCents)
+                    ? formatCompactCurrency(report.totals.avgInvoiceCents)
                     : formatPercent(report.totals.collectedRate)
+                }
+                title={
+                  view === "two"
+                    ? formatCurrency(report.totals.avgInvoiceCents)
+                    : undefined
                 }
               >
                 {view === "two" ? (
