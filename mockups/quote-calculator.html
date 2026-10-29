@@ -1,0 +1,574 @@
+<title>Quote Calculator Ideas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap">
+
+<style>
+  :root {
+    --paper: #f2ece1;
+    --surface: #fffdf8;
+    --surface-2: #f7f1e7;
+    --ink: #1d211d;
+    --muted: #5f6157;
+    --line: #d9d0bf;
+    --line-soft: #e8e0d1;
+    --pine: #344236;
+    --deep-pine: #243027;
+    --clay: #a56543;
+    --sage: #a8ae91;
+    --sand: #e8ddca;
+    --body: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --shadow: 0 18px 50px rgba(29, 33, 29, 0.1);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .shell { max-width: 1280px; margin: 0 auto; padding-block: 28px 56px; }
+
+  h1, h2, h3, p { margin: 0; }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .page-title {
+    margin-top: 6px;
+    font-size: clamp(30px, 4vw, 40px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    color: var(--deep-pine);
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin-top: 8px;
+    max-width: 72ch;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0 10px; }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--pine);
+    border-radius: 999px;
+    padding: 8px 13px;
+    font-family: var(--body);
+    font-size: 12.5px;
+    font-weight: 700;
+    min-height: 38px;
+    cursor: pointer;
+  }
+
+  .tab[aria-selected="true"] { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+  .tab small { display: block; font-size: 10.5px; font-weight: 500; opacity: 0.72; margin-top: 1px; }
+
+  .stage { display: flex; flex-wrap: wrap; gap: 22px; align-items: flex-start; }
+
+  /* Browser frame */
+  .browser {
+    position: relative;
+    flex: 1 1 760px;
+    min-width: 0;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .app-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 11px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; align-items: center; gap: 8px; }
+  .brand-mark { width: 24px; height: 24px; border-radius: 7px; background: var(--pine); color: var(--surface); display: grid; place-items: center; font-size: 12px; font-weight: 800; }
+  .brand-name { font-size: 12px; font-weight: 700; color: var(--deep-pine); white-space: nowrap; }
+  .nav-links { display: flex; gap: 13px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .nav-links span:nth-child(2) { color: var(--deep-pine); font-weight: 700; }
+  @media (max-width: 980px) { .nav-links { display: none; } }
+  .new-quote { border: 0; border-radius: 999px; background: var(--clay); color: #fffdf8; font-family: var(--body); font-size: 10.5px; font-weight: 700; padding: 7px 11px; white-space: nowrap; }
+
+  .page { padding: 16px 18px 22px; }
+
+  .page-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+  .page-head .eyebrow { font-size: 9.5px; }
+  .page-title-sm { margin-top: 3px; font-size: 26px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; color: #6e7751; }
+  .page-sub { margin-top: 2px; font-size: 10.5px; font-weight: 600; color: var(--muted); }
+  .head-actions { display: flex; gap: 5px; }
+  .pill { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 10px; font-family: var(--body); font-size: 10px; font-weight: 700; color: var(--deep-pine); }
+  .pill.on { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+
+  .builder-grid { display: grid; grid-template-columns: minmax(0, 1fr) 286px; gap: 14px; align-items: start; }
+  @media (max-width: 820px) { .builder-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    padding: 13px;
+    margin-bottom: 10px;
+    min-width: 0;
+  }
+  .card-kicker { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay); }
+  .card-title { margin-top: 2px; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); }
+
+  .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
+  .field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .field.wide { grid-column: 1 / -1; }
+  .field-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); }
+  .input {
+    min-height: 31px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-2);
+    padding: 6px 8px; font-size: 11px; font-weight: 600; color: var(--ink);
+    display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  }
+  .input.plain { background: var(--surface); }
+  .caret { font-size: 7px; color: var(--muted); }
+
+  .line-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-top: 9px; }
+  .line-name { font-size: 12px; font-weight: 700; color: var(--deep-pine); }
+  .line-meta { font-size: 9.5px; font-weight: 600; color: var(--muted); }
+  .line-row { display: grid; grid-template-columns: 76px 100px 1fr; gap: 7px; align-items: end; margin-top: 7px; padding-top: 7px; border-top: 1px solid var(--line-soft); }
+  .line-row .input { font-variant-numeric: tabular-nums; }
+  .line-total { font-size: 12px; font-weight: 700; color: var(--deep-pine); font-variant-numeric: tabular-nums; padding-bottom: 8px; white-space: nowrap; text-align: right; }
+  .calc-icon {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 6px;
+    width: 26px; height: 26px; display: grid; place-items: center; font-size: 12px; color: var(--clay); cursor: pointer;
+  }
+  .qty-wrap { position: relative; display: flex; gap: 4px; align-items: center; }
+  .qty-wrap .input { flex: 1; }
+
+  /* Rail */
+  .rail { min-width: 0; }
+  .totals { background: var(--surface); border: 1px solid var(--line); border-radius: 13px; padding: 13px; }
+  .totals-kicker { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay); }
+  .totals-value { margin-top: 3px; font-size: 29px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 700; color: #6e7751; font-variant-numeric: tabular-nums; }
+  .totals-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 5px; }
+  .total-row { display: flex; justify-content: space-between; gap: 8px; font-size: 10px; color: var(--muted); }
+  .total-row strong { color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+  .totals-final { margin-top: 9px; border-radius: 8px; background: var(--pine); color: var(--surface); padding: 9px 10px; display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; }
+
+  /* Calculator common */
+  .calc {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    box-shadow: 0 22px 55px rgba(29, 33, 29, 0.18);
+    overflow: hidden;
+    width: 252px;
+  }
+  .calc-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 10px 6px; }
+  .calc-title { font-size: 10.5px; font-weight: 700; color: var(--deep-pine); }
+  .calc-modes { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: var(--surface-2); }
+  .calc-mode { border: 0; background: transparent; border-radius: 999px; padding: 3px 7px; font-family: var(--body); font-size: 8.5px; font-weight: 700; color: var(--muted); }
+  .calc-mode.on { background: var(--pine); color: var(--surface); }
+
+  .calc-display { margin: 0 10px; border: 1px solid var(--line-soft); border-radius: 9px; background: var(--surface-2); padding: 7px 9px; text-align: right; }
+  .calc-expr { font-size: 9.5px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 13px; }
+  .calc-result { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); font-variant-numeric: tabular-nums; line-height: 1.1; }
+
+  .calc-tape { margin: 6px 10px 0; font-size: 8.5px; font-weight: 600; color: var(--muted); border-left: 2px solid var(--sand); padding-left: 6px; }
+
+  .keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 8px 10px 0; }
+  .key {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 8px;
+    min-height: 31px; display: grid; place-items: center;
+    font-family: var(--body); font-size: 12px; font-weight: 700; color: var(--ink);
+  }
+  .key.fn { background: var(--surface-2); color: var(--clay); }
+  .key.op { background: var(--surface-2); color: var(--deep-pine); }
+  .key.eq { background: var(--pine); color: var(--surface); border-color: var(--pine); }
+
+  .calc-actions { display: flex; gap: 4px; padding: 8px 10px 9px; }
+  .calc-use { flex: 1; border: 0; border-radius: 8px; background: var(--clay); color: #fffdf8; font-family: var(--body); font-size: 9.5px; font-weight: 700; padding: 7px 8px; }
+  .calc-copy { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--deep-pine); font-family: var(--body); font-size: 9.5px; font-weight: 700; padding: 7px 8px; }
+
+  /* Option-specific */
+  .calc-rail { display: none; margin-top: 10px; width: 100%; box-shadow: none; }
+  .calc-inline { display: none; width: 100%; box-shadow: none; margin-top: 8px; border-color: var(--clay); }
+  .inline-bridge {
+    display: flex; align-items: center; gap: 6px; font-size: 9px; font-weight: 700; color: var(--clay);
+    margin: 0 0 5px 2px;
+  }
+  .inline-bridge::before { content: ""; width: 10px; height: 10px; border-left: 2px solid var(--clay); border-bottom: 2px solid var(--clay); transform: rotate(45deg); margin-left: 8px; }
+
+  .fab {
+    position: absolute;
+    right: 14px;
+    bottom: 14px;
+    width: 46px; height: 46px; border-radius: 50%;
+    border: 0; background: var(--pine); color: var(--surface);
+    font-family: var(--body); font-size: 20px; font-weight: 700;
+    box-shadow: 0 12px 28px rgba(29, 33, 29, 0.28);
+    display: none;
+  }
+
+  .calc-float { display: none; position: absolute; right: 66px; bottom: 14px; z-index: 6; }
+
+  .builder[data-option="float"] .calc-float,
+  .builder[data-option="float"] .fab { display: block; }
+  .builder[data-option="rail"] .calc-rail { display: block; }
+  .builder[data-option="inline"] .calc-inline { display: block; }
+  .builder[data-option="inline"] .line-row:not(.active-row) .inline-calc-icon { display: none; }
+  .builder[data-option="float"] .inline-calc-icon,
+  .builder[data-option="rail"] .inline-calc-icon { display: none; }
+  .builder[data-option="rail"] .fab { display: none; }
+
+  /* Inline mode: highlight the field */
+  .builder[data-option="inline"] .active-row .qty-wrap .input { border-color: var(--clay); box-shadow: 0 0 0 2px rgba(165,101,67,0.14); }
+
+  /* Phone */
+  .phone-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .phone-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); }
+  .phone {
+    width: 264px; height: 570px; border-radius: 36px; background: #1d211d; padding: 7px;
+    box-shadow: 0 24px 55px rgba(29,33,29,0.22);
+  }
+  .phone-screen { width: 100%; height: 100%; border-radius: 29px; background: var(--paper); overflow: hidden; position: relative; }
+  .phone-status { padding: 10px 14px 3px; font-size: 9px; font-weight: 700; color: var(--deep-pine); display: flex; justify-content: space-between; }
+  .phone-appbar { display: flex; justify-content: space-between; align-items: center; padding: 6px 10px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .phone-brand { font-size: 8.5px; font-weight: 700; color: var(--deep-pine); }
+  .phone-menu { font-size: 8px; font-weight: 700; border: 1px solid var(--line); border-radius: 999px; padding: 3px 7px; }
+  .phone-content { padding: 10px; }
+  .phone-kicker { font-size: 7.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--clay); }
+  .phone-title { margin-top: 2px; font-size: 18px; font-weight: 700; letter-spacing: -0.02em; color: #6e7751; }
+  .phone-card { margin-top: 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 9px; }
+  .phone-field { margin-top: 6px; }
+  .phone-label-sm { font-size: 7px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--clay); }
+  .phone-input { margin-top: 2px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface-2); padding: 4px 6px; font-size: 9px; font-weight: 600; }
+  .phone-total { margin-top: 8px; border-radius: 9px; background: var(--pine); color: var(--surface); padding: 9px; display: flex; justify-content: space-between; font-size: 9px; font-weight: 700; }
+
+  .sheet {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    background: var(--surface);
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -16px 40px rgba(29,33,29,0.22);
+    padding: 8px 10px 12px;
+  }
+  .sheet-handle { width: 34px; height: 3px; border-radius: 999px; background: var(--line); margin: 0 auto 7px; }
+  .sheet .calc { width: 100%; box-shadow: none; border: 0; }
+  .sheet .calc-result { font-size: 20px; }
+  .sheet .key { min-height: 27px; font-size: 11px; }
+
+  /* Rationale */
+  .rationale { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+  @media (max-width: 820px) { .rationale { grid-template-columns: 1fr; } }
+  .idea {
+    border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 13px;
+  }
+  .idea h3 { font-size: 13px; font-weight: 700; color: var(--deep-pine); margin-bottom: 4px; }
+  .idea p { font-size: 12px; line-height: 1.55; color: var(--muted); }
+  .idea ul { margin: 6px 0 0; padding-left: 15px; font-size: 11.5px; line-height: 1.55; color: var(--muted); }
+  .idea li { margin-bottom: 2px; }
+  .idea .best { display: inline-block; margin-top: 6px; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--clay); }
+
+  .footnote { margin-top: 16px; font-size: 12.5px; line-height: 1.6; color: var(--muted); max-width: 84ch; }
+  .footnote strong { color: var(--deep-pine); }
+
+  @media (max-width: 1100px) {
+    .stage { justify-content: center; }
+    .phone-wrap { order: 2; }
+  }
+</style>
+
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">Quote builder · calculator</p>
+      <h1 class="page-title">Where the calculator lives.</h1>
+      <p class="lede">
+        Three placements for a calculator on the new-build quote page. The left
+        side is the form, the right rail is the Live Total. Switch between the
+        options to compare. All of them keep the quote data untouched until you
+        press Use result.
+      </p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Calculator placements">
+      <button class="tab" role="tab" data-option="float" aria-selected="true">A · Floating<small>Always one tap away</small></button>
+      <button class="tab" role="tab" data-option="rail" aria-selected="false">B · In the rail<small>Beside the totals</small></button>
+      <button class="tab" role="tab" data-option="inline" aria-selected="false">C · On the field<small>Qty and price</small></button>
+    </div>
+
+    <div class="stage">
+      <div class="browser builder" id="builder" data-option="float">
+        <div class="app-bar">
+          <div class="brand">
+            <span class="brand-mark">F</span>
+            <span class="brand-name">FREEDOM FAMILY ELECTRIC</span>
+          </div>
+          <div class="nav-links" aria-hidden="true">
+            <span>Dashboard</span><span>Quotes</span><span>Customers</span><span>Schedule</span><span>Reports</span>
+          </div>
+          <button type="button" class="new-quote">+ New Quote</button>
+        </div>
+
+        <div class="page">
+          <div class="page-head">
+            <div>
+              <p class="eyebrow">New Build Quote</p>
+              <p class="page-title-sm">Coleman Residence</p>
+              <p class="page-sub">Draft · Camel City Construction · 3,700 sf</p>
+            </div>
+            <div class="head-actions">
+              <span class="pill">Save as draft</span>
+              <span class="pill on">Complete Quote</span>
+            </div>
+          </div>
+
+          <div class="builder-grid">
+            <div>
+              <div class="card">
+                <p class="card-kicker">Quote Details</p>
+                <p class="card-title">Project and client information.</p>
+                <div class="field-grid">
+                  <label class="field"><span class="field-label">Project Name</span><span class="input">Coleman Residence</span></label>
+                  <label class="field"><span class="field-label">Builder / Customer</span><span class="input">Camel City Construction <span class="caret">▼</span></span></label>
+                  <label class="field"><span class="field-label">Square Footage</span><span class="input plain">3,700</span></label>
+                  <label class="field"><span class="field-label">Base Rate</span><span class="input">$7.00 / sf <span class="caret">▼</span></span></label>
+                </div>
+              </div>
+
+              <div class="card">
+                <p class="card-kicker">Adders</p>
+                <p class="card-title">Line items and pricing.</p>
+
+                <div class="line-head"><span class="line-name">Garage Space</span><span class="line-meta">1,021 sf · $2.00/sf</span></div>
+                <div class="line-row active-row">
+                  <label class="field"><span class="field-label">Qty</span><span class="qty-wrap"><span class="input plain">1,021</span><button type="button" class="calc-icon inline-calc-icon">=</button></span></label>
+                  <label class="field"><span class="field-label">Unit Price</span><span class="qty-wrap"><span class="input plain">$2.00</span><button type="button" class="calc-icon inline-calc-icon">=</button></span></label>
+                  <span class="line-total">$2,042.00</span>
+                </div>
+
+                <!-- Inline option: calculator opens under the field -->
+                <div class="calc-inline calc">
+                  <div class="inline-bridge">Editing Qty · Garage Space</div>
+                  <div class="calc-head">
+                    <span class="calc-title">Area to quantity</span>
+                    <div class="calc-modes"><span class="calc-mode">Basic</span><span class="calc-mode on">Area</span><span class="calc-mode">%</span></div>
+                  </div>
+                  <div class="calc-display">
+                    <p class="calc-expr">31.4 ft × 32.5 ft</p>
+                    <p class="calc-result">1,021 sf</p>
+                  </div>
+                  <div class="calc-tape">Tap Apply to put 1,021 into Qty</div>
+                  <div class="calc-actions">
+                    <button type="button" class="calc-use">Apply to Qty</button>
+                    <button type="button" class="calc-copy">Copy</button>
+                  </div>
+                </div>
+
+                <div class="line-head"><span class="line-name">Recessed LED Wafer 6in</span><span class="line-meta">Plan count · $80.00 each</span></div>
+                <div class="line-row">
+                  <label class="field"><span class="field-label">Qty</span><span class="qty-wrap"><span class="input plain">70</span><button type="button" class="calc-icon inline-calc-icon">=</button></span></label>
+                  <label class="field"><span class="field-label">Unit Price</span><span class="qty-wrap"><span class="input plain">$80.00</span><button type="button" class="calc-icon inline-calc-icon">=</button></span></label>
+                  <span class="line-total">$5,600.00</span>
+                </div>
+
+                <div class="line-head"><span class="line-name">Under Cabinet Light</span><span class="line-meta">5 · $125.00 each</span></div>
+                <div class="line-row">
+                  <label class="field"><span class="field-label">Qty</span><span class="qty-wrap"><span class="input plain">5</span><button type="button" class="calc-icon inline-calc-icon">=</button></span></label>
+                  <label class="field"><span class="field-label">Unit Price</span><span class="qty-wrap"><span class="input plain">$125.00</span><button type="button" class="calc-icon inline-calc-icon">=</button></span></label>
+                  <span class="line-total">$625.00</span>
+                </div>
+
+              </div>
+            </div>
+
+            <aside class="rail">
+              <div class="totals">
+                <p class="totals-kicker">Live Total</p>
+                <p class="totals-value">$40,964.00</p>
+                <div class="totals-rows">
+                  <div class="total-row"><span>Base package</span><strong>$25,900.00</strong></div>
+                  <div class="total-row"><span>Selected adders</span><strong>$15,064.00</strong></div>
+                  <div class="total-row"><span>Multiplier</span><strong>1.00</strong></div>
+                </div>
+                <div class="totals-final"><span>Final Quote</span><span>$40,964.00</span></div>
+              </div>
+
+              <!-- Rail option -->
+              <div class="calc-rail calc">
+                <div class="calc-head">
+                  <span class="calc-title">Quick calculator</span>
+                  <div class="calc-modes"><span class="calc-mode on">Basic</span><span class="calc-mode">Area</span><span class="calc-mode">%</span></div>
+                </div>
+                <div class="calc-display">
+                  <p class="calc-expr">1,021 × 2.00</p>
+                  <p class="calc-result">2,042.00</p>
+                </div>
+                <div class="calc-tape">1,021 × 2.00 = 2,042.00</div>
+                <div class="keys">
+                  <span class="key fn">C</span><span class="key fn">⌫</span><span class="key fn">%</span><span class="key op">÷</span>
+                  <span class="key">7</span><span class="key">8</span><span class="key">9</span><span class="key op">×</span>
+                  <span class="key">4</span><span class="key">5</span><span class="key">6</span><span class="key op">−</span>
+                  <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key op">+</span>
+                  <span class="key">0</span><span class="key">.</span><span class="key eq">=</span><span class="key eq" style="background:var(--clay);border-color:var(--clay)">Use</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- Floating option -->
+        <button type="button" class="fab">=</button>
+        <div class="calc-float calc">
+          <div class="calc-head">
+            <span class="calc-title">Calculator</span>
+            <div class="calc-modes"><span class="calc-mode on">Basic</span><span class="calc-mode">Area</span><span class="calc-mode">%</span></div>
+          </div>
+          <div class="calc-display">
+            <p class="calc-expr">1,021 × 2.00</p>
+            <p class="calc-result">2,042.00</p>
+          </div>
+          <div class="calc-tape">Last: 70 × 80 = 5,600</div>
+          <div class="keys">
+            <span class="key fn">C</span><span class="key fn">⌫</span><span class="key fn">%</span><span class="key op">÷</span>
+            <span class="key">7</span><span class="key">8</span><span class="key">9</span><span class="key op">×</span>
+            <span class="key">4</span><span class="key">5</span><span class="key">6</span><span class="key op">−</span>
+            <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key op">+</span>
+            <span class="key">0</span><span class="key">.</span><span class="key eq">=</span><span class="key eq" style="background:var(--clay);border-color:var(--clay)">Use</span>
+          </div>
+          <div class="calc-actions">
+            <button type="button" class="calc-use">Use in focused field</button>
+            <button type="button" class="calc-copy">Copy</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-wrap">
+        <span class="phone-label">On iPhone · bottom sheet</span>
+        <div class="phone">
+          <div class="phone-screen">
+            <div class="phone-status"><span>9:41</span><span>▮▮ WiFi</span></div>
+            <div class="phone-appbar">
+              <span class="phone-brand">FREEDOM FAMILY ELECTRIC</span>
+              <span class="phone-menu">Menu</span>
+            </div>
+            <div class="phone-content">
+              <p class="phone-kicker">New Build Quote</p>
+              <p class="phone-title">Coleman Residence</p>
+              <p style="font-size:8px;font-weight:600;color:var(--muted);margin-top:2px">Draft · Camel City Construction</p>
+
+              <div class="phone-card">
+                <p class="phone-label-sm">Project Name</p>
+                <div class="phone-input">Coleman Residence</div>
+                <p class="phone-label-sm" style="margin-top:6px">Square Footage</p>
+                <div class="phone-input">3,700</div>
+                <p class="phone-label-sm" style="margin-top:6px">Base Rate</p>
+                <div class="phone-input">$7.00 / sf</div>
+              </div>
+
+              <div class="phone-total"><span>Live Total</span><span>$40,964.00</span></div>
+            </div>
+
+            <div class="sheet">
+              <div class="sheet-handle"></div>
+              <div class="calc">
+                <div class="calc-head">
+                  <span class="calc-title">Calculator</span>
+                  <div class="calc-modes"><span class="calc-mode on">Basic</span><span class="calc-mode">Area</span><span class="calc-mode">%</span></div>
+                </div>
+                <div class="calc-display">
+                  <p class="calc-expr">1,021 × 2.00</p>
+                  <p class="calc-result">2,042.00</p>
+                </div>
+                <div class="keys">
+                  <span class="key fn">C</span><span class="key fn">⌫</span><span class="key fn">%</span><span class="key op">÷</span>
+                  <span class="key">7</span><span class="key">8</span><span class="key">9</span><span class="key op">×</span>
+                  <span class="key">4</span><span class="key">5</span><span class="key">6</span><span class="key op">−</span>
+                  <span class="key">1</span><span class="key">2</span><span class="key">3</span><span class="key op">+</span>
+                  <span class="key">0</span><span class="key">.</span><span class="key eq">=</span><span class="key eq" style="background:var(--clay);border-color:var(--clay)">Use</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rationale">
+      <div class="idea" data-idea="float">
+        <h3>A · Floating calculator</h3>
+        <p>A small round button sits in the corner of the builder. Tap it and the calculator opens above it; on a phone it becomes a bottom sheet.</p>
+        <ul>
+          <li>Always one tap away, never in the way</li>
+          <li>Can write the result into whichever field you last tapped</li>
+          <li>Same widget on desktop and phone</li>
+        </ul>
+        <span class="best">Recommended</span>
+      </div>
+      <div class="idea" data-idea="rail">
+        <h3>B · Calculator in the totals rail</h3>
+        <p>The calculator is a card under the Live Total, visible the whole time you are on the page.</p>
+        <ul>
+          <li>No overlay or extra tap to open</li>
+          <li>Easy to glance at while typing</li>
+          <li>Makes the rail long, and on a phone it sits below the form</li>
+        </ul>
+      </div>
+      <div class="idea" data-idea="inline">
+        <h3>C · Calculator on the field</h3>
+        <p>A small calculator icon next to Qty and Unit Price opens a calculator tied to that field and applies the result back.</p>
+        <ul>
+          <li>Most direct: the math lands where it is used</li>
+          <li>Good for area-to-quantity and price math</li>
+          <li>More taps, and more icons on an already busy row</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footnote">
+      <strong>What the calculator needs to do:</strong> basic arithmetic, percent
+      (for markup, tax, deposit), and an area mode that takes feet and inches
+      with an optional waste percentage. A tape line of the last few
+      calculations is useful when pricing several lines in a row. Any result is
+      a draft until you press Use, so it can never change a quote by accident.
+    </p>
+  </main>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const builder = document.getElementById("builder");
+    const ideas = Array.from(document.querySelectorAll("[data-idea]"));
+
+    function select(option) {
+      builder.dataset.option = option;
+      tabs.forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.option === option));
+      });
+      ideas.forEach((idea) => {
+        idea.style.opacity = idea.dataset.idea === option ? "1" : "0.55";
+      });
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => select(tab.dataset.option));
+    });
+
+    select("float");
+  </script>
+</body>

@@ -24,6 +24,7 @@ import type {
   QuoteFormState
 } from "@/lib/types";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
+import { FloatingCalculator } from "@/components/floating-calculator";
 import { CustomerPicker } from "@/components/customer-picker";
 import { QuoteLineItemPicker } from "@/components/quote-line-item-picker";
 import { QuoteTotalsPanel } from "@/components/quote-totals-panel";
@@ -515,7 +516,7 @@ export function QuoteBuilder({
     : [];
 
   return (
-    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid min-w-0 gap-8 pb-24 lg:grid-cols-[minmax(0,1fr)_360px] lg:pb-0">
       <div className="min-w-0 space-y-6">
         {savedQuoteId ? (
           <div className="rounded-soft border border-clay/25 bg-cream/70 px-4 py-3 text-sm font-black text-clay">
@@ -987,6 +988,7 @@ export function QuoteBuilder({
       </div>
 
       <QuoteTotalsPanel result={result} />
+      <FloatingCalculator />
     </div>
   );
 }

@@ -24,6 +24,7 @@ import type {
 } from "@/lib/types";
 import { CatalogPicker, type CatalogPickerItem } from "@/components/catalog-picker";
 import { CustomerPicker } from "@/components/customer-picker";
+import { FloatingCalculator } from "@/components/floating-calculator";
 import { FormattedNumberInput } from "@/components/formatted-number-input";
 
 // Authenticated browser client (singleton). Carries the logged-in user's
@@ -439,7 +440,7 @@ function DirectInvoiceCreate({
     : [];
 
   return (
-    <div className="grid min-w-0 gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
+    <div className="grid min-w-0 gap-8 pb-24 lg:grid-cols-[minmax(0,1fr)_360px] lg:pb-0">
       <div className="min-w-0 space-y-6">
         <section className="rounded-xl2 border border-pine/10 bg-whitewarm/75 p-6 shadow-card">
           <div className="mb-6 flex flex-col justify-between gap-4 md:flex-row md:items-start">
@@ -698,6 +699,7 @@ function DirectInvoiceCreate({
           ) : null}
         </div>
       </aside>
+      <FloatingCalculator />
     </div>
   );
 }
