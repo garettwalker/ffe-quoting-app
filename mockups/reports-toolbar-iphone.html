@@ -1,0 +1,465 @@
+<title>Reports on iPhone</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap">
+
+<style>
+  :root {
+    --paper: #f2ece1;
+    --surface: #fffdf8;
+    --surface-2: #f7f1e7;
+    --ink: #1d211d;
+    --muted: #5f6157;
+    --line: #d9d0bf;
+    --line-soft: #e8e0d1;
+    --pine: #344236;
+    --deep-pine: #243027;
+    --clay: #a56543;
+    --sage: #a8ae91;
+    --good: #0f7a3d;
+    --s1: #2a78d6;
+    --s2: #1baf7a;
+    --body: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .shell { max-width: 1000px; margin: 0 auto; padding-block: 28px 56px; }
+
+  h1, h2, h3, p { margin: 0; }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .page-title {
+    margin-top: 6px;
+    font-size: clamp(30px, 4.5vw, 40px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    color: var(--deep-pine);
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin-top: 8px;
+    max-width: 68ch;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .phones {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 34px 40px;
+    margin-top: 28px;
+  }
+
+  .phone-block { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
+  .phone-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .device {
+    width: 390px;
+    height: 844px;
+    padding: 9px;
+    border-radius: 50px;
+    background: #1d211d;
+    box-shadow: 0 30px 70px rgba(29, 33, 29, 0.24), inset 0 0 0 1px rgba(255,255,255,0.08);
+    position: relative;
+    flex: none;
+  }
+
+  .screen {
+    width: 100%;
+    height: 100%;
+    border-radius: 41px;
+    background: var(--paper);
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .screen::-webkit-scrollbar { display: none; }
+
+  .notch {
+    position: absolute;
+    top: 18px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 116px;
+    height: 26px;
+    border-radius: 999px;
+    background: #111411;
+    z-index: 5;
+  }
+
+  .status {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 22px 4px;
+    background: var(--paper);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--deep-pine);
+  }
+  .status .icons { display: flex; gap: 5px; align-items: center; }
+  .status .bar { width: 17px; height: 8px; border: 1.5px solid var(--deep-pine); border-radius: 2px; position: relative; }
+  .status .bar::after { content: ""; position: absolute; inset: 1px; right: 5px; background: var(--deep-pine); border-radius: 1px; }
+
+  .app-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 14px 9px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .brand-mark {
+    width: 24px; height: 24px; border-radius: 7px; background: var(--pine); color: var(--surface);
+    display: grid; place-items: center; font-size: 12px; font-weight: 800; flex: none;
+  }
+  .brand-name { font-size: 11.5px; font-weight: 700; color: var(--deep-pine); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .menu-btn { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 11px; font-family: var(--body); font-size: 11px; font-weight: 700; color: var(--deep-pine); }
+
+  /* Toolbar */
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .toolbar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+  .toolbar-title { font-size: 15px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); line-height: 1.15; }
+  .toolbar-title span { color: var(--muted); font-weight: 600; }
+  .export { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 10px; font-family: var(--body); font-size: 10.5px; font-weight: 700; color: var(--deep-pine); white-space: nowrap; }
+
+  .tabs { display: flex; gap: 2px; width: 100%; padding: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); }
+  .tab { flex: 1; border: 0; background: transparent; border-radius: 999px; padding: 6px 4px; font-family: var(--body); font-size: 10.5px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+  .tab.on { background: var(--pine); color: var(--surface); }
+
+  /* Filters */
+  .filters { padding: 9px 12px 10px; background: var(--surface-2); border-bottom: 1px solid var(--line); }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 9px; font-family: var(--body); font-size: 10px; font-weight: 700; color: var(--muted); }
+  .chip.on { background: var(--pine); color: var(--surface); border-color: var(--pine); }
+
+  .selects { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 8px; }
+  .select-label { display: flex; flex-direction: column; gap: 2px; font-size: 8.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--clay); }
+  .select-box {
+    border: 1px solid var(--line); border-radius: 7px; background: var(--surface);
+    padding: 6px 8px; font-size: 10.5px; font-weight: 600; color: var(--ink);
+    display: flex; align-items: center; justify-content: space-between; gap: 4px;
+    text-transform: none; letter-spacing: normal;
+  }
+  .caret { font-size: 8px; color: var(--muted); }
+
+  .range-line { margin-top: 7px; font-size: 9.5px; font-weight: 700; color: var(--muted); }
+
+  /* Content */
+  .content { padding: 10px 12px 30px; }
+
+  .kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .kpi { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); padding: 9px 10px; min-width: 0; }
+  .kpi-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: var(--clay); }
+  .kpi-value { margin-top: 1px; font-size: 21px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); font-variant-numeric: tabular-nums; line-height: 1.12; }
+  .kpi-meta { margin-top: 2px; font-size: 9px; color: var(--muted); }
+  .up { color: var(--good); font-weight: 700; }
+
+  .card { border: 1px solid var(--line); border-radius: 11px; background: var(--surface); padding: 10px; margin-top: 8px; }
+  .card-title { font-size: 12px; font-weight: 700; color: var(--deep-pine); }
+  .card-note { font-size: 9px; font-weight: 600; color: var(--muted); }
+  .legend { display: flex; gap: 9px; margin-top: 5px; font-size: 9px; font-weight: 600; color: var(--muted); }
+  .legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; margin-right: 3px; }
+
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 104px; margin-top: 8px; padding-bottom: 3px; border-bottom: 1px solid var(--line-soft); }
+  .pair { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 1px; height: 100%; min-width: 0; }
+  .bar { width: 44%; border-radius: 2px 2px 0 0; }
+  .bar.blue { background: var(--s1); }
+  .bar.green { background: var(--s2); }
+  .axis { display: flex; justify-content: space-between; margin-top: 4px; font-size: 8px; font-weight: 600; color: var(--muted); }
+
+  .aging { display: flex; flex-direction: column; gap: 7px; margin-top: 8px; }
+  .aging-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; align-items: center; gap: 6px; font-size: 9.5px; }
+  .customer-row { grid-template-columns: 76px minmax(0, 1fr) auto; }
+  .track { height: 6px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--line-soft); overflow: hidden; }
+  .fill { display: block; height: 100%; background: var(--s1); border-radius: 2px; }
+  .aging-val { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .funnel-row { display: grid; grid-template-columns: 62px minmax(0,1fr) auto; gap: 6px; align-items: center; font-size: 9.5px; margin-top: 6px; }
+  .funnel-track { height: 12px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+  .funnel-fill { display: block; height: 100%; background: var(--s1); border-radius: 2px; }
+  .funnel-val { font-weight: 700; color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+
+  .note-box {
+    margin-top: 22px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    padding: 13px 15px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+  .note-box strong { color: var(--deep-pine); }
+  .note-box ul { margin: 6px 0 0; padding-left: 18px; }
+  .note-box li { margin-bottom: 3px; }
+
+  @media (max-width: 860px) {
+    .phones { gap: 26px; }
+    .device { transform: scale(0.88); transform-origin: top center; margin-bottom: -100px; }
+  }
+  @media (max-width: 470px) {
+    .device { transform: scale(0.94); transform-origin: top center; margin-bottom: -50px; }
+  }
+</style>
+
+<body>
+  <main class="shell">
+    <header>
+      <p class="eyebrow">Reports · iPhone review</p>
+      <h1 class="page-title">The toolbar on a phone.</h1>
+      <p class="lede">
+        Same Option B toolbar at iPhone width (390px), with the app header. The
+        first frame is the top of the page. The second is scrolled to the charts.
+        Both fit without sideways scrolling.
+      </p>
+    </header>
+
+    <div class="phones">
+      <div class="phone-block">
+        <span class="phone-label">Top of page</span>
+        <div class="device">
+          <span class="notch"></span>
+          <div class="screen" data-screen="top">
+            <div class="status">
+              <span>9:41</span>
+              <span class="icons"><span>▮▮</span><span>WiFi</span><span class="bar"></span></span>
+            </div>
+
+            <div class="app-bar">
+              <div class="brand">
+                <span class="brand-mark">F</span>
+                <span class="brand-name">FREEDOM FAMILY ELECTRIC</span>
+              </div>
+              <button type="button" class="menu-btn">Menu</button>
+            </div>
+
+            <div class="toolbar">
+              <div class="toolbar-top">
+                <p class="toolbar-title">Reports <span>· Business performance</span></p>
+                <button type="button" class="export">Export CSV</button>
+              </div>
+              <div class="tabs" role="tablist">
+                <button class="tab on">One screen</button>
+                <button class="tab">Compare first</button>
+                <button class="tab">Report builder</button>
+              </div>
+            </div>
+
+            <div class="filters">
+              <div class="chip-row">
+                <button class="chip">This month</button>
+                <button class="chip">This quarter</button>
+                <button class="chip on">Year to date</button>
+                <button class="chip">Last 12</button>
+                <button class="chip">All time</button>
+              </div>
+              <div class="selects">
+                <label class="select-label">Group by<span class="select-box">Month <span class="caret">▼</span></span></label>
+                <label class="select-label">Compare<span class="select-box">Prior year <span class="caret">▼</span></span></label>
+                <label class="select-label">Customer<span class="select-box">All customers <span class="caret">▼</span></span></label>
+                <label class="select-label">Job type<span class="select-box">All job types <span class="caret">▼</span></span></label>
+              </div>
+              <p class="range-line">Jan 1 to Oct 28, 2026</p>
+            </div>
+
+            <div class="content">
+              <div class="kpis">
+                <div class="kpi"><p class="kpi-label">Invoiced</p><p class="kpi-value">$941.4k</p><p class="kpi-meta"><span class="up">+19.3%</span> vs prior</p></div>
+                <div class="kpi"><p class="kpi-label">Collected</p><p class="kpi-value">$874.8k</p><p class="kpi-meta"><span class="up">+21.3%</span> vs prior</p></div>
+                <div class="kpi"><p class="kpi-label">Outstanding</p><p class="kpi-value">$66.6k</p><p class="kpi-meta"><span class="up">-2.1%</span> vs prior</p></div>
+                <div class="kpi"><p class="kpi-label">Collected rate</p><p class="kpi-value">92.9%</p><p class="kpi-meta"><span class="up">+1.5 pts</span> vs prior</p></div>
+              </div>
+
+              <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+                  <p class="card-title">Invoiced and collected by month</p>
+                  <span class="card-note">Dollars</span>
+                </div>
+                <div class="legend"><span><i style="background:var(--s1)"></i>Invoiced</span><span><i style="background:var(--s2)"></i>Collected</span></div>
+                <div class="bars" data-bars="10"></div>
+                <div class="axis"><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span><span>Oct</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone-block">
+        <span class="phone-label">Scrolled to charts</span>
+        <div class="device">
+          <span class="notch"></span>
+          <div class="screen" data-screen="scrolled">
+            <div class="status">
+              <span>9:41</span>
+              <span class="icons"><span>▮▮</span><span>WiFi</span><span class="bar"></span></span>
+            </div>
+
+            <div class="app-bar">
+              <div class="brand">
+                <span class="brand-mark">F</span>
+                <span class="brand-name">FREEDOM FAMILY ELECTRIC</span>
+              </div>
+              <button type="button" class="menu-btn">Menu</button>
+            </div>
+
+            <div class="toolbar">
+              <div class="toolbar-top">
+                <p class="toolbar-title">Reports <span>· Business performance</span></p>
+                <button type="button" class="export">Export CSV</button>
+              </div>
+              <div class="tabs" role="tablist">
+                <button class="tab on">One screen</button>
+                <button class="tab">Compare first</button>
+                <button class="tab">Report builder</button>
+              </div>
+            </div>
+
+            <div class="filters">
+              <div class="chip-row">
+                <button class="chip">This month</button>
+                <button class="chip">This quarter</button>
+                <button class="chip on">Year to date</button>
+                <button class="chip">Last 12</button>
+                <button class="chip">All time</button>
+              </div>
+              <div class="selects">
+                <label class="select-label">Group by<span class="select-box">Month <span class="caret">▼</span></span></label>
+                <label class="select-label">Compare<span class="select-box">Prior year <span class="caret">▼</span></span></label>
+                <label class="select-label">Customer<span class="select-box">All customers <span class="caret">▼</span></span></label>
+                <label class="select-label">Job type<span class="select-box">All job types <span class="caret">▼</span></span></label>
+              </div>
+              <p class="range-line">Jan 1 to Oct 28, 2026</p>
+            </div>
+
+            <div class="content">
+              <div class="kpis">
+                <div class="kpi"><p class="kpi-label">Invoiced</p><p class="kpi-value">$941.4k</p><p class="kpi-meta"><span class="up">+19.3%</span> vs prior</p></div>
+                <div class="kpi"><p class="kpi-label">Collected</p><p class="kpi-value">$874.8k</p><p class="kpi-meta"><span class="up">+21.3%</span> vs prior</p></div>
+                <div class="kpi"><p class="kpi-label">Outstanding</p><p class="kpi-value">$66.6k</p><p class="kpi-meta"><span class="up">-2.1%</span> vs prior</p></div>
+                <div class="kpi"><p class="kpi-label">Collected rate</p><p class="kpi-value">92.9%</p><p class="kpi-meta"><span class="up">+1.5 pts</span> vs prior</p></div>
+              </div>
+
+              <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px">
+                  <p class="card-title">Invoiced and collected by month</p>
+                  <span class="card-note">Dollars</span>
+                </div>
+                <div class="legend"><span><i style="background:var(--s1)"></i>Invoiced</span><span><i style="background:var(--s2)"></i>Collected</span></div>
+                <div class="bars" data-bars="10"></div>
+                <div class="axis"><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span><span>Oct</span></div>
+              </div>
+
+              <div class="card">
+                <p class="card-title">Receivables aging</p>
+                <div class="aging">
+                  <div class="aging-row"><span>0-30</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="aging-val">$38.2k</span></div>
+                  <div class="aging-row"><span>31-60</span><span class="track"><span class="fill" style="width:48%"></span></span><span class="aging-val">$18.4k</span></div>
+                  <div class="aging-row"><span>61-90</span><span class="track"><span class="fill" style="width:18%"></span></span><span class="aging-val">$6.8k</span></div>
+                  <div class="aging-row"><span>91-120</span><span class="track"><span class="fill" style="width:6%"></span></span><span class="aging-val">$2.1k</span></div>
+                </div>
+              </div>
+
+              <div class="card">
+                <p class="card-title">Top customers</p>
+                <div class="aging">
+                  <div class="aging-row customer-row"><span>Camel City</span><span class="track"><span class="fill" style="width:100%"></span></span><span class="aging-val">$189.6k</span></div>
+                  <div class="aging-row customer-row"><span>Darren Burke</span><span class="track"><span class="fill" style="width:84%"></span></span><span class="aging-val">$158.9k</span></div>
+                  <div class="aging-row customer-row"><span>Fulk Builders</span><span class="track"><span class="fill" style="width:71%"></span></span><span class="aging-val">$134.4k</span></div>
+                  <div class="aging-row customer-row"><span>Holy Helper</span><span class="track"><span class="fill" style="width:60%"></span></span><span class="aging-val">$112.8k</span></div>
+                </div>
+              </div>
+
+              <div class="card">
+                <p class="card-title">Quote to paid</p>
+                <div class="funnel-row"><span>Quoted</span><span class="funnel-track"><span class="funnel-fill" style="width:100%"></span></span><span class="funnel-val">$1.18M</span></div>
+                <div class="funnel-row"><span>Accepted</span><span class="funnel-track"><span class="funnel-fill" style="width:86%"></span></span><span class="funnel-val">$1.02M</span></div>
+                <div class="funnel-row"><span>Invoiced</span><span class="funnel-track"><span class="funnel-fill" style="width:79%"></span></span><span class="funnel-val">$941.4k</span></div>
+                <div class="funnel-row"><span>Paid</span><span class="funnel-track"><span class="funnel-fill" style="width:74%"></span></span><span class="funnel-val">$874.8k</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note-box">
+      <strong>What to check on the phone:</strong>
+      <ul>
+        <li>The toolbar title and Export button share the first row, and the three layout tabs share the second. No control is clipped.</li>
+        <li>Period chips wrap to two rows; the four selects sit two per row, and the date range closes the filter block.</li>
+        <li>KPIs are 2 across instead of stacked four high, so the first chart starts within the first screen.</li>
+        <li>Charts scale down to the card width. There is no sideways scrolling.</li>
+        <li>The toolbar scrolls away with the page. If you want it pinned while scrolling, that is a separate choice and costs about 90px of viewport.</li>
+      </ul>
+    </div>
+  </main>
+
+  <script>
+    // Build the bar pairs.
+    const heights = [
+      [42, 36], [52, 44], [64, 50], [58, 52], [70, 60],
+      [76, 64], [68, 58], [82, 70], [88, 74], [80, 72]
+    ];
+    document.querySelectorAll("[data-bars]").forEach((chart) => {
+      const count = Number(chart.dataset.bars) || 10;
+      for (let i = 0; i < count; i += 1) {
+        const pair = document.createElement("div");
+        pair.className = "pair";
+        const [blue, green] = heights[i % heights.length];
+        pair.innerHTML =
+          '<span class="bar blue" style="height:' + blue + '%"></span>' +
+          '<span class="bar green" style="height:' + green + '%"></span>';
+        chart.appendChild(pair);
+      }
+    });
+
+    // Simulate the second phone scrolled to the charts.
+    const scrolled = document.querySelector('[data-screen="scrolled"]');
+    if (scrolled) scrolled.scrollTop = 500;
+  </script>
+</body>

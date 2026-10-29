@@ -1,0 +1,606 @@
+<title>Compact Reports Header</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap">
+
+<style>
+  :root {
+    --paper: #f2ece1;
+    --surface: #fffdf8;
+    --surface-2: #f7f1e7;
+    --ink: #1d211d;
+    --muted: #5f6157;
+    --line: #d9d0bf;
+    --line-soft: #e8e0d1;
+    --pine: #344236;
+    --deep-pine: #243027;
+    --clay: #a56543;
+    --sage: #a8ae91;
+    --good: #0f7a3d;
+    --bad: #b23b3b;
+    --s1: #2a78d6;
+    --s2: #1baf7a;
+    --s3: #eb6834;
+    --display: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --body: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --radius: 18px;
+    --shadow: 0 18px 50px rgba(29, 33, 29, 0.08);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .shell { max-width: 1180px; margin: 0 auto; padding-block: 28px 60px; }
+
+  h1, h2, h3, p { margin: 0; }
+
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .review-title {
+    margin-top: 6px;
+    font-size: clamp(30px, 4vw, 42px);
+    line-height: 1.05;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    color: var(--deep-pine);
+    text-wrap: balance;
+  }
+
+  .review-lede {
+    margin-top: 8px;
+    max-width: 70ch;
+    font-size: 14.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .review-head { margin-bottom: 18px; }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--pine);
+    border-radius: 999px;
+    padding: 8px 13px;
+    font-family: var(--body);
+    font-size: 12.5px;
+    font-weight: 700;
+    min-height: 38px;
+    cursor: pointer;
+  }
+
+  .tab[aria-selected="true"] { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+  .tab small { display: block; font-size: 10.5px; font-weight: 500; opacity: 0.72; margin-top: 1px; }
+  .tab:focus-visible, .btn:focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
+
+  .measure-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 16px;
+    margin-bottom: 10px;
+    padding: 9px 13px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--surface);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .measure-bar strong { color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+
+  .note-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--clay);
+    margin-right: 6px;
+  }
+
+  /* Browser-like frame */
+  .frame {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    overflow: hidden;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+  }
+
+  .app-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .brand-mark {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: var(--pine); color: var(--surface);
+    display: grid; place-items: center;
+    font-size: 13px; font-weight: 800; flex: none;
+  }
+  .brand-name { font-size: 14px; font-weight: 700; letter-spacing: 0.01em; color: var(--deep-pine); white-space: nowrap; }
+  .nav-links { display: flex; gap: 15px; font-size: 12.5px; font-weight: 500; color: var(--muted); overflow: hidden; }
+  .nav-links span:nth-child(5) { color: var(--deep-pine); font-weight: 700; }
+  @media (max-width: 680px) { .nav-links { display: none; } }
+
+  .new-quote {
+    border: 0; border-radius: 999px; background: var(--clay); color: #fffdf8;
+    font-family: var(--body); font-size: 11.5px; font-weight: 700;
+    padding: 8px 13px; white-space: nowrap; min-height: 36px;
+  }
+
+  .page { padding: 0 0 26px; }
+
+  .variant { display: block; }
+  .variant[hidden] { display: none !important; }
+
+  /* Current */
+  .current-wrap { padding: 22px 24px 0; }
+  .back-link { font-size: 12.5px; font-weight: 700; color: var(--deep-pine); text-decoration: underline; text-decoration-color: rgba(165,101,67,0.4); text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .current-eyebrow { margin-top: 18px; }
+  .current-title { margin-top: 7px; font-size: clamp(36px, 5vw, 54px); line-height: 1.03; letter-spacing: -0.045em; font-weight: 700; color: #6e7751; }
+  .current-lede { margin-top: 10px; max-width: 62ch; font-size: 15px; line-height: 1.6; color: var(--muted); }
+  .current-tabs { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .current-tab { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 8px 13px; font-family: var(--body); font-size: 12px; font-weight: 700; color: var(--deep-pine); }
+  .current-tab.on { background: var(--pine); color: var(--surface); border-color: var(--pine); }
+  .current-desc { margin-top: 8px; font-size: 12.5px; color: var(--muted); }
+
+  /* Shared report chrome */
+  .report {
+    margin-top: 14px;
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+  .report-head {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+  .report-title { font-size: 22px; font-weight: 700; letter-spacing: -0.025em; color: var(--deep-pine); }
+  .report-sub { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .btn {
+    border: 1px solid var(--line); background: var(--surface); color: var(--pine);
+    border-radius: 999px; padding: 8px 13px; font-family: var(--body);
+    font-size: 11.5px; font-weight: 700; min-height: 36px; cursor: pointer;
+  }
+  .btn.primary { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+
+  .filter-row {
+    display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 12px;
+    padding: 11px 24px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .mini-label { display: flex; flex-direction: column; gap: 3px; font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+  .mini-select { min-height: 34px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font-family: var(--body); font-size: 11.5px; font-weight: 600; padding: 6px 26px 6px 9px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+  .chip { border: 0; background: transparent; border-radius: 999px; padding: 6px 10px; font-family: var(--body); font-size: 11px; font-weight: 600; color: var(--muted); min-height: 30px; }
+  .chip.on { background: var(--pine); color: var(--surface); }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 24px 0;
+  }
+  @media (max-width: 760px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 480px) { .kpi-row { grid-template-columns: 1fr; } }
+
+  .kpi { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 11px 12px; min-width: 0; }
+  .kpi-label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+  .kpi-value { margin-top: 2px; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .kpi-meta { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+  .up { color: var(--good); font-weight: 700; }
+
+  .chart-strip {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px 24px 0;
+  }
+  @media (max-width: 820px) { .chart-strip { grid-template-columns: 1fr; } }
+  .card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 12px; min-width: 0; }
+  .card-title { font-size: 13px; font-weight: 700; color: var(--deep-pine); }
+  .bars { display: flex; align-items: flex-end; gap: 7px; height: 92px; margin-top: 10px; padding-bottom: 4px; border-bottom: 1px solid var(--line-soft); }
+  .bar-pair { flex: 1; display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100%; min-width: 0; }
+  .bar { width: 42%; border-radius: 2px 2px 0 0; }
+  .bar.blue { background: var(--s1); }
+  .bar.green { background: var(--s2); }
+  .legend { display: flex; gap: 10px; margin-top: 7px; font-size: 10px; font-weight: 600; color: var(--muted); }
+  .legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 4px; }
+
+  .aging { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .aging-row { display: grid; grid-template-columns: 62px minmax(0, 1fr) auto; align-items: center; gap: 7px; font-size: 10.5px; }
+  .aging-track { height: 7px; border-radius: 3px; background: var(--surface-2); border: 1px solid var(--line-soft); overflow: hidden; }
+  .aging-fill { display: block; height: 100%; background: var(--s1); border-radius: 2px; }
+  .aging-val { font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* Compact header variants */
+  .slim-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; padding: 16px 24px 0; }
+  .slim-title { font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--deep-pine); line-height: 1.1; }
+  .slim-kicker { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: var(--clay); margin-bottom: 3px; }
+  .slim-sub { margin-top: 2px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .slim-tabs { display: flex; flex-wrap: wrap; gap: 5px; }
+  .slim-tab { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 7px 12px; font-family: var(--body); font-size: 11.5px; font-weight: 700; color: var(--deep-pine); }
+  .slim-tab.on { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+  .slim-rule { margin: 13px 24px 0; border-top: 1px solid var(--line); }
+
+  .toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .toolbar-left { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .toolbar-title { font-size: 15px; font-weight: 700; color: var(--deep-pine); }
+  .toolbar-title span { font-weight: 500; color: var(--muted); }
+  .toolbar-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .toolbar-tab { border: 1px solid transparent; background: transparent; border-radius: 999px; padding: 6px 10px; font-family: var(--body); font-size: 11.5px; font-weight: 700; color: var(--muted); }
+  .toolbar-tab.on { background: var(--pine); color: var(--surface); }
+  .toolbar-actions { display: flex; gap: 6px; }
+
+  .bare-top { padding: 12px 24px; background: var(--surface); border-bottom: 1px solid var(--line); }
+  .bare-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+  .bare-title { font-size: 13px; font-weight: 700; color: var(--deep-pine); }
+  .bare-title span { font-weight: 500; color: var(--muted); }
+  .bare-filters { margin-top: 9px; }
+  .bare-filters .filter-row { padding: 0; background: transparent; border-bottom: 0; }
+
+  .footnote { margin-top: 18px; font-size: 12.5px; line-height: 1.6; color: var(--muted); max-width: 80ch; }
+  .footnote strong { color: var(--deep-pine); }
+</style>
+
+<body>
+  <main class="shell">
+    <header class="review-head">
+      <p class="eyebrow">Reports · layout review</p>
+      <h1 class="review-title">Less header, more report.</h1>
+      <p class="review-lede">
+        The current page spends roughly the first third of a laptop screen on the
+        back link, eyebrow, headline, and description before the report begins.
+        These three treatments cut that down. Switch between them to compare how
+        soon the numbers appear.
+      </p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Header treatments">
+      <button class="tab" role="tab" data-view="current" aria-selected="true">Current<small>As built</small></button>
+      <button class="tab" role="tab" data-view="slim" aria-selected="false">A · Slim<small>Title + tabs</small></button>
+      <button class="tab" role="tab" data-view="toolbar" aria-selected="false">B · Toolbar<small>No hero</small></button>
+      <button class="tab" role="tab" data-view="bare" aria-selected="false">C · Bare<small>Tabs + filters only</small></button>
+    </div>
+
+    <div class="measure-bar">
+      <span><span class="note-dot"></span>First KPI row begins <strong id="offset-readout">measuring…</strong> below the app bar</span>
+      <span id="space-readout"></span>
+    </div>
+
+    <div class="frame">
+      <div class="app-bar">
+        <div class="brand">
+          <span class="brand-mark">F</span>
+          <span class="brand-name">FREEDOM FAMILY ELECTRIC</span>
+        </div>
+        <div class="nav-links" aria-hidden="true">
+          <span>Dashboard</span><span>Quotes</span><span>Customers</span><span>Schedule</span><span>Reports</span>
+        </div>
+        <button type="button" class="new-quote">+ New Quote</button>
+      </div>
+
+      <!-- CURRENT -->
+      <section class="variant" id="view-current">
+        <div class="current-wrap">
+          <a class="back-link" href="#">Back to dashboard</a>
+          <p class="eyebrow current-eyebrow">Reports</p>
+          <h2 class="current-title">Where the money stands.</h2>
+          <p class="current-lede">
+            Invoiced, collected, and outstanding, compared across months, quarters,
+            and years. Every filter recalculates the headline numbers, the charts,
+            and the tables together.
+          </p>
+          <div class="current-tabs">
+            <button type="button" class="current-tab on">One screen</button>
+            <button type="button" class="current-tab">Compare first</button>
+            <button type="button" class="current-tab">Report builder</button>
+          </div>
+          <p class="current-desc">One screen: filters, headline numbers, and comparisons on one page.</p>
+        </div>
+        <div class="report">
+          <div class="report-head">
+            <div>
+              <p class="report-title">Business performance</p>
+              <p class="report-sub">January 1 to October 28, 2026 · all customers · all job types</p>
+            </div>
+            <button type="button" class="btn">Export CSV</button>
+          </div>
+          <div class="filter-row">
+            <div class="chip-row">
+              <button class="chip">This month</button>
+              <button class="chip">This quarter</button>
+              <button class="chip on">Year to date</button>
+              <button class="chip">Last 12</button>
+              <button class="chip">All time</button>
+            </div>
+            <label class="mini-label">Group by<select class="mini-select"><option>Month</option></select></label>
+            <label class="mini-label">Compare to<select class="mini-select"><option>Prior year</option></select></label>
+            <label class="mini-label">Customer<select class="mini-select"><option>All customers</option></select></label>
+            <label class="mini-label">Job type<select class="mini-select"><option>All job types</option></select></label>
+          </div>
+          <div class="kpi-row">
+            <div class="kpi"><p class="kpi-label">Invoiced</p><p class="kpi-value">$941.4k</p><p class="kpi-meta"><span class="up">+19.3%</span> vs prior</p></div>
+            <div class="kpi"><p class="kpi-label">Collected</p><p class="kpi-value">$874.8k</p><p class="kpi-meta"><span class="up">+21.3%</span> vs prior</p></div>
+            <div class="kpi"><p class="kpi-label">Outstanding</p><p class="kpi-value">$66.6k</p><p class="kpi-meta"><span class="up">-2.1%</span> vs prior</p></div>
+            <div class="kpi"><p class="kpi-label">Collected rate</p><p class="kpi-value">92.9%</p><p class="kpi-meta"><span class="up">+1.5 pts</span> vs prior</p></div>
+          </div>
+          <div class="chart-strip">
+            <div class="card">
+              <p class="card-title">Invoiced and collected by month</p>
+              <div class="legend"><span><i style="background:var(--s1)"></i>Invoiced</span><span><i style="background:var(--s2)"></i>Collected</span></div>
+              <div class="bars" data-bars="9"></div>
+            </div>
+            <div class="card">
+              <p class="card-title">Receivables aging</p>
+              <div class="aging">
+                <div class="aging-row"><span>0-30</span><span class="aging-track"><span class="aging-fill" style="width:100%"></span></span><span class="aging-val">$38.2k</span></div>
+                <div class="aging-row"><span>31-60</span><span class="aging-track"><span class="aging-fill" style="width:48%"></span></span><span class="aging-val">$18.4k</span></div>
+                <div class="aging-row"><span>61-90</span><span class="aging-track"><span class="aging-fill" style="width:18%"></span></span><span class="aging-val">$6.8k</span></div>
+                <div class="aging-row"><span>91-120</span><span class="aging-track"><span class="aging-fill" style="width:6%"></span></span><span class="aging-val">$2.1k</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- A SLIM -->
+      <section class="variant" id="view-slim" hidden>
+        <div class="slim-head">
+          <div>
+            <p class="slim-kicker">Reports</p>
+            <h2 class="slim-title">Business performance</h2>
+            <p class="slim-sub">January 1 to October 28, 2026 · all customers</p>
+          </div>
+          <div class="slim-tabs">
+            <button type="button" class="slim-tab on">One screen</button>
+            <button type="button" class="slim-tab">Compare first</button>
+            <button type="button" class="slim-tab">Report builder</button>
+          </div>
+        </div>
+        <div class="slim-rule"></div>
+        <div class="report" style="margin-top:0;border-top:0">
+          <div class="filter-row">
+            <div class="chip-row">
+              <button class="chip">This month</button>
+              <button class="chip">This quarter</button>
+              <button class="chip on">Year to date</button>
+              <button class="chip">Last 12</button>
+              <button class="chip">All time</button>
+            </div>
+            <label class="mini-label">Group by<select class="mini-select"><option>Month</option></select></label>
+            <label class="mini-label">Compare<select class="mini-select"><option>Prior year</option></select></label>
+            <label class="mini-label">Customer<select class="mini-select"><option>All customers</option></select></label>
+            <label class="mini-label">Job type<select class="mini-select"><option>All job types</option></select></label>
+            <button type="button" class="btn" style="margin-left:auto">Export CSV</button>
+          </div>
+          <div class="kpi-row">
+            <div class="kpi"><p class="kpi-label">Invoiced</p><p class="kpi-value">$941.4k</p><p class="kpi-meta"><span class="up">+19.3%</span> vs prior</p></div>
+            <div class="kpi"><p class="kpi-label">Collected</p><p class="kpi-value">$874.8k</p><p class="kpi-meta"><span class="up">+21.3%</span> vs prior</p></div>
+            <div class="kpi"><p class="kpi-label">Outstanding</p><p class="kpi-value">$66.6k</p><p class="kpi-meta"><span class="up">-2.1%</span> vs prior</p></div>
+            <div class="kpi"><p class="kpi-label">Collected rate</p><p class="kpi-value">92.9%</p><p class="kpi-meta"><span class="up">+1.5 pts</span> vs prior</p></div>
+          </div>
+          <div class="chart-strip">
+            <div class="card">
+              <p class="card-title">Invoiced and collected by month</p>
+              <div class="legend"><span><i style="background:var(--s1)"></i>Invoiced</span><span><i style="background:var(--s2)"></i>Collected</span></div>
+              <div class="bars" data-bars="9"></div>
+            </div>
+            <div class="card">
+              <p class="card-title">Receivables aging</p>
+              <div class="aging">
+                <div class="aging-row"><span>0-30</span><span class="aging-track"><span class="aging-fill" style="width:100%"></span></span><span class="aging-val">$38.2k</span></div>
+                <div class="aging-row"><span>31-60</span><span class="aging-track"><span class="aging-fill" style="width:48%"></span></span><span class="aging-val">$18.4k</span></div>
+                <div class="aging-row"><span>61-90</span><span class="aging-track"><span class="aging-fill" style="width:18%"></span></span><span class="aging-val">$6.8k</span></div>
+                <div class="aging-row"><span>91-120</span><span class="aging-track"><span class="aging-fill" style="width:6%"></span></span><span class="aging-val">$2.1k</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- B TOOLBAR -->
+      <section class="variant" id="view-toolbar" hidden>
+        <div class="toolbar">
+          <div class="toolbar-left">
+            <p class="toolbar-title">Reports <span>· Business performance</span></p>
+            <div class="toolbar-tabs">
+              <button type="button" class="toolbar-tab on">One screen</button>
+              <button type="button" class="toolbar-tab">Compare first</button>
+              <button type="button" class="toolbar-tab">Report builder</button>
+            </div>
+          </div>
+          <div class="toolbar-actions">
+            <button type="button" class="btn">Export CSV</button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <div class="chip-row">
+            <button class="chip">This month</button>
+            <button class="chip">This quarter</button>
+            <button class="chip on">Year to date</button>
+            <button class="chip">Last 12</button>
+            <button class="chip">All time</button>
+          </div>
+          <label class="mini-label">Group by<select class="mini-select"><option>Month</option></select></label>
+          <label class="mini-label">Compare<select class="mini-select"><option>Prior year</option></select></label>
+          <label class="mini-label">Customer<select class="mini-select"><option>All customers</option></select></label>
+          <label class="mini-label">Job type<select class="mini-select"><option>All job types</option></select></label>
+          <span style="font-size:11px;color:var(--muted);margin-left:auto">Jan 1 to Oct 28, 2026</span>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi"><p class="kpi-label">Invoiced</p><p class="kpi-value">$941.4k</p><p class="kpi-meta"><span class="up">+19.3%</span> vs prior</p></div>
+          <div class="kpi"><p class="kpi-label">Collected</p><p class="kpi-value">$874.8k</p><p class="kpi-meta"><span class="up">+21.3%</span> vs prior</p></div>
+          <div class="kpi"><p class="kpi-label">Outstanding</p><p class="kpi-value">$66.6k</p><p class="kpi-meta"><span class="up">-2.1%</span> vs prior</p></div>
+          <div class="kpi"><p class="kpi-label">Collected rate</p><p class="kpi-value">92.9%</p><p class="kpi-meta"><span class="up">+1.5 pts</span> vs prior</p></div>
+        </div>
+        <div class="chart-strip">
+          <div class="card">
+            <p class="card-title">Invoiced and collected by month</p>
+            <div class="legend"><span><i style="background:var(--s1)"></i>Invoiced</span><span><i style="background:var(--s2)"></i>Collected</span></div>
+            <div class="bars" data-bars="9"></div>
+          </div>
+          <div class="card">
+            <p class="card-title">Receivables aging</p>
+            <div class="aging">
+              <div class="aging-row"><span>0-30</span><span class="aging-track"><span class="aging-fill" style="width:100%"></span></span><span class="aging-val">$38.2k</span></div>
+              <div class="aging-row"><span>31-60</span><span class="aging-track"><span class="aging-fill" style="width:48%"></span></span><span class="aging-val">$18.4k</span></div>
+              <div class="aging-row"><span>61-90</span><span class="aging-track"><span class="aging-fill" style="width:18%"></span></span><span class="aging-val">$6.8k</span></div>
+              <div class="aging-row"><span>91-120</span><span class="aging-track"><span class="aging-fill" style="width:6%"></span></span><span class="aging-val">$2.1k</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- C BARE -->
+      <section class="variant" id="view-bare" hidden>
+        <div class="bare-top">
+          <div class="bare-row">
+            <p class="bare-title">Reports <span>· Business performance · Jan 1 to Oct 28, 2026</span></p>
+            <div class="slim-tabs">
+              <button type="button" class="slim-tab on">One screen</button>
+              <button type="button" class="slim-tab">Compare first</button>
+              <button type="button" class="slim-tab">Report builder</button>
+            </div>
+          </div>
+          <div class="bare-filters">
+            <div class="filter-row">
+              <div class="chip-row">
+                <button class="chip">This month</button>
+                <button class="chip">This quarter</button>
+                <button class="chip on">Year to date</button>
+                <button class="chip">Last 12</button>
+                <button class="chip">All time</button>
+              </div>
+              <label class="mini-label">Group by<select class="mini-select"><option>Month</option></select></label>
+              <label class="mini-label">Compare<select class="mini-select"><option>Prior year</option></select></label>
+              <label class="mini-label">Customer<select class="mini-select"><option>All customers</option></select></label>
+              <label class="mini-label">Job type<select class="mini-select"><option>All job types</option></select></label>
+            </div>
+          </div>
+        </div>
+        <div class="kpi-row">
+          <div class="kpi"><p class="kpi-label">Invoiced</p><p class="kpi-value">$941.4k</p><p class="kpi-meta"><span class="up">+19.3%</span> vs prior</p></div>
+          <div class="kpi"><p class="kpi-label">Collected</p><p class="kpi-value">$874.8k</p><p class="kpi-meta"><span class="up">+21.3%</span> vs prior</p></div>
+          <div class="kpi"><p class="kpi-label">Outstanding</p><p class="kpi-value">$66.6k</p><p class="kpi-meta"><span class="up">-2.1%</span> vs prior</p></div>
+          <div class="kpi"><p class="kpi-label">Collected rate</p><p class="kpi-value">92.9%</p><p class="kpi-meta"><span class="up">+1.5 pts</span> vs prior</p></div>
+        </div>
+        <div class="chart-strip">
+          <div class="card">
+            <p class="card-title">Invoiced and collected by month</p>
+            <div class="legend"><span><i style="background:var(--s1)"></i>Invoiced</span><span><i style="background:var(--s2)"></i>Collected</span></div>
+            <div class="bars" data-bars="9"></div>
+          </div>
+          <div class="card">
+            <p class="card-title">Receivables aging</p>
+            <div class="aging">
+              <div class="aging-row"><span>0-30</span><span class="aging-track"><span class="aging-fill" style="width:100%"></span></span><span class="aging-val">$38.2k</span></div>
+              <div class="aging-row"><span>31-60</span><span class="aging-track"><span class="aging-fill" style="width:48%"></span></span><span class="aging-val">$18.4k</span></div>
+              <div class="aging-row"><span>61-90</span><span class="aging-track"><span class="aging-fill" style="width:18%"></span></span><span class="aging-val">$6.8k</span></div>
+              <div class="aging-row"><span>91-120</span><span class="aging-track"><span class="aging-fill" style="width:6%"></span></span><span class="aging-val">$2.1k</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <p class="footnote">
+      <strong>What changes:</strong> A keeps the report name and period, moves the
+      layout tabs beside it, and drops the long description. B turns the top into
+      one toolbar with the report name, tabs, and export, then filters. C removes
+      the page title entirely and starts with the tabs and filters; the nav already
+      says Reports. The measurements above count from the top of the app bar, so
+      they are the real distance to the numbers.
+    </p>
+  </main>
+
+  <script>
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const variants = Array.from(document.querySelectorAll(".variant"));
+
+    function select(key) {
+      tabs.forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.view === key));
+      });
+      variants.forEach((variant) => {
+        variant.hidden = variant.id !== "view-" + key;
+      });
+      requestAnimationFrame(measure);
+    }
+
+    let currentOffset = null;
+
+    function measure() {
+      const visible = variants.find((variant) => !variant.hidden);
+      if (!visible) return;
+      const appBar = document.querySelector(".app-bar").getBoundingClientRect();
+      const kpis = visible.querySelector(".kpi-row").getBoundingClientRect();
+      const offset = Math.round(kpis.top - appBar.bottom);
+      document.getElementById("offset-readout").textContent = offset + "px";
+      if (visible.id === "view-current") currentOffset = offset;
+      document.getElementById("space-readout").textContent =
+        currentOffset != null && currentOffset > offset
+          ? "That is " + (currentOffset - offset) + "px sooner than the current layout."
+          : "";
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => select(tab.dataset.view));
+    });
+
+    // Simple bar pairs for the chart preview
+    document.querySelectorAll("[data-bars]").forEach((chart) => {
+      const count = Number(chart.dataset.bars) || 9;
+      const heights = [
+        [42, 36], [52, 44], [64, 50], [58, 52], [70, 60],
+        [76, 64], [68, 58], [82, 70], [88, 74], [80, 72], [86, 76], [78, 74]
+      ];
+      for (let i = 0; i < count; i += 1) {
+        const pair = document.createElement("div");
+        pair.className = "bar-pair";
+        const [blue, green] = heights[i % heights.length];
+        pair.innerHTML =
+          '<span class="bar blue" style="height:' + blue + '%"></span>' +
+          '<span class="bar green" style="height:' + green + '%"></span>';
+        chart.appendChild(pair);
+      }
+    });
+
+    select("current");
+  </script>
+</body>

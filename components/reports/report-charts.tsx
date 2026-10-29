@@ -86,7 +86,7 @@ export function GroupedBarChart({
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={ariaLabel}
-          className="block min-w-[440px] w-full"
+          className="block min-w-[340px] w-full"
         >
           {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
             const y = pad.top + plotH * (1 - fraction);
@@ -206,7 +206,7 @@ export function TrendLineChart({
           viewBox={`0 0 ${width} ${height}`}
           role="img"
           aria-label={ariaLabel}
-          className="block min-w-[440px] w-full"
+          className="block min-w-[340px] w-full"
         >
           {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
             const y = pad.top + plotH * (1 - fraction);

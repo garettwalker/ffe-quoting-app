@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { formatCurrency, formatPercent } from "@/lib/currency";
 import {
   EMPTY_FILTERS,
@@ -426,17 +425,12 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
     { value: "all", label: "All customers" },
     ...customers.map((name) => ({ value: name, label: name }))
   ];
-  const projectTypeOptions = [
-    { value: "all", label: "All job types" },
-    ...projectTypes.map((name) => ({ value: name, label: name }))
-  ];
   const singleQuoteType =
     filters.quoteTypes.length === 0 ? "all" : filters.quoteTypes[0];
 
   const commonFilters = (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-2">
       {rangeChips}
-      {customDates}
       <div className="flex flex-wrap items-end gap-3">
         <Select
           label="Group by"
@@ -472,7 +466,11 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
             }))
           ]}
         />
+        <span className="ml-auto pb-2 text-xs font-bold text-charcoal/55">
+          {rangeLabel(filters, report.window)}
+        </span>
       </div>
+      {customDates}
     </div>
   );
 
@@ -518,7 +516,7 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
     view === "one"
       ? "Business performance"
       : view === "two"
-        ? "This period against the last"
+        ? "Compare first"
         : "Report builder";
 
   const reportSubtitle = `${rangeLabel(filters, report.window)} · ${
@@ -531,87 +529,61 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
 
   return (
     <div>
-      <div className="mb-8">
-        <Link
-          href="/"
-          className="mb-6 inline-flex text-sm font-black text-deep-pine underline decoration-clay/40 decoration-2 underline-offset-4"
-        >
-          Back to dashboard
-        </Link>
-
-        <p className="mb-2 text-sm font-black uppercase tracking-[0.18em] text-clay">
-          Reports
-        </p>
-
-        <h1 className="font-display text-5xl font-bold tracking-[-0.04em] text-moss md:text-6xl">
-          Where the money stands.
-        </h1>
-
-        <p className="mt-4 max-w-2xl text-lg leading-8 text-charcoal/75">
-          Invoiced, collected, and outstanding, compared across months, quarters,
-          and years. Every filter recalculates the headline numbers, the charts,
-          and the tables together.
-        </p>
-      </div>
-
       {dataset.capped ? (
-        <p className="mb-6 rounded-soft border border-clay/30 bg-clay/10 px-4 py-3 text-sm font-bold text-clay">
+        <p className="mb-3 rounded-soft border border-clay/30 bg-clay/10 px-4 py-2.5 text-sm font-bold text-clay">
           This report reached its cap (500 quotes), so older jobs are not
           included and these totals may be undercounting. Raise the cap in
           lib/reports-server.ts to fix the count.
         </p>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap gap-2">
-        {(Object.keys(VIEW_COPY) as ReportView[]).map((key) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => setView(key)}
-            aria-selected={view === key}
-            className={
-              view === key
-                ? "rounded-full bg-pine px-4 py-2.5 text-sm font-black text-whitewarm shadow-card"
-                : "rounded-full border border-pine/20 bg-whitewarm px-4 py-2.5 text-sm font-black text-deep-pine hover:bg-pine/10"
-            }
-          >
-            {VIEW_COPY[key].name}
-          </button>
-        ))}
-      </div>
-
-      <p className="mb-4 text-sm font-bold text-charcoal/60">
-        <span className="font-black text-deep-pine">
-          {VIEW_COPY[view].name}
-        </span>{" "}
-        {VIEW_COPY[view].desc}
-      </p>
-
       <div className="overflow-hidden rounded-xl2 border border-pine/10 bg-cream/60 shadow-soft">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-pine/10 bg-whitewarm px-5 py-4">
-          <div>
-            <h2 className="font-display text-2xl font-bold text-deep-pine">
-              {reportHeading}
-            </h2>
-            <p className="mt-0.5 text-xs font-bold text-charcoal/60">
-              {reportSubtitle}
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-pine/10 bg-whitewarm px-4 py-2.5">
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-2 sm:flex-none sm:justify-start">
+            <h1 className="min-w-0 font-display text-lg font-bold tracking-[-0.02em] text-deep-pine">
+              Reports{" "}
+              <span className="font-semibold text-charcoal/50">
+                · {reportHeading}
+              </span>
+            </h1>
             <button
               type="button"
               onClick={exportCsv}
-              className="rounded-full border border-pine/20 bg-whitewarm px-4 py-2 text-xs font-black text-deep-pine hover:bg-pine/10"
+              className="rounded-full border border-pine/20 bg-whitewarm px-3 py-1.5 text-[11px] font-black text-deep-pine hover:bg-pine/10 sm:hidden"
             >
               Export CSV
             </button>
           </div>
+          <div className="order-last flex w-full flex-wrap gap-0.5 rounded-full border border-pine/15 bg-cream/60 p-0.5 sm:order-none sm:w-auto">
+            {(Object.keys(VIEW_COPY) as ReportView[]).map((key) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setView(key)}
+                aria-selected={view === key}
+                className={
+                  view === key
+                    ? "flex-1 rounded-full bg-pine px-2.5 py-1.5 text-[11px] font-black text-whitewarm sm:flex-none"
+                    : "flex-1 rounded-full px-2.5 py-1.5 text-[11px] font-black text-charcoal/60 hover:bg-pine/10 sm:flex-none"
+                }
+              >
+                {VIEW_COPY[key].name}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={exportCsv}
+            className="hidden rounded-full border border-pine/20 bg-whitewarm px-3 py-1.5 text-[11px] font-black text-deep-pine hover:bg-pine/10 sm:inline-flex"
+          >
+            Export CSV
+          </button>
         </div>
 
         {view === "three" ? null : (
-          <div className="border-b border-pine/10 bg-cream/70 px-5 py-4">
+          <div className="border-b border-pine/10 bg-cream/70 px-4 py-3">
             {view === "two" ? (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <div className="flex flex-wrap items-end gap-3">
                   <Select
                     label="Compare"
@@ -650,6 +622,9 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                       }))
                     ]}
                   />
+                  <span className="ml-auto pb-2 text-xs font-bold text-charcoal/55">
+                    {rangeLabel(filters, report.window)}
+                  </span>
                 </div>
                 {rangeChips}
                 {customDates}
@@ -983,7 +958,7 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
           </div>
         ) : (
           <div className="space-y-4 p-5">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
               <Kpi label="Invoiced" value={formatCurrency(report.totals.invoicedCents)}>
                 <Delta
                   current={report.totals.invoicedCents}
