@@ -109,6 +109,15 @@ const ICONS = {
       <path d="M4 19h16" />
       <path d="m7 15 4-5 3 3 4-6" />
     </Icon>
+  ),
+  reports: (
+    <Icon>
+      <path d="M4 19V5" />
+      <path d="M4 19h16" />
+      <rect x="7" y="11" width="3" height="8" />
+      <rect x="12" y="7" width="3" height="12" />
+      <rect x="17" y="14" width="3" height="5" />
+    </Icon>
   )
 };
 
@@ -156,6 +165,12 @@ const GROUPS: Array<{ label: string; items: NavItem[] }> = [
         label: "Receivables",
         description: "Outstanding and paid invoices",
         icon: ICONS.receivables
+      },
+      {
+        href: "/reports",
+        label: "Reports",
+        description: "Revenue, collections, and trends",
+        icon: ICONS.reports
       },
       {
         href: "/pnl",

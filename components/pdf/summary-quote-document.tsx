@@ -20,7 +20,7 @@ import {
 //
 // Receives only plain, pre-formatted strings (all money/date/locale formatting
 // is done server-side by lib/summary-quote-pdf.ts). Built-in react-pdf fonts:
-// Times-Bold for serif headings, Helvetica/Helvetica-Bold for body.
+// Helvetica-Bold for headings, Helvetica for body.
 
 export type SummaryQuotePdfProps = {
   businessName: string;

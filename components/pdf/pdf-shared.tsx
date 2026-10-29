@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     marginRight: 14
   },
   businessName: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 18,
     color: PDF_COLORS.deepPine
   },
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end"
   },
   docTitle: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 26,
     color: PDF_COLORS.moss
   },
@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
     color: PDF_COLORS.clay
   },
   totalValue: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 17,
     color: PDF_COLORS.deepPine
   },

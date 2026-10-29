@@ -18,7 +18,7 @@ import {
 // "previously invoiced" block for the finish invoice), so this component stays
 // pure data-in. Shares the header/info/total/notes/footer/list building blocks
 // with the Summary Quote (see pdf-shared.tsx). Built-in react-pdf fonts:
-// Times-Bold for serif headings, Helvetica/Helvetica-Bold for body.
+// Helvetica-Bold for headings, Helvetica for body.
 
 export type InvoicePdfProps = {
   businessName: string;

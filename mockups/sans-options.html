@@ -1,0 +1,518 @@
+<title>Sans Weight Options</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=Archivo:wght@400;500;600;700;800&family=Public+Sans:wght@400;500;600;700;800&display=swap">
+
+<style>
+  /* Layout concept: the same quiet review sheet, now testing one family at a
+     time and moving only the heading weight. */
+  :root {
+    --paper: #f2ece1;
+    --surface: #fffdf8;
+    --surface-2: #f7f1e7;
+    --ink: #1d211d;
+    --muted: #5f6157;
+    --line: #d9d0bf;
+    --pine: #344236;
+    --deep-pine: #243027;
+    --clay: #a56543;
+    --sage: #a8ae91;
+    --radius: 18px;
+    --shadow: 0 18px 50px rgba(29, 33, 29, 0.08);
+    --display: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --body: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --hw: 600;
+    --ht: -0.025em;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #141713;
+      --surface: #1e231e;
+      --surface-2: #252b25;
+      --ink: #f1eee5;
+      --muted: #b9b6aa;
+      --line: #3b423a;
+      --pine: #dbe3d7;
+      --deep-pine: #eef3ec;
+      --clay: #d18f67;
+      --sage: #7b8467;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #141713;
+    --surface: #1e231e;
+    --surface-2: #252b25;
+    --ink: #f1eee5;
+    --muted: #b9b6aa;
+    --line: #3b423a;
+    --pine: #dbe3d7;
+    --deep-pine: #eef3ec;
+    --clay: #d18f67;
+    --sage: #7b8467;
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+
+  .f-intertight { --display: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; --body: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-plex { --display: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif; --body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-archivo { --display: Archivo, "Inter Tight", ui-sans-serif, system-ui, -apple-system, sans-serif; --body: Archivo, ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-public { --display: "Public Sans", "Inter Tight", ui-sans-serif, system-ui, -apple-system, sans-serif; --body: "Public Sans", "Inter Tight", ui-sans-serif, system-ui, -apple-system, sans-serif; }
+
+  .w500 { --hw: 500; --ht: -0.012em; }
+  .w600 { --hw: 600; --ht: -0.022em; }
+  .w700 { --hw: 700; --ht: -0.03em; }
+  .w800 { --hw: 800; --ht: -0.038em; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+  }
+
+  .shell { max-width: 1120px; margin: 0 auto; padding-block: clamp(28px, 5vw, 56px) 64px; }
+
+  h1, h2, h3, h4, p { margin: 0; }
+
+  .eyebrow {
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .page-title {
+    font-family: var(--display);
+    font-size: clamp(38px, 6vw, 58px);
+    line-height: 1.04;
+    letter-spacing: var(--ht);
+    font-weight: var(--hw);
+    color: var(--deep-pine);
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin-top: 16px;
+    max-width: 64ch;
+    font-size: 16.5px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .masthead { margin-bottom: 26px; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--pine);
+    border-radius: 999px;
+    padding: 9px 15px;
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 42px;
+    cursor: pointer;
+  }
+
+  .tab:hover { border-color: var(--clay); }
+  .tab[aria-selected="true"] { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+  .tab:focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
+  .tab small { display: block; font-size: 11px; font-weight: 500; opacity: 0.72; margin-top: 2px; }
+
+  .weight-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px 14px;
+    margin-bottom: 18px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+  }
+
+  .weight-bar > span {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .weights { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); }
+
+  .weight {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 7px 13px;
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 600;
+    min-height: 34px;
+    cursor: pointer;
+  }
+
+  .weight[aria-pressed="true"] { background: var(--pine); color: var(--surface); }
+  .weight:focus-visible { outline: 2px solid var(--clay); outline-offset: 1px; }
+
+  .weight-hint { font-size: 12px; color: var(--muted); }
+
+  .review { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 18px; align-items: start; }
+  @media (max-width: 860px) { .review { grid-template-columns: 1fr; } }
+
+  .app { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+
+  .app-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--line); background: var(--surface); }
+  .brand { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 8px; background: var(--pine); color: var(--surface); display: grid; place-items: center; font-family: var(--display); font-size: 13px; font-weight: 800; flex: none; }
+  .brand-name { font-family: var(--display); font-size: 14px; font-weight: 700; letter-spacing: 0.01em; color: var(--deep-pine); white-space: nowrap; }
+  .nav-links { display: flex; gap: 16px; font-size: 13px; font-weight: 500; color: var(--muted); overflow: hidden; }
+  .nav-links span:first-child { color: var(--deep-pine); font-weight: 600; }
+  @media (max-width: 620px) { .nav-links { display: none; } }
+
+  .new-quote { border: 0; border-radius: 999px; background: var(--clay); color: #fffdf8; font-family: var(--body); font-size: 12px; font-weight: 700; padding: 9px 14px; white-space: nowrap; min-height: 38px; }
+
+  .app-body { padding: clamp(18px, 3.5vw, 30px); }
+
+  .sample-eyebrow { font-family: var(--body); font-size: 11px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--clay); margin-bottom: 8px; }
+
+  .sample-title {
+    font-family: var(--display);
+    font-size: clamp(30px, 4.6vw, 42px);
+    line-height: 1.06;
+    letter-spacing: var(--ht);
+    font-weight: var(--hw);
+    color: color-mix(in srgb, var(--pine) 82%, var(--sage));
+    text-wrap: balance;
+  }
+
+  .sample-copy { margin-top: 10px; max-width: 56ch; font-size: 14.5px; line-height: 1.62; color: var(--muted); }
+
+  .kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 22px; }
+  @media (max-width: 560px) { .kpis { grid-template-columns: 1fr; } }
+
+  .kpi { border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); padding: 14px; min-width: 0; }
+  .kpi-label { font-family: var(--body); font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay); margin-bottom: 4px; }
+  .kpi-value { font-family: var(--display); font-size: clamp(22px, 3.4vw, 29px); font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+  .kpi-note { margin-top: 3px; font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .table-wrap { margin-top: 20px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-family: var(--body); font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--line); padding: 9px 12px 9px 0; white-space: nowrap; }
+  td { border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent); padding: 12px 12px 12px 0; vertical-align: top; }
+  .job { font-weight: 600; color: var(--deep-pine); }
+  .job small { display: block; font-size: 11.5px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .due { color: var(--clay); font-weight: 700; }
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 8px; font-size: 10.5px; font-weight: 600; background: color-mix(in srgb, var(--sage) 34%, transparent); color: var(--deep-pine); white-space: nowrap; }
+  .badge.partial { background: color-mix(in srgb, var(--clay) 18%, transparent); color: var(--clay); }
+
+  .sample-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  .btn { border-radius: 999px; border: 1px solid var(--pine); background: var(--pine); color: var(--surface); font-family: var(--body); font-size: 13px; font-weight: 600; padding: 10px 16px; min-height: 42px; }
+  .btn.secondary { background: transparent; color: var(--pine); border-color: var(--line); }
+
+  .panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); padding: 20px; }
+  .panel h2 { font-family: var(--display); font-size: 21px; line-height: 1.15; letter-spacing: -0.02em; font-weight: var(--hw); color: var(--deep-pine); margin-bottom: 4px; }
+  .pairing { font-size: 12px; font-weight: 600; color: var(--clay); margin-bottom: 12px; }
+  .rationale { font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+
+  .rating { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
+  .rating li { font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; padding: 4px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .rating li.on { border-color: var(--sage); color: var(--deep-pine); background: color-mix(in srgb, var(--sage) 22%, transparent); }
+
+  .ladder { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .ladder-title { font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--clay); margin-bottom: 8px; }
+  .ladder-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 5px 0; border-bottom: 1px dotted var(--line); }
+  .ladder-row:last-child { border-bottom: 0; }
+  .ladder-word { font-family: var(--display); font-size: 19px; letter-spacing: -0.02em; color: var(--deep-pine); white-space: nowrap; }
+  .ladder-num { font-size: 10.5px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .specimen { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 14px; }
+  .spec-h1 { font-family: var(--display); font-size: 27px; line-height: 1.08; letter-spacing: var(--ht); font-weight: var(--hw); color: var(--deep-pine); margin-bottom: 8px; }
+  .spec-body { font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+  .spec-label { margin-top: 10px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay); }
+  .spec-number { font-family: var(--display); font-size: 25px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+
+  .compare { margin-top: 30px; }
+  .compare h2 { font-family: var(--display); font-size: 24px; letter-spacing: -0.02em; font-weight: var(--hw); color: var(--deep-pine); margin-bottom: 12px; }
+  .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; }
+  .mini { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 14px; }
+  .mini .mini-name { font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+  .mini .mini-big { font-family: var(--display); font-size: 21px; font-weight: var(--hw); letter-spacing: var(--ht); line-height: 1.12; color: var(--deep-pine); margin-top: 6px; }
+  .mini .mini-body { font-size: 12px; line-height: 1.55; color: var(--muted); margin-top: 6px; }
+
+  .footnote { margin-top: 26px; font-size: 12.5px; line-height: 1.6; color: var(--muted); max-width: 78ch; }
+  .footnote strong { color: var(--deep-pine); }
+</style>
+
+<body class="f-intertight w600">
+  <main class="shell">
+    <header class="masthead">
+      <p class="eyebrow">Typography review · sans only</p>
+      <h1 class="page-title">Weight carries the tone.</h1>
+      <p class="lede">
+        Four professional sans families, with a live heading weight control. A heavier heading
+        reads more authoritative; a medium weight reads calmer. Body copy stays at 400 and labels
+        at 600 in every option so only the headline weight moves.
+      </p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Sans font options">
+      <button class="tab" role="tab" data-key="intertight" data-weight="600" aria-selected="true">A · Inter Tight<small>Neutral software</small></button>
+      <button class="tab" role="tab" data-key="plex" data-weight="600" aria-selected="false">B · IBM Plex Sans<small>Engineered</small></button>
+      <button class="tab" role="tab" data-key="archivo" data-weight="700" aria-selected="false">C · Archivo<small>Sturdy grotesque</small></button>
+      <button class="tab" role="tab" data-key="public" data-weight="700" aria-selected="false">D · Public Sans<small>Plain and formal</small></button>
+    </div>
+
+    <div class="weight-bar">
+      <span>Heading weight</span>
+      <div class="weights" role="group" aria-label="Heading weight">
+        <button type="button" class="weight" data-weight="500" aria-pressed="false">500</button>
+        <button type="button" class="weight" data-weight="600" aria-pressed="true">600</button>
+        <button type="button" class="weight" data-weight="700" aria-pressed="false">700</button>
+        <button type="button" class="weight" data-weight="800" aria-pressed="false">800</button>
+      </div>
+      <span class="weight-hint" id="weight-hint">Medium. Professional without shouting.</span>
+    </div>
+
+    <div class="review">
+      <section class="app" aria-label="Live app sample">
+        <div class="app-bar">
+          <div class="brand">
+            <span class="brand-mark">F</span>
+            <span class="brand-name">FREEDOM FAMILY ELECTRIC</span>
+          </div>
+          <div class="nav-links" aria-hidden="true">
+            <span>Dashboard</span><span>Quotes</span><span>Customers</span><span>Receivables</span>
+          </div>
+          <button type="button" class="new-quote">+ New Quote</button>
+        </div>
+
+        <div class="app-body">
+          <p class="sample-eyebrow">Accounts Receivable</p>
+          <p class="sample-title">Who owes what.</p>
+          <p class="sample-copy">
+            Every invoiced job in one place. Pending Payments shows what is still outstanding.
+            Historical Paid shows jobs that are paid in full.
+          </p>
+
+          <div class="kpis">
+            <div class="kpi">
+              <p class="kpi-label">Total Invoiced</p>
+              <p class="kpi-value">$284,310</p>
+              <p class="kpi-note">14 jobs this quarter</p>
+            </div>
+            <div class="kpi">
+              <p class="kpi-label">Total Outstanding</p>
+              <p class="kpi-value">$61,884</p>
+              <p class="kpi-note">6 jobs still open</p>
+            </div>
+            <div class="kpi">
+              <p class="kpi-label">Total Paid</p>
+              <p class="kpi-value">$222,426</p>
+              <p class="kpi-note">78.2% collected</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr><th scope="col">Job</th><th scope="col">Rough-In</th><th scope="col">Finish</th><th scope="col">Outstanding</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="job">Coleman Residence<small>Camel City Construction</small></td>
+                  <td class="money">$20,482 <span class="badge">Paid</span></td>
+                  <td class="money">$20,482 <span class="badge partial">Partial</span></td>
+                  <td class="money due">$8,140</td>
+                </tr>
+                <tr>
+                  <td class="job">Conrad Road<small>Camel City Construction</small></td>
+                  <td class="money">$18,952 <span class="badge">Paid</span></td>
+                  <td class="money">$18,952 <span class="badge">Paid</span></td>
+                  <td class="money">$0</td>
+                </tr>
+                <tr>
+                  <td class="job">Burke Residence<small>Darren Burke</small></td>
+                  <td class="money">$30,945 <span class="badge">Paid</span></td>
+                  <td class="money">$31,947 <span class="badge partial">Partial</span></td>
+                  <td class="money due">$15,947</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="sample-actions">
+            <button type="button" class="btn">Record payment</button>
+            <button type="button" class="btn secondary">View invoice</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel" aria-live="polite">
+        <h2 id="option-name">Inter Tight</h2>
+        <p class="pairing" id="option-pairing">Inter Tight headings · Inter body</p>
+        <p class="rationale" id="option-note">
+          Neutral, compact, and built for screens. Tight headings at 600 read modern and
+          confident without the extra weight of a marketing headline.
+        </p>
+        <ul class="rating" id="option-rating">
+          <li class="on">Modern</li><li class="on">Neutral</li><li class="on">Compact</li>
+        </ul>
+
+        <div class="ladder">
+          <p class="ladder-title">Weight ladder</p>
+          <div class="ladder-row"><span class="ladder-word" style="font-weight:500">Who owes what.</span><span class="ladder-num">500</span></div>
+          <div class="ladder-row"><span class="ladder-word" style="font-weight:600">Who owes what.</span><span class="ladder-num">600</span></div>
+          <div class="ladder-row"><span class="ladder-word" style="font-weight:700">Who owes what.</span><span class="ladder-num">700</span></div>
+          <div class="ladder-row"><span class="ladder-word" style="font-weight:800">Who owes what.</span><span class="ladder-num">800</span></div>
+        </div>
+
+        <div class="specimen">
+          <p class="spec-h1">Pending payments</p>
+          <p class="spec-body">Invoice INV-0042 was emailed on October 24. The balance shown includes the partial payment recorded on October 27.</p>
+          <p class="spec-label">Total outstanding</p>
+          <p class="spec-number">$61,884.00</p>
+        </div>
+      </aside>
+    </div>
+
+    <section class="compare">
+      <h2>At a glance</h2>
+      <div class="compare-grid">
+        <div class="mini f-intertight">
+          <p class="mini-name">A · Inter Tight</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Modern software. Compact, quiet, and easy to read at small sizes.</p>
+        </div>
+        <div class="mini f-plex">
+          <p class="mini-name">B · IBM Plex Sans</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Squared and engineered. Reads like a well-run trade business.</p>
+        </div>
+        <div class="mini f-archivo">
+          <p class="mini-name">C · Archivo</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Sturdy grotesque with strong numerals. Built for signage and data.</p>
+        </div>
+        <div class="mini f-public">
+          <p class="mini-name">D · Public Sans</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Plain and formal. A government-adjacent sans that never decorates.</p>
+        </div>
+      </div>
+    </section>
+
+    <p class="footnote">
+      <strong>Recommendation:</strong> Inter Tight at 600. It keeps the clean, modern feel of your
+      current body text, and the heavier 600 heading gives the page authority without the
+      marketing feel of 700 or 800. Try Archivo at 700 if you want a sturdier, more
+      contractor-like voice.
+    </p>
+  </main>
+
+  <script>
+    const OPTIONS = {
+      intertight: {
+        name: "Inter Tight",
+        pairing: "Inter Tight headings · Inter body",
+        note: "Neutral, compact, and built for screens. Tight headings at 600 read modern and confident without the extra weight of a marketing headline.",
+        rating: ["Modern", "Neutral", "Compact"],
+        weight: 600
+      },
+      plex: {
+        name: "IBM Plex Sans",
+        pairing: "IBM Plex Sans headings and body",
+        note: "Drawn for technical documentation, with squared terminals and a steady rhythm. It reads engineered and practical, and its numerals line up well in tables.",
+        rating: ["Professional", "Technical", "Practical"],
+        weight: 600
+      },
+      archivo: {
+        name: "Archivo",
+        pairing: "Archivo headings and body",
+        note: "A grotesque built for signage and data. At 700 the heading has real presence and the numerals are especially strong, which suits invoices and job totals.",
+        rating: ["Professional", "Sturdy", "Data-friendly"],
+        weight: 700
+      },
+      public: {
+        name: "Public Sans",
+        pairing: "Public Sans headings and body",
+        note: "A plain, formal sans with a civic-document feel. It stays out of the way and looks official on quotes and paperwork, especially at 700.",
+        rating: ["Formal", "Plain", "Official"],
+        weight: 700
+      }
+    };
+
+    const WEIGHT_HINTS = {
+      500: "Medium. Calm and understated.",
+      600: "Medium-bold. Professional without shouting.",
+      700: "Bold. More authority and presence.",
+      800: "Extra bold. Strongest, best kept to short headings."
+    };
+
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const weightButtons = Array.from(document.querySelectorAll(".weight"));
+    const panel = document.querySelector(".panel");
+    const els = {
+      name: document.getElementById("option-name"),
+      pairing: document.getElementById("option-pairing"),
+      note: document.getElementById("option-note"),
+      rating: document.getElementById("option-rating"),
+      hint: document.getElementById("weight-hint")
+    };
+
+    let familyClass = "f-intertight";
+
+    function setWeight(weight) {
+      document.body.classList.remove("w500", "w600", "w700", "w800");
+      document.body.classList.add("w" + weight);
+      weightButtons.forEach((button) => {
+        button.setAttribute("aria-pressed", String(Number(button.dataset.weight) === weight));
+      });
+      els.hint.textContent = WEIGHT_HINTS[weight];
+    }
+
+    function select(key, weight) {
+      const option = OPTIONS[key] || OPTIONS.intertight;
+      familyClass = "f-" + key;
+      document.body.classList.remove("f-intertight", "f-plex", "f-archivo", "f-public");
+      document.body.classList.add(familyClass);
+      tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.key === key)));
+      els.name.textContent = option.name;
+      els.pairing.textContent = option.pairing;
+      els.note.textContent = option.note;
+      els.rating.innerHTML = option.rating.map((label) => '<li class="on">' + label + "</li>").join("");
+      setWeight(weight || option.weight);
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => select(tab.dataset.key, Number(tab.dataset.weight)));
+    });
+
+    weightButtons.forEach((button) => {
+      button.addEventListener("click", () => setWeight(Number(button.dataset.weight)));
+    });
+
+    select("intertight", 600);
+  </script>
+</body>

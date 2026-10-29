@@ -4,7 +4,7 @@ import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/render
 // A react-pdf recreation of the on-screen Detailed Quote printable.
 // Receives only plain, pre-formatted strings (all money/date/locale formatting
 // is done server-side by the print page). Uses built-in react-pdf fonts:
-// Times-Bold for the serif headings (matches the Georgia display font on
+// Helvetica-Bold for the headings (matches the sans display font on
 // screen), Helvetica/Helvetica-Bold for body and the line-items table.
 // No Font.register needed.
 
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     marginRight: 14
   },
   businessName: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 18,
     color: COLORS.deepPine
   },
@@ -104,7 +104,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end"
   },
   docTitle: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 26,
     color: COLORS.moss
   },
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     color: COLORS.clay
   },
   totalValue: {
-    fontFamily: "Times-Bold",
+    fontFamily: "Helvetica-Bold",
     fontSize: 17,
     color: COLORS.deepPine
   },

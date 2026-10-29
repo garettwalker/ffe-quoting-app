@@ -1,0 +1,699 @@
+<title>Font Pairings</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&family=Source+Sans+3:wght@400;500;600;700&family=Source+Serif+4:wght@500;600;700&family=Inter:wght@400;500;600;700&family=Inter+Tight:wght@500;600;700&family=Libre+Franklin:wght@400;500;600;700&family=Libre+Baskerville:wght@400;700&display=swap">
+
+<style>
+  /* Layout concept: a quiet review sheet. The type does the talking, so the
+     chrome stays warm, flat, and out of the way. */
+  :root {
+    --paper: #f2ece1;
+    --surface: #fffdf8;
+    --surface-2: #f7f1e7;
+    --ink: #1d211d;
+    --muted: #5f6157;
+    --line: #d9d0bf;
+    --pine: #344236;
+    --deep-pine: #243027;
+    --clay: #a56543;
+    --sage: #a8ae91;
+    --good: #0f7a3d;
+    --display: Georgia, "Times New Roman", serif;
+    --body: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --radius: 18px;
+    --shadow: 0 18px 50px rgba(29, 33, 29, 0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #141713;
+      --surface: #1e231e;
+      --surface-2: #252b25;
+      --ink: #f1eee5;
+      --muted: #b9b6aa;
+      --line: #3b423a;
+      --pine: #dbe3d7;
+      --deep-pine: #eef3ec;
+      --clay: #d18f67;
+      --sage: #7b8467;
+      --good: #57c98a;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #141713;
+    --surface: #1e231e;
+    --surface-2: #252b25;
+    --ink: #f1eee5;
+    --muted: #b9b6aa;
+    --line: #3b423a;
+    --pine: #dbe3d7;
+    --deep-pine: #eef3ec;
+    --clay: #d18f67;
+    --sage: #7b8467;
+    --good: #57c98a;
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+
+  /* Pairings */
+  .f-current { --display: Georgia, "Times New Roman", serif; --body: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-plex { --display: "IBM Plex Serif", Georgia, "Times New Roman", serif; --body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-source { --display: "Source Serif 4", Georgia, "Times New Roman", serif; --body: "Source Sans 3", ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-inter { --display: "Inter Tight", Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; --body: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  .f-franklin { --display: "Libre Baskerville", Georgia, "Times New Roman", serif; --body: "Libre Franklin", ui-sans-serif, system-ui, -apple-system, sans-serif; }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+    transition: background 180ms ease;
+  }
+
+  .shell { max-width: 1120px; margin: 0 auto; padding-block: clamp(28px, 5vw, 56px) 64px; }
+
+  .eyebrow {
+    margin: 0 0 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  h1, h2, h3, h4, p { margin: 0; }
+
+  .page-title {
+    font-family: var(--display);
+    font-size: clamp(38px, 6vw, 58px);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    color: var(--deep-pine);
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin-top: 16px;
+    max-width: 62ch;
+    font-size: 17px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .masthead { margin-bottom: 30px; }
+
+  .tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 18px;
+  }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--pine);
+    border-radius: 999px;
+    padding: 9px 15px;
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    min-height: 42px;
+  }
+
+  .tab:hover { border-color: var(--clay); }
+
+  .tab[aria-selected="true"] {
+    background: var(--pine);
+    border-color: var(--pine);
+    color: var(--surface);
+  }
+
+  .tab:focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
+
+  .tab small {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    opacity: 0.72;
+    margin-top: 2px;
+  }
+
+  .review {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 310px;
+    gap: 18px;
+    align-items: start;
+  }
+
+  @media (max-width: 860px) {
+    .review { grid-template-columns: 1fr; }
+  }
+
+  /* App sample */
+  .app {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .app-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+  }
+
+  .brand-mark {
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: var(--pine);
+    color: var(--surface);
+    display: grid;
+    place-items: center;
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 700;
+    flex: none;
+  }
+
+  .brand-name {
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: var(--deep-pine);
+    white-space: nowrap;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    overflow: hidden;
+  }
+
+  .nav-links span:first-child { color: var(--deep-pine); }
+
+  @media (max-width: 620px) {
+    .nav-links { display: none; }
+  }
+
+  .new-quote {
+    border: 0;
+    border-radius: 999px;
+    background: var(--clay);
+    color: #fffdf8;
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 700;
+    padding: 9px 14px;
+    white-space: nowrap;
+    min-height: 38px;
+  }
+
+  .app-body { padding: clamp(18px, 3.5vw, 30px); }
+
+  .sample-eyebrow {
+    font-family: var(--body);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--clay);
+    margin-bottom: 8px;
+  }
+
+  .sample-title {
+    font-family: var(--display);
+    font-size: clamp(30px, 4.6vw, 42px);
+    line-height: 1.06;
+    letter-spacing: -0.03em;
+    font-weight: 700;
+    color: color-mix(in srgb, var(--pine) 82%, var(--sage));
+    text-wrap: balance;
+  }
+
+  .sample-copy {
+    margin-top: 10px;
+    max-width: 56ch;
+    font-size: 14.5px;
+    line-height: 1.62;
+    color: var(--muted);
+  }
+
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 22px;
+  }
+
+  @media (max-width: 560px) {
+    .kpis { grid-template-columns: 1fr; }
+  }
+
+  .kpi {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface-2);
+    padding: 14px;
+    min-width: 0;
+  }
+
+  .kpi-label {
+    font-family: var(--body);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--clay);
+    margin-bottom: 4px;
+  }
+
+  .kpi-value {
+    font-family: var(--display);
+    font-size: clamp(22px, 3.4vw, 29px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--deep-pine);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .kpi-note {
+    margin-top: 3px;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .table-wrap { margin-top: 20px; overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+
+  th {
+    text-align: left;
+    font-family: var(--body);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    padding: 9px 12px 9px 0;
+    white-space: nowrap;
+  }
+
+  td {
+    border-bottom: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    padding: 12px 12px 12px 0;
+    vertical-align: top;
+  }
+
+  .job { font-weight: 700; color: var(--deep-pine); }
+  .job small { display: block; font-size: 11.5px; font-weight: 500; color: var(--muted); margin-top: 2px; }
+  .money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .due { color: var(--clay); font-weight: 700; }
+  .badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 10.5px;
+    font-weight: 700;
+    background: color-mix(in srgb, var(--sage) 34%, transparent);
+    color: var(--deep-pine);
+    white-space: nowrap;
+  }
+  .badge.partial { background: color-mix(in srgb, var(--clay) 18%, transparent); color: var(--clay); }
+
+  .sample-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+
+  .btn {
+    border-radius: 999px;
+    border: 1px solid var(--pine);
+    background: var(--pine);
+    color: var(--surface);
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px 16px;
+    min-height: 42px;
+  }
+
+  .btn.secondary { background: transparent; color: var(--pine); border-color: var(--line); }
+
+  /* Side panel */
+  .panel {
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+    padding: 20px;
+  }
+
+  .panel h2 {
+    font-family: var(--display);
+    font-size: 22px;
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    color: var(--deep-pine);
+    margin-bottom: 4px;
+  }
+
+  .pairing {
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--clay);
+    margin-bottom: 12px;
+  }
+
+  .rationale {
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: var(--muted);
+  }
+
+  .rating {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 14px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rating li {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+  }
+
+  .rating li.on { border-color: var(--sage); color: var(--deep-pine); background: color-mix(in srgb, var(--sage) 22%, transparent); }
+
+  .specimen { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 16px; }
+  .specimen p { margin-bottom: 10px; }
+  .spec-h1 { font-family: var(--display); font-size: 30px; line-height: 1.08; letter-spacing: -0.03em; font-weight: 700; color: var(--deep-pine); }
+  .spec-h2 { font-family: var(--display); font-size: 20px; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); }
+  .spec-body { font-size: 13.5px; line-height: 1.6; color: var(--muted); }
+  .spec-label { font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--clay); }
+  .spec-number { font-family: var(--display); font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+
+  .compare { margin-top: 30px; }
+  .compare h2 {
+    font-family: var(--display);
+    font-size: 24px;
+    letter-spacing: -0.02em;
+    color: var(--deep-pine);
+    margin-bottom: 12px;
+  }
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 12px;
+  }
+
+  .mini {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+    padding: 14px;
+  }
+
+  .mini .mini-name { font-family: var(--body); font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+  .mini .mini-big { font-family: var(--display); font-size: 21px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.12; color: var(--deep-pine); margin-top: 6px; }
+  .mini .mini-body { font-family: var(--body); font-size: 12px; line-height: 1.55; color: var(--muted); margin-top: 6px; }
+
+  .footnote {
+    margin-top: 26px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 78ch;
+  }
+
+  .footnote strong { color: var(--deep-pine); }
+
+  @media (prefers-reduced-motion: reduce) {
+    body { transition: none; }
+  }
+</style>
+
+<body class="f-plex">
+  <main class="shell">
+    <header class="masthead">
+      <p class="eyebrow">Typography review</p>
+      <h1 class="page-title">A steadier hand.</h1>
+      <p class="lede">
+        The app currently pairs Georgia headings with Inter body text. Georgia has a bookish,
+        slightly storybook curve that reads as whimsical on an invoice. These four pairings keep
+        the warm FFE palette but give the headings a more professional voice. Switch between them
+        below. Nothing is changed in the live app.
+      </p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Font options">
+      <button class="tab" role="tab" data-key="current" aria-selected="false">Current<small>Georgia + Inter</small></button>
+      <button class="tab" role="tab" data-key="plex" aria-selected="true">A · IBM Plex<small>Sans + Serif</small></button>
+      <button class="tab" role="tab" data-key="source" aria-selected="false">B · Source<small>Sans 3 + Serif 4</small></button>
+      <button class="tab" role="tab" data-key="inter" aria-selected="false">C · Inter Tight<small>All sans</small></button>
+      <button class="tab" role="tab" data-key="franklin" aria-selected="false">D · Franklin<small>Franklin + Baskerville</small></button>
+    </div>
+
+    <div class="review">
+      <section class="app" aria-label="Live app sample">
+        <div class="app-bar">
+          <div class="brand">
+            <span class="brand-mark">F</span>
+            <span class="brand-name">FREEDOM FAMILY ELECTRIC</span>
+          </div>
+          <div class="nav-links" aria-hidden="true">
+            <span>Dashboard</span><span>Quotes</span><span>Customers</span><span>Receivables</span>
+          </div>
+          <button type="button" class="new-quote">+ New Quote</button>
+        </div>
+
+        <div class="app-body">
+          <p class="sample-eyebrow">Accounts Receivable</p>
+          <p class="sample-title">Who owes what.</p>
+          <p class="sample-copy">
+            Every invoiced job in one place. Pending Payments shows what is still outstanding.
+            Historical Paid shows jobs that are paid in full.
+          </p>
+
+          <div class="kpis">
+            <div class="kpi">
+              <p class="kpi-label">Total Invoiced</p>
+              <p class="kpi-value">$284,310</p>
+              <p class="kpi-note">14 jobs this quarter</p>
+            </div>
+            <div class="kpi">
+              <p class="kpi-label">Total Outstanding</p>
+              <p class="kpi-value">$61,884</p>
+              <p class="kpi-note">6 jobs still open</p>
+            </div>
+            <div class="kpi">
+              <p class="kpi-label">Total Paid</p>
+              <p class="kpi-value">$222,426</p>
+              <p class="kpi-note">78.2% collected</p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Job</th>
+                  <th scope="col">Rough-In</th>
+                  <th scope="col">Finish</th>
+                  <th scope="col">Outstanding</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="job">Coleman Residence<small>Camel City Construction</small></td>
+                  <td class="money">$20,482 <span class="badge">Paid</span></td>
+                  <td class="money">$20,482 <span class="badge partial">Partial</span></td>
+                  <td class="money due">$8,140</td>
+                </tr>
+                <tr>
+                  <td class="job">Conrad Road<small>Camel City Construction</small></td>
+                  <td class="money">$18,952 <span class="badge">Paid</span></td>
+                  <td class="money">$18,952 <span class="badge">Paid</span></td>
+                  <td class="money">$0</td>
+                </tr>
+                <tr>
+                  <td class="job">Burke Residence<small>Darren Burke</small></td>
+                  <td class="money">$30,945 <span class="badge">Paid</span></td>
+                  <td class="money">$31,947 <span class="badge partial">Partial</span></td>
+                  <td class="money due">$15,947</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="sample-actions">
+            <button type="button" class="btn">Record payment</button>
+            <button type="button" class="btn secondary">View invoice</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="panel" aria-live="polite">
+        <h2 id="option-name">IBM Plex</h2>
+        <p class="pairing" id="option-pairing">IBM Plex Serif headings · IBM Plex Sans body</p>
+        <p class="rationale" id="option-note">
+          Drawn for technical documentation, so it carries an engineered, squared confidence
+          without feeling cold. The serif is firm enough for invoice headers and the sans is
+          exceptionally clear in tables.
+        </p>
+        <ul class="rating" id="option-rating">
+          <li class="on">Professional</li><li class="on">Technical</li><li>Neutral</li><li>Traditional</li>
+        </ul>
+
+        <div class="specimen f-plex" id="specimen">
+          <p class="spec-h1">Who owes what.</p>
+          <p class="spec-h2">Pending payments</p>
+          <p class="spec-body">Invoice INV-0042 was emailed on October 24. The balance shown includes the partial payment recorded on October 27.</p>
+          <p class="spec-label">Total outstanding</p>
+          <p class="spec-number">$61,884.00</p>
+        </div>
+      </aside>
+    </div>
+
+    <section class="compare">
+      <h2>At a glance</h2>
+      <div class="compare-grid">
+        <div class="mini f-current">
+          <p class="mini-name">Current</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Georgia has a soft, literary curve that reads friendly but less formal.</p>
+        </div>
+        <div class="mini f-plex">
+          <p class="mini-name">A · IBM Plex</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Squared and steady. Reads like a well-run trade business.</p>
+        </div>
+        <div class="mini f-source">
+          <p class="mini-name">B · Source</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Humanist and calm. Warm without the storybook feel.</p>
+        </div>
+        <div class="mini f-inter">
+          <p class="mini-name">C · Inter Tight</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Modern software. The most neutral and understated option.</p>
+        </div>
+        <div class="mini f-franklin">
+          <p class="mini-name">D · Franklin</p>
+          <p class="mini-big">Who owes what.</p>
+          <p class="mini-body">Printed-document feel. Conservative and unmistakably business.</p>
+        </div>
+      </div>
+    </section>
+
+    <p class="footnote">
+      <strong>Recommendation:</strong> Option A. IBM Plex keeps a serif headline, which suits a
+      contractor's printed quotes and invoices, while removing the literary flourish of Georgia.
+      Option C is the safest if you would rather drop serifs entirely.
+    </p>
+  </main>
+
+  <script>
+    const OPTIONS = {
+      current: {
+        name: "Current",
+        pairing: "Georgia headings · Inter body",
+        note: "The baseline. Georgia's soft, literary curves give the app a friendly, bookish tone. It is legible, but on quotes and invoices it reads less like a contractor's paperwork and more like a storybook.",
+        rating: ["Friendly", "Readable", "Whimsical"]
+      },
+      plex: {
+        name: "IBM Plex",
+        pairing: "IBM Plex Serif headings · IBM Plex Sans body",
+        note: "Drawn for technical documentation, so it carries an engineered, squared confidence without feeling cold. The serif is firm enough for invoice headers and the sans is exceptionally clear in tables.",
+        rating: ["Professional", "Technical", "Neutral", "Traditional"]
+      },
+      source: {
+        name: "Source",
+        pairing: "Source Serif 4 headings · Source Sans 3 body",
+        note: "Adobe's open pair. The serif is humanist and calm with a slightly softer finish than Plex, and the sans is one of the most readable UI faces at small sizes. Professional with a little more warmth.",
+        rating: ["Professional", "Warm", "Readable"]
+      },
+      inter: {
+        name: "Inter Tight",
+        pairing: "Inter Tight headings · Inter body",
+        note: "A single-family system with a tightened display cut. Nothing decorative, nothing dated. If you want the app to read like modern business software and never call attention to its type, this is it.",
+        rating: ["Professional", "Modern", "Neutral", "Understated"]
+      },
+      franklin: {
+        name: "Franklin",
+        pairing: "Libre Baskerville headings · Libre Franklin body",
+        note: "The most traditional of the four. Libre Baskerville gives documents a printed, contractual weight, and Libre Franklin is a sturdy newspaper gothic underneath. Conservative, clear, and very businesslike.",
+        rating: ["Professional", "Traditional", "Formal"]
+      }
+    };
+
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    const specimen = document.getElementById("specimen");
+    const els = {
+      name: document.getElementById("option-name"),
+      pairing: document.getElementById("option-pairing"),
+      note: document.getElementById("option-note"),
+      rating: document.getElementById("option-rating")
+    };
+
+    function select(key) {
+      const option = OPTIONS[key] || OPTIONS.plex;
+      document.body.className = "f-" + key;
+      specimen.className = "specimen f-" + key;
+      tabs.forEach((tab) => {
+        tab.setAttribute("aria-selected", String(tab.dataset.key === key));
+      });
+      els.name.textContent = option.name;
+      els.pairing.textContent = option.pairing;
+      els.note.textContent = option.note;
+      els.rating.innerHTML = option.rating
+        .map((label) => '<li class="on">' + label + "</li>")
+        .join("");
+    }
+
+    tabs.forEach((tab) => {
+      tab.addEventListener("click", () => select(tab.dataset.key));
+    });
+
+    select("plex");
+  </script>
+</body>

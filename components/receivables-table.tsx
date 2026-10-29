@@ -101,8 +101,13 @@ export function ReceivablesTable({ jobs }: ReceivablesTableProps) {
   const [period, setPeriod] = useState<Period>("all");
   const [sort, setSort] = useState<Sort>("oldest");
 
-  const { pending, historical, filteredInvoiced, filteredOutstanding } =
-    useMemo(() => {
+  const {
+    pending,
+    historical,
+    filteredInvoiced,
+    filteredOutstanding,
+    filteredPaid
+  } = useMemo(() => {
       const range = periodRange(period);
 
       const inPeriod = (job: ReceivableJob) => {
@@ -142,55 +147,72 @@ export function ReceivablesTable({ jobs }: ReceivablesTableProps) {
         0
       );
 
-      return { pending, historical, filteredInvoiced, filteredOutstanding };
+      return {
+        pending,
+        historical,
+        filteredInvoiced,
+        filteredOutstanding,
+        filteredPaid: filteredInvoiced - filteredOutstanding
+      };
     }, [jobs, period, sort]);
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {PERIODS.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => setPeriod(option.value)}
-              className={
-                period === option.value
-                  ? "rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card"
-                  : "rounded-full border border-pine/20 bg-whitewarm px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine/10"
-              }
+      <div className="space-y-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {PERIODS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriod(option.value)}
+                className={
+                  period === option.value
+                    ? "rounded-full bg-pine px-4 py-2 text-sm font-black text-whitewarm shadow-card"
+                    : "rounded-full border border-pine/20 bg-whitewarm px-4 py-2 text-sm font-black text-deep-pine hover:bg-pine/10"
+                }
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <label className="flex items-center gap-2 text-sm font-black text-deep-pine">
+            <span className="uppercase tracking-[0.12em] text-clay">Sort</span>
+            <select
+              value={sort}
+              onChange={(event) => setSort(event.target.value as Sort)}
+              className="focus-ring min-h-12 rounded-soft border border-pine/20 bg-whitewarm px-3 font-bold text-charcoal"
             >
-              {option.label}
-            </button>
-          ))}
+              {SORTS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
-        <label className="flex items-center gap-2 text-sm font-black text-deep-pine">
-          <span className="uppercase tracking-[0.12em] text-clay">Sort</span>
-          <select
-            value={sort}
-            onChange={(event) => setSort(event.target.value as Sort)}
-            className="focus-ring min-h-12 rounded-soft border border-pine/20 bg-whitewarm px-3 font-bold text-charcoal"
-          >
-            {SORTS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <SummaryCard
+            label="Total Invoiced"
+            value={formatCurrency(filteredInvoiced)}
+          />
+          <SummaryCard
+            label="Total Outstanding"
+            value={formatCurrency(filteredOutstanding)}
+            emphasize={filteredOutstanding > 0}
+          />
+          <SummaryCard label="Total Paid" value={formatCurrency(filteredPaid)} />
+        </div>
 
-      {period !== "all" ? (
-        <p className="rounded-soft border border-pine/10 bg-cream px-4 py-3 text-sm font-bold text-charcoal/70">
-          Showing {pending.length + historical.length} jobs first invoiced in
-          this period. Outstanding in period:{" "}
-          <span className="font-black text-clay">
-            {formatCurrency(filteredOutstanding)}
-          </span>{" "}
-          of {formatCurrency(filteredInvoiced)} invoiced.
-        </p>
-      ) : null}
+        {period !== "all" ? (
+          <p className="rounded-soft border border-pine/10 bg-cream px-4 py-3 text-sm font-bold text-charcoal/70">
+            Showing {pending.length + historical.length} jobs first invoiced in
+            this period. The totals above reflect that selection.
+          </p>
+        ) : null}
+      </div>
 
       <ReceivablesSection
         eyebrow="Pending Payments"
@@ -211,6 +233,39 @@ export function ReceivablesTable({ jobs }: ReceivablesTableProps) {
         count={historical.length}
         countTone="paid"
       />
+    </div>
+  );
+}
+
+function SummaryCard({
+  label,
+  value,
+  emphasize
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div
+      className={
+        emphasize
+          ? "rounded-xl2 border border-clay/30 bg-clay/10 p-5 shadow-soft"
+          : "rounded-xl2 border border-pine/10 bg-whitewarm/75 p-5 shadow-soft"
+      }
+    >
+      <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
+        {label}
+      </p>
+      <p
+        className={
+          emphasize
+            ? "font-display text-3xl font-bold text-clay"
+            : "font-display text-3xl font-bold text-deep-pine"
+        }
+      >
+        {value}
+      </p>
     </div>
   );
 }

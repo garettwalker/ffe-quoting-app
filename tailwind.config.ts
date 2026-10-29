@@ -31,6 +31,8 @@ const config: Config = {
       },
       fontFamily: {
         body: [
+          "var(--font-inter-tight)",
+          "Inter Tight",
           "Inter",
           "ui-sans-serif",
           "system-ui",
@@ -39,7 +41,17 @@ const config: Config = {
           "Segoe UI",
           "sans-serif"
         ],
-        display: ["Georgia", "Times New Roman", "serif"]
+        display: [
+          "var(--font-inter-tight)",
+          "Inter Tight",
+          "Inter",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "BlinkMacSystemFont",
+          "Segoe UI",
+          "sans-serif"
+        ]
       },
       keyframes: {
         "project-pulse": {

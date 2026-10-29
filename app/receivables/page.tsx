@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { ReceivablesTable } from "@/components/receivables-table";
-import { formatCurrency } from "@/lib/currency";
 import {
   invoiceIsReceivable,
   invoiceDisplayNumber,
@@ -178,19 +177,6 @@ export default async function ReceivablesPage() {
     )
     .filter((job): job is ReceivableJob => Boolean(job));
 
-  // Page-level totals across every job (independent of the client-side period
-  // filter, which only narrows what is displayed, not the headline figures).
-  // These count only receivable (billed) invoices.
-  const totalInvoiced = jobs.reduce(
-    (sum, job) => sum + job.totalInvoicedCents,
-    0
-  );
-  const totalOutstanding = jobs.reduce(
-    (sum, job) => sum + job.totalOutstandingCents,
-    0
-  );
-  const totalPaid = totalInvoiced - totalOutstanding;
-
   // True when the query hit its cap: invoiced jobs older than the cap are
   // dropped, so the headline totals would undercount. Tell the owner.
   const capped = rows.length >= RECEIVABLES_LIMIT;
@@ -206,16 +192,6 @@ export default async function ReceivablesPage() {
           cap in app/receivables/page.tsx to fix the count.
         </p>
       ) : null}
-
-      <div className="mb-8 grid gap-3 sm:grid-cols-3">
-        <SummaryCard label="Total Invoiced" value={formatCurrency(totalInvoiced)} />
-        <SummaryCard
-          label="Total Outstanding"
-          value={formatCurrency(totalOutstanding)}
-          emphasize={totalOutstanding > 0}
-        />
-        <SummaryCard label="Total Paid" value={formatCurrency(totalPaid)} />
-      </div>
 
       <ReceivablesTable jobs={jobs} />
     </AppShell>
@@ -244,39 +220,6 @@ function ReceivablesHeader() {
         Every invoiced job in one place. Pending Payments shows what is still
         outstanding; Historical Paid shows jobs that are paid in full. Filter by
         period and sort to follow up on balances.
-      </p>
-    </div>
-  );
-}
-
-function SummaryCard({
-  label,
-  value,
-  emphasize
-}: {
-  label: string;
-  value: string;
-  emphasize?: boolean;
-}) {
-  return (
-    <div
-      className={
-        emphasize
-          ? "rounded-xl2 border border-clay/30 bg-clay/10 p-5 shadow-soft"
-          : "rounded-xl2 border border-pine/10 bg-whitewarm/75 p-5 shadow-soft"
-      }
-    >
-      <p className="mb-1 text-sm font-black uppercase tracking-[0.16em] text-clay">
-        {label}
-      </p>
-      <p
-        className={
-          emphasize
-            ? "font-display text-3xl font-bold text-clay"
-            : "font-display text-3xl font-bold text-deep-pine"
-        }
-      >
-        {value}
       </p>
     </div>
   );

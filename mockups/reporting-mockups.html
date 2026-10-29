@@ -1,0 +1,1356 @@
+<title>Reporting Mockups</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600;700&display=swap">
+
+<style>
+  /* Layout concept: a working reports desk. Warm paper, one clear filter row,
+     charts on quiet cards, numbers that line up. */
+  :root {
+    --paper: #f2ece1;
+    --surface: #fffdf8;
+    --surface-2: #f7f1e7;
+    --ink: #1d211d;
+    --muted: #5f6157;
+    --line: #d9d0bf;
+    --line-soft: #e8e0d1;
+    --pine: #344236;
+    --deep-pine: #243027;
+    --clay: #a56543;
+    --sage: #a8ae91;
+    --good: #0f7a3d;
+    --bad: #b23b3b;
+    --s1: #2a78d6;
+    --s2: #1baf7a;
+    --s3: #eb6834;
+    --s4: #eda100;
+    --seq1: #2a78d6;
+    --seq2: #5598e7;
+    --seq3: #86b6ef;
+    --seq4: #b7d3f6;
+    --seq5: #cde2fb;
+    --radius: 18px;
+    --shadow: 0 18px 50px rgba(29, 33, 29, 0.08);
+    --display: "IBM Plex Serif", Georgia, "Times New Roman", serif;
+    --body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #141713;
+      --surface: #1e231e;
+      --surface-2: #252b25;
+      --ink: #f1eee5;
+      --muted: #b9b6aa;
+      --line: #3b423a;
+      --line-soft: #2e352e;
+      --pine: #dbe3d7;
+      --deep-pine: #eef3ec;
+      --clay: #d18f67;
+      --sage: #7b8467;
+      --good: #57c98a;
+      --bad: #e68181;
+      --s1: #3987e5;
+      --s2: #199e70;
+      --s3: #d95926;
+      --s4: #c98500;
+      --seq1: #3987e5;
+      --seq2: #2a78d6;
+      --seq3: #256abf;
+      --seq4: #1c5cab;
+      --seq5: #184f95;
+      --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #141713;
+    --surface: #1e231e;
+    --surface-2: #252b25;
+    --ink: #f1eee5;
+    --muted: #b9b6aa;
+    --line: #3b423a;
+    --line-soft: #2e352e;
+    --pine: #dbe3d7;
+    --deep-pine: #eef3ec;
+    --clay: #d18f67;
+    --sage: #7b8467;
+    --good: #57c98a;
+    --bad: #e68181;
+    --s1: #3987e5;
+    --s2: #199e70;
+    --s3: #d95926;
+    --s4: #c98500;
+    --seq1: #3987e5;
+    --seq2: #2a78d6;
+    --seq3: #256abf;
+    --seq4: #1c5cab;
+    --seq5: #184f95;
+    --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.5;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 0;
+  }
+
+  .shell { max-width: 1180px; margin: 0 auto; padding-block: clamp(28px, 5vw, 54px) 72px; }
+
+  h1, h2, h3, h4, p { margin: 0; }
+
+  .eyebrow {
+    margin-bottom: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .page-title {
+    font-family: var(--display);
+    font-size: clamp(38px, 6vw, 58px);
+    line-height: 1.04;
+    letter-spacing: -0.035em;
+    font-weight: 700;
+    color: var(--deep-pine);
+    text-wrap: balance;
+  }
+
+  .lede {
+    margin-top: 16px;
+    max-width: 66ch;
+    font-size: 16.5px;
+    line-height: 1.65;
+    color: var(--muted);
+  }
+
+  .masthead { margin-bottom: 28px; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+
+  .tab {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--pine);
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-family: var(--body);
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 44px;
+    cursor: pointer;
+  }
+
+  .tab:hover { border-color: var(--clay); }
+  .tab[aria-selected="true"] { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+  .tab:focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
+  .tab small { display: block; font-size: 11px; font-weight: 500; opacity: 0.72; margin-top: 2px; }
+
+  .option-note {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+    align-items: baseline;
+    margin-bottom: 18px;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  .option-note strong { color: var(--deep-pine); }
+
+  .report {
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .report-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 20px 22px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .report-title {
+    font-family: var(--display);
+    font-size: clamp(24px, 3.4vw, 32px);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--deep-pine);
+  }
+
+  .report-sub { margin-top: 4px; font-size: 13px; color: var(--muted); }
+
+  .report-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--pine);
+    border-radius: 999px;
+    padding: 9px 14px;
+    font-family: var(--body);
+    font-size: 12.5px;
+    font-weight: 700;
+    min-height: 40px;
+    cursor: pointer;
+  }
+
+  .btn.primary { background: var(--pine); border-color: var(--pine); color: var(--surface); }
+  .btn.tiny { min-height: 34px; padding: 6px 11px; font-size: 11.5px; }
+  .btn[aria-pressed="true"] { background: var(--pine); color: var(--surface); border-color: var(--pine); }
+  .btn:focus-visible { outline: 3px solid var(--clay); outline-offset: 2px; }
+
+  /* Filter bar */
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    align-items: flex-end;
+    padding: 14px 22px;
+    background: var(--surface-2);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .filter { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+
+  .filter-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 3px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+  }
+
+  .seg button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 7px 12px;
+    font-family: var(--body);
+    font-size: 12px;
+    font-weight: 600;
+    min-height: 34px;
+    cursor: pointer;
+  }
+
+  .seg button[aria-pressed="true"] { background: var(--pine); color: var(--surface); }
+  .seg button:focus-visible { outline: 2px solid var(--clay); outline-offset: 1px; }
+
+  select {
+    appearance: none;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 9px 30px 9px 11px;
+    font-family: var(--body);
+    font-size: 12.5px;
+    font-weight: 600;
+    min-height: 38px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 16px, calc(100% - 10px) 16px;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+  }
+
+  .report-body { padding: 18px 22px 22px; }
+
+  /* Cards and grids */
+  .kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .kpis.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+  @media (max-width: 900px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 520px) { .kpis, .kpis.three { grid-template-columns: 1fr; } }
+
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface);
+    padding: 16px;
+    min-width: 0;
+  }
+
+  .kpi-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+
+  .kpi-value {
+    margin-top: 5px;
+    font-family: var(--display);
+    font-size: clamp(24px, 3.2vw, 31px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--deep-pine);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+
+  .kpi-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+
+  .delta { font-weight: 700; font-variant-numeric: tabular-nums; }
+  .delta.up { color: var(--good); }
+  .delta.down { color: var(--bad); }
+
+  .grid-2 { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .grid-half { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+
+  @media (max-width: 900px) {
+    .grid-2, .grid-3, .grid-half { grid-template-columns: 1fr; }
+  }
+
+  .card-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; margin-bottom: 10px; }
+
+  .card-title { font-family: var(--display); font-size: 18px; font-weight: 600; letter-spacing: -0.015em; color: var(--deep-pine); }
+  .card-note { font-size: 11.5px; color: var(--muted); }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 2px 0 8px; font-size: 11.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+
+  .chart-scroll { overflow-x: auto; overflow-y: hidden; }
+  .chart { width: 100%; min-width: 520px; }
+  .chart.short { min-width: 320px; }
+  .chart svg { display: block; width: 100%; height: auto; }
+  .chart text { font-family: var(--body); }
+  .axis-label { font-size: 10px; fill: var(--muted); }
+  .grid-line { stroke: var(--line-soft); stroke-width: 1; }
+  .baseline { stroke: var(--line); stroke-width: 1; }
+  .bar-hit { cursor: default; }
+
+  /* Horizontal bars */
+  .hbars { display: flex; flex-direction: column; gap: 9px; }
+  .hbar { display: grid; grid-template-columns: minmax(84px, 128px) minmax(0, 1fr) auto; align-items: center; gap: 10px; min-width: 0; }
+  .hbar-label { font-size: 12px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hbar-track { height: 10px; border-radius: 4px; background: var(--surface-2); border: 1px solid var(--line-soft); overflow: hidden; }
+  .hbar-fill { display: block; height: 100%; border-radius: 3px; }
+  .hbar-value { font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  @media (max-width: 520px) {
+    .hbar { grid-template-columns: 84px minmax(0, 1fr) auto; }
+  }
+
+  /* Funnel */
+  .funnel { display: flex; flex-direction: column; gap: 8px; }
+  .funnel-row { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto; align-items: center; gap: 9px; }
+  .funnel-stage { font-size: 11.5px; font-weight: 600; color: var(--muted); }
+  .funnel-track { height: 18px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+  .funnel-fill { display: block; height: 100%; border-radius: 3px; }
+  .funnel-value { font-size: 11px; font-weight: 700; color: var(--deep-pine); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .funnel-rate { font-size: 10.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  /* Tables */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th {
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.11em;
+    text-transform: uppercase;
+    color: var(--muted);
+    border-bottom: 1px solid var(--line);
+    padding: 8px 10px 8px 0;
+    white-space: nowrap;
+  }
+  td {
+    border-bottom: 1px solid var(--line-soft);
+    padding: 9px 10px 9px 0;
+    vertical-align: middle;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; padding-right: 0; }
+  th.num { text-align: right; }
+  .name { font-weight: 600; color: var(--deep-pine); }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    background: color-mix(in srgb, var(--sage) 30%, transparent);
+    color: var(--deep-pine);
+    white-space: nowrap;
+  }
+
+  /* Option 3: builder layout */
+  .builder { display: grid; grid-template-columns: 256px minmax(0, 1fr); min-height: 640px; }
+  @media (max-width: 900px) { .builder { grid-template-columns: 1fr; } }
+
+  .rail {
+    border-right: 1px solid var(--line);
+    background: var(--surface);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .rail { border-right: 0; border-bottom: 1px solid var(--line); }
+  }
+
+  .rail-group { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+  .rail-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--clay);
+  }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--ink); min-height: 26px; }
+  .check input { width: 15px; height: 15px; accent-color: var(--pine); }
+  .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .date-row input {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 12px;
+    padding: 8px 9px;
+    min-height: 36px;
+  }
+  .rail .btn { width: 100%; }
+
+  .canvas { padding: 18px 20px 22px; min-width: 0; }
+  .canvas-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: flex-end; margin-bottom: 14px; }
+  .canvas-title { font-family: var(--display); font-size: 24px; line-height: 1.1; letter-spacing: -0.025em; color: var(--deep-pine); }
+  .canvas-sub { margin-top: 3px; font-size: 12px; color: var(--muted); }
+
+  .stat-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 22px;
+    padding: 11px 14px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--surface);
+    margin-bottom: 12px;
+  }
+  .stat-strip div { min-width: 0; }
+  .stat-strip .label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--clay); }
+  .stat-strip .value { font-family: var(--display); font-size: 19px; font-weight: 700; color: var(--deep-pine); font-variant-numeric: tabular-nums; }
+
+  .saved-views { display: flex; flex-direction: column; gap: 5px; }
+  .saved-view {
+    text-align: left;
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 8px;
+    padding: 7px 9px;
+    font-family: var(--body);
+    font-size: 12.5px;
+    color: var(--muted);
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .saved-view:hover { background: var(--surface-2); }
+  .saved-view[aria-current="true"] { border-color: var(--line); background: var(--surface-2); color: var(--deep-pine); }
+
+  .note {
+    margin-top: 18px;
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--muted);
+    max-width: 80ch;
+  }
+  .note strong { color: var(--deep-pine); }
+
+  .sample-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  #tip {
+    position: fixed;
+    z-index: 30;
+    pointer-events: none;
+    background: var(--deep-pine);
+    color: var(--surface);
+    border-radius: 7px;
+    padding: 5px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    transform: translate(-50%, -130%);
+    transition: opacity 100ms ease;
+    white-space: nowrap;
+  }
+  #tip.on { opacity: 1; }
+
+  @media (prefers-reduced-motion: reduce) { #tip { transition: none; } }
+</style>
+
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <p class="eyebrow">Reports concept</p>
+      <h1 class="page-title">Numbers that hold up.</h1>
+      <p class="lede">
+        Three layouts for a reporting page built on the same data the app already tracks.
+        Filters change every figure and every chart, not just the rows underneath. Figures are
+        sample data for reviewing the layout. Nothing is connected to Supabase.
+      </p>
+    </header>
+
+    <div class="tabs" role="tablist" aria-label="Report layout options">
+      <button class="tab" role="tab" data-view="one" aria-selected="true">1 · One screen<small>Filters, KPIs, charts</small></button>
+      <button class="tab" role="tab" data-view="two" aria-selected="false">2 · Compare first<small>Year and quarter deltas</small></button>
+      <button class="tab" role="tab" data-view="three" aria-selected="false">3 · Report builder<small>Deep filters, saved views</small></button>
+    </div>
+
+    <div class="option-note">
+      <span class="sample-flag">Sample data</span>
+      <span><strong id="view-name">One screen</strong> <span id="view-desc">keeps the filter row, headline numbers, and comparisons on one page. Best for a weekly look at the business.</span></span>
+    </div>
+
+    <!-- OPTION 1 -->
+    <section id="view-one" class="report" aria-label="Report layout option one">
+      <div class="report-head">
+        <div>
+          <p class="report-title">Business performance</p>
+          <p class="report-sub">January 1 to October 28, 2026 · all customers · all job types</p>
+        </div>
+        <div class="report-actions">
+          <button type="button" class="btn">Export CSV</button>
+          <button type="button" class="btn primary">Email report</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="filter">
+          <span class="filter-label">Period</span>
+          <div class="seg" role="group" aria-label="Period">
+            <button type="button" aria-pressed="false">This month</button>
+            <button type="button" aria-pressed="false">This quarter</button>
+            <button type="button" aria-pressed="true">Year to date</button>
+            <button type="button" aria-pressed="false">Last 12 months</button>
+            <button type="button" aria-pressed="false">Custom</button>
+          </div>
+        </div>
+        <label class="filter">
+          <span class="filter-label">Group by</span>
+          <select>
+            <option>Month</option>
+            <option>Quarter</option>
+            <option>Year</option>
+          </select>
+        </label>
+        <label class="filter">
+          <span class="filter-label">Compare to</span>
+          <select>
+            <option>Prior year</option>
+            <option>Prior period</option>
+            <option>No comparison</option>
+          </select>
+        </label>
+        <label class="filter">
+          <span class="filter-label">Customer</span>
+          <select>
+            <option>All customers</option>
+            <option>Camel City Construction</option>
+            <option>Darren Burke</option>
+            <option>Fulk Builders</option>
+          </select>
+        </label>
+        <label class="filter">
+          <span class="filter-label">Job type</span>
+          <select>
+            <option>All job types</option>
+            <option>New build</option>
+            <option>Service call</option>
+            <option>Direct invoice</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="report-body">
+        <div class="kpis">
+          <div class="card">
+            <p class="kpi-label">Invoiced</p>
+            <p class="kpi-value">$941.4k</p>
+            <p class="kpi-meta"><span class="delta up">+19.3%</span> vs 2025 ($789.0k)</p>
+          </div>
+          <div class="card">
+            <p class="kpi-label">Collected</p>
+            <p class="kpi-value">$874.8k</p>
+            <p class="kpi-meta"><span class="delta up">+21.3%</span> vs 2025 ($721.0k)</p>
+          </div>
+          <div class="card">
+            <p class="kpi-label">Outstanding</p>
+            <p class="kpi-value">$66.6k</p>
+            <p class="kpi-meta"><span class="delta up">-2.1%</span> vs 2025 ($68.0k)</p>
+          </div>
+          <div class="card">
+            <p class="kpi-label">Collected rate</p>
+            <p class="kpi-value">92.9%</p>
+            <p class="kpi-meta"><span class="delta up">+1.5 pts</span> vs 2025 (91.4%)</p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Invoiced and collected by month</h2>
+              <span class="card-note">Thousands of dollars</span>
+            </div>
+            <div class="legend" data-legend="monthly"></div>
+            <div class="chart-scroll"><div class="chart" id="chart-monthly"></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Receivables aging</h2>
+              <span class="card-note">$66.6k open</span>
+            </div>
+            <div class="hbars" id="aging"></div>
+          </div>
+        </div>
+
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-head"><h2 class="card-title">Quarter over quarter</h2></div>
+            <div class="legend" data-legend="quarterly"></div>
+            <div class="chart-scroll"><div class="chart short" id="chart-quarterly"></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2 class="card-title">Top customers</h2></div>
+            <div class="hbars" id="customers"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head"><h2 class="card-title">Quote to paid</h2></div>
+            <div class="funnel" id="funnel"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OPTION 2 -->
+    <section id="view-two" class="report" aria-label="Report layout option two" hidden>
+      <div class="report-head">
+        <div>
+          <p class="report-title">This year against last</p>
+          <p class="report-sub">January 1 to October 28 · all customers · compared with the same period in 2025</p>
+        </div>
+        <div class="seg" role="group" aria-label="Comparison type">
+          <button type="button" aria-pressed="false">Month</button>
+          <button type="button" aria-pressed="false">Quarter</button>
+          <button type="button" aria-pressed="true">Year to date</button>
+        </div>
+      </div>
+
+      <div class="filters">
+        <div class="filter">
+          <span class="filter-label">Compare</span>
+          <div class="seg" role="group" aria-label="Compare">
+            <button type="button" aria-pressed="true">Year over year</button>
+            <button type="button" aria-pressed="false">Quarter over quarter</button>
+            <button type="button" aria-pressed="false">Month over month</button>
+          </div>
+        </div>
+        <label class="filter">
+          <span class="filter-label">Measure</span>
+          <select>
+            <option>Invoiced</option>
+            <option>Collected</option>
+            <option>Outstanding</option>
+            <option>Average job size</option>
+          </select>
+        </label>
+        <label class="filter">
+          <span class="filter-label">Customer</span>
+          <select>
+            <option>All customers</option>
+            <option>Camel City Construction</option>
+            <option>Darren Burke</option>
+            <option>Fulk Builders</option>
+          </select>
+        </label>
+        <label class="filter">
+          <span class="filter-label">Job type</span>
+          <select>
+            <option>All job types</option>
+            <option>New build</option>
+            <option>Service call</option>
+            <option>Direct invoice</option>
+          </select>
+        </label>
+        <div class="filter">
+          <span class="filter-label">Range</span>
+          <div class="seg" role="group" aria-label="Range">
+            <button type="button" aria-pressed="false">Q3</button>
+            <button type="button" aria-pressed="true">YTD</button>
+            <button type="button" aria-pressed="false">Last 12 mo</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="report-body">
+        <div class="kpis">
+          <div class="card">
+            <p class="kpi-label">Invoiced 2026</p>
+            <p class="kpi-value">$941.4k</p>
+            <p class="kpi-meta">2025 <span class="num">$789.0k</span> · <span class="delta up">+$152.4k / +19.3%</span></p>
+          </div>
+          <div class="card">
+            <p class="kpi-label">Collected 2026</p>
+            <p class="kpi-value">$874.8k</p>
+            <p class="kpi-meta">2025 <span class="num">$721.0k</span> · <span class="delta up">+$153.8k / +21.3%</span></p>
+          </div>
+          <div class="card">
+            <p class="kpi-label">Outstanding 2026</p>
+            <p class="kpi-value">$66.6k</p>
+            <p class="kpi-meta">2025 <span class="num">$68.0k</span> · <span class="delta up">-$1.4k / -2.1%</span></p>
+          </div>
+          <div class="card">
+            <p class="kpi-label">Average invoice</p>
+            <p class="kpi-value">$47.1k</p>
+            <p class="kpi-meta">2025 <span class="num">$41.5k</span> · <span class="delta up">+13.5%</span></p>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Invoiced by month, 2026 against 2025</h2>
+              <span class="card-note">Thousands of dollars</span>
+            </div>
+            <div class="legend" data-legend="yoy"></div>
+            <div class="chart-scroll"><div class="chart" id="chart-yoy"></div></div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Quarter comparison</h2>
+              <button type="button" class="btn tiny">By customer</button>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th scope="col">Quarter</th><th class="num" scope="col">2026</th><th class="num" scope="col">2025</th><th class="num" scope="col">Change</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="name">Q1</td><td class="num">$218.5k</td><td class="num">$199.0k</td><td class="num delta up">+9.8%</td></tr>
+                  <tr><td class="name">Q2</td><td class="num">$277.8k</td><td class="num">$232.0k</td><td class="num delta up">+19.7%</td></tr>
+                  <tr><td class="name">Q3</td><td class="num">$336.3k</td><td class="num">$252.0k</td><td class="num delta up">+33.5%</td></tr>
+                  <tr><td class="name">Q4 to date</td><td class="num">$108.9k</td><td class="num">$96.0k</td><td class="num delta up">+13.4%</td></tr>
+                  <tr><td class="name">Total</td><td class="num">$941.4k</td><td class="num">$789.0k</td><td class="num delta up">+19.3%</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-half">
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Customer movement</h2>
+              <span class="card-note">Invoiced, year to date</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr><th scope="col">Customer</th><th class="num" scope="col">2026</th><th class="num" scope="col">2025</th><th class="num" scope="col">Change</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td class="name">Camel City Construction</td><td class="num">$189.6k</td><td class="num">$112.4k</td><td class="num delta up">+68.7%</td></tr>
+                  <tr><td class="name">Darren Burke</td><td class="num">$158.9k</td><td class="num">$141.2k</td><td class="num delta up">+12.5%</td></tr>
+                  <tr><td class="name">Fulk Builders</td><td class="num">$134.4k</td><td class="num">$98.7k</td><td class="num delta up">+36.2%</td></tr>
+                  <tr><td class="name">Holy Helper GC</td><td class="num">$112.8k</td><td class="num">$86.5k</td><td class="num delta up">+30.4%</td></tr>
+                  <tr><td class="name">Whitaker Homes</td><td class="num">$96.3k</td><td class="num">$74.2k</td><td class="num delta up">+29.8%</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-head">
+              <h2 class="card-title">Where the work came from</h2>
+              <span class="card-note">Share of invoiced</span>
+            </div>
+            <div class="hbars" id="types"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- OPTION 3 -->
+    <section id="view-three" class="report" aria-label="Report layout option three" hidden>
+      <div class="report-head">
+        <div>
+          <p class="report-title">Report builder</p>
+          <p class="report-sub">Saved view · Revenue by quarter · updated when the page loads</p>
+        </div>
+        <div class="report-actions">
+          <button type="button" class="btn">Save view</button>
+          <button type="button" class="btn primary">Run report</button>
+        </div>
+      </div>
+
+      <div class="builder">
+        <aside class="rail" aria-label="Report filters">
+          <div class="rail-group">
+            <span class="rail-title">Date range</span>
+            <select aria-label="Date range preset">
+              <option>Year to date</option>
+              <option>This month</option>
+              <option>This quarter</option>
+              <option>Last 12 months</option>
+              <option>Custom range</option>
+            </select>
+            <div class="date-row">
+              <input type="date" value="2026-01-01" aria-label="Start date">
+              <input type="date" value="2026-10-28" aria-label="End date">
+            </div>
+          </div>
+
+          <div class="rail-group">
+            <span class="rail-title">Compare</span>
+            <label class="check"><input type="checkbox" checked> Prior year</label>
+            <label class="check"><input type="checkbox"> Prior quarter</label>
+            <label class="check"><input type="checkbox"> Prior month</label>
+          </div>
+
+          <div class="rail-group">
+            <span class="rail-title">Group by</span>
+            <select aria-label="Group by">
+              <option>Quarter</option>
+              <option>Month</option>
+              <option>Year</option>
+              <option>Customer</option>
+              <option>Job type</option>
+            </select>
+          </div>
+
+          <div class="rail-group">
+            <span class="rail-title">Customers</span>
+            <label class="check"><input type="checkbox" checked> All customers</label>
+            <label class="check"><input type="checkbox"> Camel City Construction</label>
+            <label class="check"><input type="checkbox"> Darren Burke</label>
+            <label class="check"><input type="checkbox"> Fulk Builders</label>
+            <label class="check"><input type="checkbox"> Holy Helper GC</label>
+          </div>
+
+          <div class="rail-group">
+            <span class="rail-title">Job type</span>
+            <label class="check"><input type="checkbox" checked> New build</label>
+            <label class="check"><input type="checkbox" checked> Service call</label>
+            <label class="check"><input type="checkbox" checked> Direct invoice</label>
+          </div>
+
+          <div class="rail-group">
+            <span class="rail-title">Status</span>
+            <label class="check"><input type="checkbox" checked> Accepted</label>
+            <label class="check"><input type="checkbox" checked> Scheduled</label>
+            <label class="check"><input type="checkbox"> Paid in full</label>
+          </div>
+
+          <div class="rail-group">
+            <span class="rail-title">Saved views</span>
+            <div class="saved-views">
+              <button type="button" class="saved-view" aria-current="true">Revenue by quarter</button>
+              <button type="button" class="saved-view">Collections this month</button>
+              <button type="button" class="saved-view">Camel City history</button>
+              <button type="button" class="saved-view">AR aging over 60</button>
+            </div>
+          </div>
+        </aside>
+
+        <div class="canvas">
+          <div class="canvas-head">
+            <div>
+              <h2 class="canvas-title">Revenue by quarter</h2>
+              <p class="canvas-sub">Invoiced and collected · compared with the same quarters in 2025</p>
+            </div>
+            <div class="seg" role="group" aria-label="Display mode">
+              <button type="button" class="btn tiny" data-display="chart" aria-pressed="true">Chart</button>
+              <button type="button" class="btn tiny" data-display="table" aria-pressed="false">Table</button>
+            </div>
+          </div>
+
+          <div class="stat-strip">
+            <div><p class="label">Invoiced</p><p class="value">$941.4k</p></div>
+            <div><p class="label">Collected</p><p class="value">$874.8k</p></div>
+            <div><p class="label">Open</p><p class="value">$66.6k</p></div>
+            <div><p class="label">Jobs</p><p class="value">20</p></div>
+            <div><p class="label">Avg invoice</p><p class="value">$47.1k</p></div>
+          </div>
+
+          <div data-panel="chart">
+            <div class="card">
+              <div class="card-head">
+                <h3 class="card-title">Quarterly revenue</h3>
+                <span class="card-note">Thousands of dollars</span>
+              </div>
+              <div class="legend" data-legend="quarterly2"></div>
+              <div class="chart-scroll"><div class="chart" id="chart-quarterly2"></div></div>
+            </div>
+
+            <div class="grid-half">
+              <div class="card">
+                <div class="card-head"><h3 class="card-title">Month over month change</h3><span class="card-note">Invoiced</span></div>
+                <div class="chart-scroll"><div class="chart short" id="chart-mom"></div></div>
+              </div>
+              <div class="card">
+                <div class="card-head"><h3 class="card-title">Receivables aging</h3><span class="card-note">$66.6k open</span></div>
+                <div class="hbars" id="aging2"></div>
+              </div>
+            </div>
+          </div>
+
+          <div data-panel="table" hidden>
+            <div class="card">
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th scope="col">Quarter</th><th class="num" scope="col">Invoiced</th><th class="num" scope="col">Collected</th><th class="num" scope="col">Outstanding</th><th class="num" scope="col">Collected rate</th><th class="num" scope="col">vs 2025</th></tr>
+                  </thead>
+                  <tbody>
+                    <tr><td class="name">Q1 2026</td><td class="num">$218.5k</td><td class="num">$197.7k</td><td class="num">$20.8k</td><td class="num">90.5%</td><td class="num delta up">+9.8%</td></tr>
+                    <tr><td class="name">Q2 2026</td><td class="num">$277.8k</td><td class="num">$261.9k</td><td class="num">$15.9k</td><td class="num">94.3%</td><td class="num delta up">+19.7%</td></tr>
+                    <tr><td class="name">Q3 2026</td><td class="num">$336.3k</td><td class="num">$315.8k</td><td class="num">$20.5k</td><td class="num">93.9%</td><td class="num delta up">+33.5%</td></tr>
+                    <tr><td class="name">Q4 2026 to date</td><td class="num">$108.9k</td><td class="num">$99.4k</td><td class="num">$9.5k</td><td class="num">91.3%</td><td class="num delta up">+13.4%</td></tr>
+                    <tr><td class="name">Total</td><td class="num">$941.4k</td><td class="num">$874.8k</td><td class="num">$66.6k</td><td class="num">92.9%</td><td class="num delta up">+19.3%</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <p class="note">
+      <strong>What the three options share:</strong> the same data model the app already has
+      (quotes, invoices, payments, emails, job dates). Every filter recalculates the headline
+      numbers, the charts, and the tables together. The difference is how much control is on the
+      surface: option 1 is a fixed weekly view, option 2 is built around period comparison, and
+      option 3 is a configurable report with saved views.
+    </p>
+  </main>
+
+  <div id="tip" role="status" aria-live="polite"></div>
+
+  <script>
+    // ---------- Sample data (thousands of dollars) ----------
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct"];
+    const DATA = {
+      invoiced2026: [62.4, 71.9, 84.2, 77.6, 96.4, 103.8, 91.3, 118.6, 126.4, 108.9],
+      collected2026: [55.2, 64.1, 78.4, 74.9, 90.2, 96.8, 86.5, 110.4, 118.9, 99.4],
+      invoiced2025: [61.0, 66.0, 72.0, 70.0, 78.0, 84.0, 80.0, 92.0, 90.0, 96.0],
+      collected2025: [55.0, 59.0, 66.0, 64.0, 71.0, 77.0, 73.0, 85.0, 83.0, 88.0],
+      quarters: [
+        { label: "Q1", cur: 218.5, prev: 199.0 },
+        { label: "Q2", cur: 277.8, prev: 232.0 },
+        { label: "Q3", cur: 336.3, prev: 252.0 },
+        { label: "Q4*", cur: 108.9, prev: 96.0 }
+      ],
+      customers: [
+        { label: "Camel City", value: 189.6, prior: 112.4 },
+        { label: "Darren Burke", value: 158.9, prior: 141.2 },
+        { label: "Fulk Builders", value: 134.4, prior: 98.7 },
+        { label: "Holy Helper", value: 112.8, prior: 86.5 },
+        { label: "Whitaker", value: 96.3, prior: 74.2 },
+        { label: "Other", value: 249.4, prior: 276.0 }
+      ],
+      aging: [
+        { label: "0-30 days", value: 38.2 },
+        { label: "31-60 days", value: 18.4 },
+        { label: "61-90 days", value: 6.8 },
+        { label: "91-120 days", value: 2.1 },
+        { label: "120+ days", value: 1.1 }
+      ],
+      funnel: [
+        { label: "Quoted", value: 1184, colorVar: "--seq5" },
+        { label: "Accepted", value: 1020, colorVar: "--seq4" },
+        { label: "Invoiced", value: 941, colorVar: "--seq3" },
+        { label: "Paid", value: 875, colorVar: "--seq1" }
+      ],
+      types: [
+        { label: "Custom home", value: 574.2 },
+        { label: "Renovation", value: 169.5 },
+        { label: "Service", value: 113.0 },
+        { label: "Addition", value: 84.7 }
+      ]
+    };
+
+    const moneyK = (n) => "$" + n.toFixed(1) + "k";
+    const money = (n) => "$" + Math.round(n * 1000).toLocaleString("en-US");
+
+    // ---------- SVG helpers ----------
+    const NS = "http://www.w3.org/2000/svg";
+    function svgEl(tag, attrs) {
+      const node = document.createElementNS(NS, tag);
+      Object.entries(attrs || {}).forEach(([key, value]) => node.setAttribute(key, String(value)));
+      return node;
+    }
+
+    function niceMax(value) {
+      if (value <= 0) return 10;
+      const power = Math.pow(10, Math.floor(Math.log10(value)));
+      const scaled = value / power;
+      const step = scaled <= 1.2 ? 1.2 : scaled <= 2 ? 2 : scaled <= 2.5 ? 2.5 : scaled <= 5 ? 5 : 10;
+      return step * power;
+    }
+
+    function legendInto(name, series) {
+      const mount = document.querySelector('[data-legend="' + name + '"]');
+      if (!mount) return;
+      mount.innerHTML = series
+        .map((s) => '<span><i style="background: var(' + s.colorVar + ')"></i>' + s.name + "</span>")
+        .join("");
+    }
+
+    function tooltip(node, text) {
+      node.addEventListener("pointerenter", (event) => showTip(event, text));
+      node.addEventListener("pointermove", (event) => showTip(event, text));
+      node.addEventListener("pointerleave", hideTip);
+    }
+
+    const tip = document.getElementById("tip");
+    function showTip(event, text) {
+      tip.textContent = text;
+      tip.classList.add("on");
+      const x = Math.max(60, Math.min(window.innerWidth - 60, event.clientX));
+      tip.style.left = x + "px";
+      tip.style.top = event.clientY + "px";
+    }
+    function hideTip() { tip.classList.remove("on"); }
+
+    // ---------- Grouped bar chart ----------
+    function groupedBars(mountId, labels, series, opts) {
+      const mount = document.getElementById(mountId);
+      if (!mount) return;
+      const options = opts || {};
+      const W = options.width || 720;
+      const H = options.height || 260;
+      const pad = { top: 16, right: 14, bottom: 30, left: 46 };
+      const plotW = W - pad.left - pad.right;
+      const plotH = H - pad.top - pad.bottom;
+      const max = niceMax(Math.max(...series.flatMap((s) => s.values)));
+      const svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": options.aria || "Bar chart" });
+
+      [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+        const y = pad.top + plotH * (1 - f);
+        svg.appendChild(svgEl("line", { x1: pad.left, x2: W - pad.right, y1: y, y2: y, class: f === 0 ? "baseline" : "grid-line" }));
+        const label = svgEl("text", { x: pad.left - 8, y: y + 3.5, "text-anchor": "end", class: "axis-label" });
+        label.textContent = Math.round(max * f);
+        svg.appendChild(label);
+      });
+
+      const slot = plotW / labels.length;
+      const groupW = Math.min(slot * 0.72, 54);
+      const gap = 2;
+      const barW = Math.max(4, groupW / series.length - gap);
+      const base = pad.top + plotH;
+
+      labels.forEach((label, i) => {
+        const groupLeft = pad.left + slot * i + (slot - groupW) / 2;
+        series.forEach((s, j) => {
+          const value = s.values[i] || 0;
+          if (value <= 0) return;
+          const h = Math.max(1, (value / max) * plotH);
+          const x = groupLeft + j * (barW + gap);
+          const y = base - h;
+          const r = Math.min(4, h);
+          const path = svgEl("path", {
+            d: "M" + x + " " + base + " L" + x + " " + (y + r) +
+               " Q" + x + " " + y + " " + (x + r) + " " + y +
+               " L" + (x + barW - r) + " " + y +
+               " Q" + (x + barW) + " " + y + " " + (x + barW) + " " + (y + r) +
+               " L" + (x + barW) + " " + base + " Z",
+            fill: "var(" + s.colorVar + ")",
+            class: "bar-hit"
+          });
+          tooltip(path, label + " " + s.name + ": " + money(value));
+          svg.appendChild(path);
+        });
+
+        const text = svgEl("text", { x: pad.left + slot * i + slot / 2, y: H - 9, "text-anchor": "middle", class: "axis-label" });
+        text.textContent = label;
+        svg.appendChild(text);
+      });
+
+      mount.appendChild(svg);
+    }
+
+    // ---------- Line chart (current vs prior) ----------
+    function trendLines(mountId, labels, series, opts) {
+      const mount = document.getElementById(mountId);
+      if (!mount) return;
+      const options = opts || {};
+      const W = options.width || 720;
+      const H = options.height || 270;
+      const pad = { top: 18, right: 44, bottom: 30, left: 46 };
+      const plotW = W - pad.left - pad.right;
+      const plotH = H - pad.top - pad.bottom;
+      const max = niceMax(Math.max(...series.flatMap((s) => s.values)));
+      const svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": options.aria || "Line chart" });
+
+      [0, 0.25, 0.5, 0.75, 1].forEach((f) => {
+        const y = pad.top + plotH * (1 - f);
+        svg.appendChild(svgEl("line", { x1: pad.left, x2: W - pad.right, y1: y, y2: y, class: f === 0 ? "baseline" : "grid-line" }));
+        const label = svgEl("text", { x: pad.left - 8, y: y + 3.5, "text-anchor": "end", class: "axis-label" });
+        label.textContent = Math.round(max * f);
+        svg.appendChild(label);
+      });
+
+      const stepX = plotW / Math.max(1, labels.length - 1);
+      const point = (i, value) => ({
+        x: pad.left + stepX * i,
+        y: pad.top + plotH - (value / max) * plotH
+      });
+
+      series.forEach((s) => {
+        const points = s.values.map((value, i) => point(i, value));
+        const line = points.map((p, i) => (i === 0 ? "M" : "L") + p.x + " " + p.y).join(" ");
+        if (s.fill) {
+          const area = line + " L" + points[points.length - 1].x + " " + (pad.top + plotH) +
+            " L" + points[0].x + " " + (pad.top + plotH) + " Z";
+          svg.appendChild(svgEl("path", { d: area, fill: "var(" + s.colorVar + ")", opacity: 0.1 }));
+        }
+        svg.appendChild(svgEl("path", { d: line, fill: "none", stroke: "var(" + s.colorVar + ")", "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+        points.forEach((p, i) => {
+          const dot = svgEl("circle", { cx: p.x, cy: p.y, r: 4, fill: "var(--surface)", stroke: "var(" + s.colorVar + ")", "stroke-width": 2 });
+          tooltip(dot, labels[i] + " " + s.name + ": " + money(s.values[i]));
+          svg.appendChild(dot);
+        });
+        const last = points[points.length - 1];
+        const endLabel = svgEl("text", { x: last.x + 7, y: last.y + 3.5, class: "axis-label", style: "fill: var(" + s.colorVar + "); font-weight: 700" });
+        endLabel.textContent = moneyK(s.values[s.values.length - 1]);
+        svg.appendChild(endLabel);
+      });
+
+      labels.forEach((label, i) => {
+        const text = svgEl("text", { x: pad.left + stepX * i, y: H - 9, "text-anchor": "middle", class: "axis-label" });
+        text.textContent = label;
+        svg.appendChild(text);
+      });
+
+      mount.appendChild(svg);
+    }
+
+    // ---------- Diverging month-over-month chart ----------
+    function monthChange(mountId) {
+      const mount = document.getElementById(mountId);
+      if (!mount) return;
+      const values = DATA.invoiced2026.map((value, i, all) =>
+        i === 0 ? 0 : ((value - all[i - 1]) / all[i - 1]) * 100
+      );
+      const labels = MONTHS;
+      const W = 720;
+      const H = 250;
+      const pad = { top: 20, right: 12, bottom: 30, left: 42 };
+      const plotW = W - pad.left - pad.right;
+      const plotH = H - pad.top - pad.bottom;
+      const maxAbs = Math.max(...values.map((v) => Math.abs(v)), 5);
+      const scale = (plotH / 2) / maxAbs;
+      const base = pad.top + plotH / 2;
+      const svg = svgEl("svg", { viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Month over month change in invoiced" });
+
+      svg.appendChild(svgEl("line", { x1: pad.left, x2: W - pad.right, y1: base, y2: base, class: "baseline" }));
+      svg.appendChild(svgEl("text", { x: pad.left - 8, y: base + 3.5, "text-anchor": "end", class: "axis-label" })).textContent = "0%";
+
+      const slot = plotW / labels.length;
+      const barW = Math.min(30, slot * 0.56);
+
+      values.forEach((value, i) => {
+        if (i === 0) return;
+        const h = Math.abs(value) * scale;
+        const x = pad.left + slot * i + (slot - barW) / 2;
+        const y = value >= 0 ? base - h : base;
+        const r = Math.min(3, h);
+        const d = value >= 0
+          ? "M" + x + " " + base + " L" + x + " " + (y + r) + " Q" + x + " " + y + " " + (x + r) + " " + y +
+            " L" + (x + barW - r) + " " + y + " Q" + (x + barW) + " " + y + " " + (x + barW) + " " + (y + r) +
+            " L" + (x + barW) + " " + base + " Z"
+          : "M" + x + " " + base + " L" + x + " " + (base + h - r) +
+            " Q" + x + " " + (base + h) + " " + (x + r) + " " + (base + h) +
+            " L" + (x + barW - r) + " " + (base + h) + " Q" + (x + barW) + " " + (base + h) + " " + (x + barW) + " " + (base + h - r) +
+            " L" + (x + barW) + " " + base + " Z";
+        const bar = svgEl("path", { d, fill: value >= 0 ? "var(--s2)" : "var(--s3)", class: "bar-hit" });
+        tooltip(bar, labels[i] + ": " + (value >= 0 ? "+" : "") + value.toFixed(1) + "%");
+        svg.appendChild(bar);
+
+        const text = svgEl("text", { x: pad.left + slot * i + slot / 2, y: H - 9, "text-anchor": "middle", class: "axis-label" });
+        text.textContent = labels[i];
+        svg.appendChild(text);
+      });
+
+      mount.appendChild(svg);
+    }
+
+    // ---------- HTML bars ----------
+    function barsInto(mountId, items, options) {
+      const mount = document.getElementById(mountId);
+      if (!mount) return;
+      const opts = options || {};
+      const max = Math.max(...items.map((item) => item.value));
+      mount.innerHTML = items.map((item, i) => {
+        const width = Math.max(2, (item.value / max) * 100);
+        const color = item.colorVar ? "var(" + item.colorVar + ")" : "var(--seq1)";
+        const valueText = opts.money === false ? item.value.toLocaleString("en-US") : moneyK(item.value);
+        return '<div class="hbar">' +
+          '<span class="hbar-label" title="' + item.label + '">' + item.label + "</span>" +
+          '<span class="hbar-track"><span class="hbar-fill" style="width:' + width + "%;background:" + color + '"></span></span>' +
+          '<span class="hbar-value">' + valueText + "</span>" +
+          "</div>";
+      }).join("");
+    }
+
+    function funnelInto(mountId, items) {
+      const mount = document.getElementById(mountId);
+      if (!mount) return;
+      const max = items[0].value;
+      mount.innerHTML = items.map((item, i) => {
+        const width = (item.value / max) * 100;
+        const rate = i === 0 ? "" : ((item.value / items[i - 1].value) * 100).toFixed(1) + "% of " + items[i - 1].label.toLowerCase();
+        return '<div class="funnel-row">' +
+          '<span class="funnel-stage">' + item.label + "</span>" +
+          '<span class="funnel-track"><span class="funnel-fill" style="width:' + width + "%;background:var(" + item.colorVar + ')"></span></span>' +
+          '<span class="funnel-value">' + moneyK(item.value) + (rate ? '<br><span class="funnel-rate">' + rate + "</span>" : "") + "</span>" +
+          "</div>";
+      }).join("");
+    }
+
+    // ---------- Render option 1 ----------
+    const monthlySeries = [
+      { name: "Invoiced", colorVar: "--s1", values: DATA.invoiced2026 },
+      { name: "Collected", colorVar: "--s2", values: DATA.collected2026 }
+    ];
+    legendInto("monthly", monthlySeries);
+    groupedBars("chart-monthly", MONTHS, monthlySeries, { aria: "Invoiced and collected by month" });
+
+    barsInto("aging", DATA.aging.map((item, i) => ({ ...item, colorVar: ["--seq1", "--seq2", "--seq3", "--seq4", "--seq5"][i] })));
+    barsInto("customers", DATA.customers);
+
+    const quarterlySeries = [
+      { name: "2026", colorVar: "--s1", values: DATA.quarters.map((q) => q.cur) },
+      { name: "2025", colorVar: "--s2", values: DATA.quarters.map((q) => q.prev) }
+    ];
+    legendInto("quarterly", quarterlySeries);
+    groupedBars("chart-quarterly", DATA.quarters.map((q) => q.label), quarterlySeries, { width: 340, height: 220, aria: "Quarter over quarter invoiced" });
+    funnelInto("funnel", DATA.funnel);
+
+    // ---------- Render option 2 ----------
+    const yoySeries = [
+      { name: "2026", colorVar: "--s1", values: DATA.invoiced2026, fill: true },
+      { name: "2025", colorVar: "--s3", values: DATA.invoiced2025 }
+    ];
+    legendInto("yoy", yoySeries);
+    trendLines("chart-yoy", MONTHS, yoySeries, { aria: "Invoiced by month, 2026 against 2025" });
+    barsInto("types", DATA.types);
+
+    // ---------- Render option 3 ----------
+    const quarterlySeries2 = [
+      { name: "Invoiced", colorVar: "--s1", values: DATA.quarters.map((q) => q.cur) },
+      { name: "Collected", colorVar: "--s2", values: [197.7, 261.9, 315.8, 99.4] },
+      { name: "Prior year", colorVar: "--s3", values: DATA.quarters.map((q) => q.prev) }
+    ];
+    legendInto("quarterly2", quarterlySeries2);
+    groupedBars("chart-quarterly2", DATA.quarters.map((q) => q.label), quarterlySeries2, { aria: "Quarterly revenue with prior year" });
+    monthChange("chart-mom");
+    barsInto("aging2", DATA.aging.map((item, i) => ({ ...item, colorVar: ["--seq1", "--seq2", "--seq3", "--seq4", "--seq5"][i] })));
+
+    // ---------- View switching ----------
+    const VIEWS = {
+      one: {
+        name: "One screen",
+        desc: "keeps the filter row, headline numbers, and comparisons on one page. Best for a weekly look at the business."
+      },
+      two: {
+        name: "Compare first",
+        desc: "leads with this year against last, then breaks the difference down by quarter and customer. Best for a monthly or quarterly review."
+      },
+      three: {
+        name: "Report builder",
+        desc: "puts deep filters and saved views in a rail. Best when you want to answer a specific question without a new screen for every report."
+      }
+    };
+
+    const tabs = Array.from(document.querySelectorAll(".tab"));
+    function selectView(key) {
+      tabs.forEach((tab) => tab.setAttribute("aria-selected", String(tab.dataset.view === key)));
+      ["one", "two", "three"].forEach((name) => {
+        const section = document.getElementById("view-" + name);
+        if (section) section.hidden = name !== key;
+      });
+      document.getElementById("view-name").textContent = VIEWS[key].name;
+      document.getElementById("view-desc").textContent = VIEWS[key].desc;
+    }
+    tabs.forEach((tab) => tab.addEventListener("click", () => selectView(tab.dataset.view)));
+
+    // Chart / table toggle in option 3
+    const displayButtons = Array.from(document.querySelectorAll("[data-display]"));
+    displayButtons.forEach((button) => {
+      button.addEventListener("click", () => {
+        const mode = button.dataset.display;
+        displayButtons.forEach((other) => other.setAttribute("aria-pressed", String(other === button)));
+        document.querySelectorAll("[data-panel]").forEach((panel) => {
+          panel.hidden = panel.dataset.panel !== mode;
+        });
+      });
+    });
+  </script>
+</body>
