@@ -916,8 +916,8 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                   </div>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-xl1 border border-pine/10 bg-whitewarm">
-                  <table className="responsive-table w-full border-collapse text-sm">
+                <div className="rounded-xl1 border border-pine/10 bg-whitewarm">
+                  <table className="report-table w-full border-collapse text-sm">
                     <thead>
                       <tr className="border-b border-pine/15 text-left text-xs font-black uppercase tracking-[0.12em] text-charcoal/60">
                         <th className="p-3">Quarter</th>
@@ -931,24 +931,41 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                     <tbody>
                       {report.quarterRows.map((row) => (
                         <tr key={row.key} className="border-b border-pine/10">
-                          <td className="p-3 font-bold text-deep-pine">{row.label}</td>
-                          <td className="p-3 text-right tabular-nums">
+                          <td className="p-3 font-bold text-deep-pine">
+                            {row.label}
+                          </td>
+                          <td
+                            data-label="Invoiced"
+                            className="p-3 text-right tabular-nums"
+                          >
                             {formatCurrency(row.invoicedCents)}
                           </td>
-                          <td className="p-3 text-right tabular-nums">
+                          <td
+                            data-label="Collected"
+                            className="p-3 text-right tabular-nums"
+                          >
                             {formatCurrency(row.collectedCents)}
                           </td>
-                          <td className="p-3 text-right tabular-nums">
+                          <td
+                            data-label="Outstanding"
+                            className="p-3 text-right tabular-nums"
+                          >
                             {formatCurrency(row.outstandingCents)}
                           </td>
-                          <td className="p-3 text-right tabular-nums">
+                          <td
+                            data-label="Collected rate"
+                            className="p-3 text-right tabular-nums"
+                          >
                             {formatPercent(
                               row.invoicedCents > 0
                                 ? row.collectedCents / row.invoicedCents
                                 : 0
                             )}
                           </td>
-                          <td className="p-3 text-right tabular-nums">
+                          <td
+                            data-label="vs prior year"
+                            className="p-3 text-right tabular-nums"
+                          >
                             <Delta
                               current={row.invoicedCents}
                               prior={row.priorInvoicedCents}
@@ -1087,8 +1104,8 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                   </Card>
 
                   <Card title="Quarter comparison" note="Invoiced">
-                    <div className="overflow-x-auto">
-                      <table className="responsive-table w-full border-collapse text-sm">
+                    <div>
+                      <table className="report-table w-full border-collapse text-sm">
                         <thead>
                           <tr className="border-b border-pine/15 text-left text-xs font-black uppercase tracking-[0.12em] text-charcoal/60">
                             <th className="py-2 pr-3">Quarter</th>
@@ -1103,13 +1120,22 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                               <td className="py-2 pr-3 font-bold text-deep-pine">
                                 {row.label}
                               </td>
-                              <td className="py-2 pr-3 text-right tabular-nums">
+                              <td
+                                data-label="This period"
+                                className="py-2 pr-3 text-right tabular-nums"
+                              >
                                 {formatCurrency(row.invoicedCents)}
                               </td>
-                              <td className="py-2 pr-3 text-right tabular-nums">
+                              <td
+                                data-label="Prior period"
+                                className="py-2 pr-3 text-right tabular-nums"
+                              >
                                 {formatCurrency(row.priorInvoicedCents)}
                               </td>
-                              <td className="py-2 text-right tabular-nums">
+                              <td
+                                data-label="Change"
+                                className="py-2 text-right tabular-nums"
+                              >
                                 <Delta
                                   current={row.invoicedCents}
                                   prior={row.priorInvoicedCents}
@@ -1125,8 +1151,8 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
 
                 <div className="grid gap-3 lg:grid-cols-2">
                   <Card title="Customer movement" note="Invoiced this period">
-                    <div className="overflow-x-auto">
-                      <table className="responsive-table w-full border-collapse text-sm">
+                    <div>
+                      <table className="report-table w-full border-collapse text-sm">
                         <thead>
                           <tr className="border-b border-pine/15 text-left text-xs font-black uppercase tracking-[0.12em] text-charcoal/60">
                             <th className="py-2 pr-3">Customer</th>
@@ -1144,13 +1170,22 @@ export function ReportsView({ dataset }: { dataset: ReportDataset }) {
                               <td className="py-2 pr-3 font-bold text-deep-pine">
                                 {customer.name}
                               </td>
-                              <td className="py-2 pr-3 text-right tabular-nums">
+                              <td
+                                data-label="This period"
+                                className="py-2 pr-3 text-right tabular-nums"
+                              >
                                 {formatCurrency(customer.currentCents)}
                               </td>
-                              <td className="py-2 pr-3 text-right tabular-nums">
+                              <td
+                                data-label="Prior period"
+                                className="py-2 pr-3 text-right tabular-nums"
+                              >
                                 {formatCurrency(customer.priorCents)}
                               </td>
-                              <td className="py-2 text-right tabular-nums">
+                              <td
+                                data-label="Change"
+                                className="py-2 text-right tabular-nums"
+                              >
                                 <Delta
                                   current={customer.currentCents}
                                   prior={customer.priorCents}

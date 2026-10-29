@@ -95,6 +95,68 @@ input[type="date"].form-input {
   min-width: 760px;
 }
 
+/* Report tables: on a phone each row becomes a label/value card, so the full
+   report fits without sideways scrolling. Desktop keeps the normal table. */
+@media (max-width: 760px) {
+  .report-table {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .report-table thead {
+    display: none;
+  }
+
+  .report-table tbody,
+  .report-table tr,
+  .report-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .report-table tr {
+    margin-bottom: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(52, 66, 54, 0.12);
+    border-radius: 12px;
+    background: #fffdf8;
+  }
+
+  .report-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0 !important;
+    border: 0 !important;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .report-table td::before {
+    content: attr(data-label);
+    flex: none;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #a56543;
+  }
+
+  .report-table td:first-child {
+    margin-bottom: 3px;
+    padding-bottom: 7px !important;
+    border-bottom: 1px solid rgba(52, 66, 54, 0.1) !important;
+    font-size: 14px;
+  }
+
+  .report-table td:first-child::before {
+    content: none;
+  }
+}
+
 @media (max-width: 680px) {
   .app-container {
     width: min(100% - 24px, 1180px);
